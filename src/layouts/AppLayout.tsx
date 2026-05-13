@@ -25,9 +25,10 @@ export default function AppLayout() {
   const navItems = [
     { name: 'Pedidos', path: '/solicitudes', icon: Home, show: true },
     { name: 'Herramientas', path: '/herramientas', icon: Wrench, show: true },
+    { name: 'Mis Obras', path: '/mis-obras', icon: Building, show: true },
     { name: 'Logística', path: '/logistica', icon: Truck, show: isLogistica || isAdmin },
     { name: 'Compras', path: '/compras', icon: ShoppingCart, show: true },
-    { name: 'Obras', path: '/obras', icon: Building, show: isAdmin },
+    { name: 'Obras (Admin)', path: '/obras', icon: Building, show: isAdmin },
     { name: 'Usuarios', path: '/usuarios', icon: Users, show: isAdmin },
   ].filter(item => item.show);
 

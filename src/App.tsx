@@ -21,6 +21,7 @@ import SolicitudDetail from './pages/SolicitudDetail';
 import Logistica from './pages/Logistica';
 import Compras from './pages/Compras';
 import CompraDetail from './pages/CompraDetail';
+import MisObras from './pages/MisObras';
 
 export default function App() {
   const { checkUser, loading } = useAuthStore();
@@ -61,6 +62,7 @@ export default function App() {
           
           <Route path="/logistica" element={<Logistica />} />
           <Route path="/obras" element={<Obras />} />
+          <Route path="/mis-obras" element={<MisObras />} />
           <Route path="/usuarios" element={<Usuarios />} />
         </Route>
 
