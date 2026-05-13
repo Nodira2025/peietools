@@ -1,0 +1,426 @@
+import { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { ArrowLeft, Clock, CheckCircle, Truck, AlertCircle, Package, FileText, Download } from 'lucide-react';
+import { useAuthStore } from '../store/auth';
+import { buildWhatsAppLink, APP_URL } from '../lib/whatsapp';
+
+export default function SolicitudDetail() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const { profile } = useAuthStore();
+  const [solicitud, setSolicitud] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [showReceipt, setShowReceipt] = useState(false);
+  const receiptRef = useRef<HTMLDivElement>(null);
+
+  const isLogistica = profile?.role === 'logistica' || profile?.role === 'admin';
+  const isRequester = solicitud?.requester_id === profile?.id;
+
+  useEffect(() => {
+    if (id) fetchSolicitud();
+  }, [id]);
+
+  const fetchSolicitud = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('solicitudes')
+      .select(`
+        *,
+        profiles!solicitudes_requester_id_fkey(full_name, whatsapp),
+        herramientas!solicitudes_herramienta_id_fkey(name, code, brand, model, obras!herramientas_current_obra_id_fkey(name)),
+        target_obra:obras!solicitudes_target_obra_id_fkey(name),
+        assigned:profiles!solicitudes_assigned_to_fkey(full_name, whatsapp)
+      `)
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Solicitud no encontrada.' });
+      navigate('/solicitudes');
+    } else {
+      setSolicitud(data);
+    }
+    setLoading(false);
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch(status) {
+      case 'Pendiente': return <span className="flex items-center text-orange-600 bg-orange-100 px-3 py-1.5 rounded-full text-xs font-bold"><Clock className="w-3 h-3 mr-1" /> Pendiente</span>;
+      case 'Asignada': return <span className="flex items-center text-blue-600 bg-blue-100 px-3 py-1.5 rounded-full text-xs font-bold"><AlertCircle className="w-3 h-3 mr-1" /> Asignada</span>;
+      case 'En retiro': return <span className="flex items-center text-purple-600 bg-purple-100 px-3 py-1.5 rounded-full text-xs font-bold"><Package className="w-3 h-3 mr-1" /> En Retiro</span>;
+      case 'En traslado': return <span className="flex items-center text-peie-blue bg-peie-light/20 px-3 py-1.5 rounded-full text-xs font-bold"><Truck className="w-3 h-3 mr-1" /> En Traslado</span>;
+      case 'Entregada': return <span className="flex items-center text-green-600 bg-green-100 px-3 py-1.5 rounded-full text-xs font-bold"><CheckCircle className="w-3 h-3 mr-1" /> Entregada</span>;
+      case 'Confirmada': return <span className="flex items-center text-emerald-700 bg-emerald-100 px-3 py-1.5 rounded-full text-xs font-bold"><CheckCircle className="w-3 h-3 mr-1" /> Confirmada</span>;
+      default: return <span className="bg-gray-100 px-3 py-1.5 rounded-full text-xs">{status}</span>;
+    }
+  };
+
+  const updateStatus = async (newStatus: string) => {
+    if (!solicitud || !profile) return;
+    
+    const payload: any = { status: newStatus };
+    if (newStatus === 'Asignada') {
+      payload.assigned_to = profile.id;
+    }
+
+    const { error } = await supabase.from('solicitudes').update(payload).eq('id', solicitud.id);
+    
+    if (error) {
+      toast({ variant: 'destructive', title: 'Error', description: error.message });
+      return;
+    }
+
+    // Registrar movimiento en bitacora
+    await supabase.from('movimientos').insert([{
+      herramienta_id: solicitud.herramienta_id,
+      solicitud_id: solicitud.id,
+      user_id: profile.id,
+      action: 'Cambio de estado a: ' + newStatus,
+      notes: 'Gestionado por ' + profile.full_name
+    }]);
+
+    // --- SINCRONIZAR ESTADO DE LA HERRAMIENTA ---
+    if (newStatus === 'Asignada' || newStatus === 'En retiro') {
+      await supabase.from('herramientas')
+        .update({ status: 'Reservada' })
+        .eq('id', solicitud.herramienta_id);
+    } else if (newStatus === 'En traslado') {
+      await supabase.from('herramientas')
+        .update({ status: 'En traslado' })
+        .eq('id', solicitud.herramienta_id);
+    } else if (newStatus === 'Entregada' || newStatus === 'Confirmada') {
+      // Al confirmar recepcion: herramienta pasa a "En uso" y se mueve a la obra destino
+      await supabase.from('herramientas')
+        .update({ 
+          status: 'En uso',
+          current_obra_id: solicitud.target_obra_id 
+        })
+        .eq('id', solicitud.herramienta_id);
+    }
+
+    if (newStatus === 'Asignada') {
+      // Logistica acepta → avisar al encargado solicitante
+      toast({ title: 'Pedido Aceptado!', description: 'Avisando al encargado por WhatsApp...' });
+      const requesterPhone = solicitud.profiles?.whatsapp;
+      if (requesterPhone) {
+        const msg = [
+          '*PEDIDO ACEPTADO*',
+          '',
+          'Hola *' + solicitud.profiles.full_name.split(' ')[0] + '*!',
+          'Tu solicitud de traslado fue autorizada por Logistica:',
+          '',
+          '- *Equipo:* ' + solicitud.herramientas.name,
+          '- *Codigo:* ' + solicitud.herramientas.code,
+          '- *Responsable:* ' + profile.full_name,
+          '- *Destino:* ' + solicitud.target_obra.name,
+          '',
+          'El envio ya se encuentra en curso. Segui el estado aca:',
+          APP_URL + '/solicitudes/' + solicitud.id
+        ].join('\n');
+        setTimeout(() => { window.open(buildWhatsAppLink(requesterPhone, msg), '_blank'); }, 300);
+      }
+    } else if (newStatus === 'Confirmada') {
+      // Encargado confirma recepcion → avisar al de logistica
+      toast({ title: 'Recepcion Confirmada!', description: 'Generando comprobante y avisando a Logistica...' });
+      setShowReceipt(true);
+      const logisticaPhone = solicitud.assigned?.whatsapp;
+      if (logisticaPhone) {
+        const msg = [
+          '*RECEPCION CONFIRMADA*',
+          '',
+          '*' + profile.full_name + '* confirmo la recepcion de:',
+          '',
+          '- *Equipo:* ' + solicitud.herramientas.name,
+          '- *Codigo:* ' + solicitud.herramientas.code,
+          '- *Destino:* ' + solicitud.target_obra.name,
+          '',
+          'El traslado fue completado exitosamente.',
+          '',
+          'Ver comprobante:',
+          APP_URL + '/solicitudes/' + solicitud.id
+        ].join('\n');
+        setTimeout(() => { window.open(buildWhatsAppLink(logisticaPhone, msg), '_blank'); }, 300);
+      }
+    } else {
+      toast({ title: 'Estado actualizado', description: 'Nuevo estado: ' + newStatus });
+    }
+
+    fetchSolicitud();
+  };
+
+  if (loading) return <div className="p-8 text-center text-muted-foreground">Cargando solicitud...</div>;
+  if (!solicitud) return null;
+
+  const canAct = solicitud.status !== 'Confirmada' && solicitud.status !== 'Cancelada';
+
+  return (
+    <div className="space-y-6 max-w-2xl mx-auto pb-safe">
+      <div className="flex items-center mb-4">
+        <Button variant="ghost" onClick={() => navigate('/solicitudes')} className="p-0 hover:bg-transparent">
+          <ArrowLeft className="mr-2 h-4 w-4" /> Volver
+        </Button>
+      </div>
+
+      {/* TARJETA PRINCIPAL DEL PEDIDO */}
+      <Card className="shadow-sm border-0 ring-1 ring-slate-100 rounded-2xl overflow-hidden">
+        <div className="h-1.5 bg-gradient-to-r from-peie-light via-peie-blue to-peie-light" />
+        <CardHeader className="pb-4 pt-6">
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle className="text-xl font-bold text-peie-blue">
+                {solicitud.herramientas.name}
+              </CardTitle>
+              <CardDescription className="text-sm font-mono mt-1 bg-slate-100 w-max px-2 py-1 rounded">
+                {solicitud.herramientas.code}
+              </CardDescription>
+            </div>
+            {getStatusBadge(solicitud.status)}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {/* Info del traslado */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-red-50 p-3 rounded-xl border border-red-100">
+              <p className="text-[10px] font-bold text-red-400 uppercase tracking-wider">Origen</p>
+              <p className="font-semibold text-red-700 text-sm mt-0.5">{solicitud.herramientas.obras?.name || 'Desconocida'}</p>
+            </div>
+            <div className="bg-green-50 p-3 rounded-xl border border-green-100">
+              <p className="text-[10px] font-bold text-green-400 uppercase tracking-wider">Destino</p>
+              <p className="font-semibold text-green-700 text-sm mt-0.5">{solicitud.target_obra.name}</p>
+            </div>
+          </div>
+
+          {/* Detalles */}
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2 text-sm">
+            <p><strong className="text-slate-500">Solicitante:</strong> <span className="text-slate-800 font-medium">{solicitud.profiles.full_name}</span></p>
+            <p><strong className="text-slate-500">Prioridad:</strong> <span className="text-slate-800 font-medium">{solicitud.priority}</span></p>
+            <p><strong className="text-slate-500">Fecha:</strong> <span className="text-slate-800 font-medium">{new Date(solicitud.created_at).toLocaleString()}</span></p>
+            {solicitud.assigned && <p><strong className="text-slate-500">Responsable:</strong> <span className="text-slate-800 font-medium">{solicitud.assigned.full_name}</span></p>}
+            {solicitud.comments && <p><strong className="text-slate-500">Notas:</strong> <span className="text-slate-800">{solicitud.comments}</span></p>}
+          </div>
+
+          {/* ========================================================= */}
+          {/* BOTONES SEGUN ROL                                         */}
+          {/* ========================================================= */}
+
+          {/* --- ACCIONES DE LOGISTICA / ADMIN --- */}
+          {isLogistica && canAct && (
+            <div className="pt-4 border-t border-slate-100 space-y-3">
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Acciones de Logistica</h4>
+              <div className="flex flex-col gap-2">
+                {solicitud.status === 'Pendiente' && (
+                  <Button 
+                    onClick={() => updateStatus('Asignada')} 
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold w-full h-12 rounded-xl shadow-md text-sm"
+                  >
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Aceptar Pedido y Avisar por WhatsApp
+                  </Button>
+                )}
+                {solicitud.status === 'Asignada' && (
+                  <Button onClick={() => updateStatus('En retiro')} className="bg-purple-600 hover:bg-purple-700 text-white w-full h-12 rounded-xl text-sm">
+                    <Package className="mr-2 h-4 w-4" />
+                    Marcar En Retiro
+                  </Button>
+                )}
+                {solicitud.status === 'En retiro' && (
+                  <Button onClick={() => updateStatus('En traslado')} className="bg-peie-blue hover:bg-peie-blue/90 text-white w-full h-12 rounded-xl text-sm">
+                    <Truck className="mr-2 h-4 w-4" />
+                    Marcar En Traslado
+                  </Button>
+                )}
+                {solicitud.status === 'En traslado' && (
+                  <Button onClick={() => updateStatus('Entregada')} className="bg-green-600 hover:bg-green-700 text-white w-full h-12 rounded-xl text-sm">
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Marcar Entregada
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* --- ACCIONES DEL ENCARGADO (solicitante) --- */}
+          {!isLogistica && canAct && (
+            <div className="pt-4 border-t border-slate-100 space-y-3">
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Tus Acciones</h4>
+              <div className="flex flex-col gap-2">
+
+                {/* Confirmar recepcion - solo cuando Logistica marco Entregada */}
+                {solicitud.status === 'Entregada' && (
+                  <Button 
+                    onClick={() => updateStatus('Confirmada')} 
+                    className="bg-gradient-to-r from-emerald-600 to-green-500 hover:from-emerald-700 hover:to-green-600 text-white font-bold w-full h-14 rounded-xl shadow-lg text-base"
+                  >
+                    <CheckCircle className="mr-2 h-5 w-5" />
+                    Confirmar Recepcion y Generar Comprobante
+                  </Button>
+                )}
+
+                {/* Mensaje de estado para el encargado */}
+                {solicitud.status === 'Pendiente' && (
+                  <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-center">
+                    <Clock className="mx-auto h-8 w-8 text-orange-400 mb-2" />
+                    <p className="text-sm font-semibold text-orange-700">Esperando confirmacion de Logistica</p>
+                    <p className="text-xs text-orange-500 mt-1">El responsable asignado recibio tu solicitud por WhatsApp</p>
+                  </div>
+                )}
+                {(solicitud.status === 'Asignada' || solicitud.status === 'En retiro' || solicitud.status === 'En traslado') && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
+                    <Truck className="mx-auto h-8 w-8 text-blue-400 mb-2" />
+                    <p className="text-sm font-semibold text-blue-700">Herramienta en camino</p>
+                    <p className="text-xs text-blue-500 mt-1">Estado actual: *{solicitud.status}* - Cuando la recibas, aparecera el boton para confirmar</p>
+                  </div>
+                )}
+
+                {/* Reportar problema - siempre visible si no esta confirmado */}
+                <Button 
+                  variant="outline"
+                  onClick={() => {
+                    const logisticaPhone = solicitud.assigned?.whatsapp;
+                    const logisticaName = solicitud.assigned?.full_name || 'Logistica';
+                    if (!logisticaPhone) {
+                      toast({ variant: 'destructive', title: 'Sin contacto', description: 'El responsable no tiene WhatsApp configurado.' });
+                      return;
+                    }
+                    const msg = [
+                      '*REPORTE DE PROBLEMA*',
+                      '',
+                      '*' + (profile?.full_name || 'Encargado') + '* reporta un inconveniente con el pedido:',
+                      '',
+                      '- *Herramienta:* ' + solicitud.herramientas.name,
+                      '- *Codigo:* ' + solicitud.herramientas.code,
+                      '- *Estado actual:* ' + solicitud.status,
+                      '',
+                      'Por favor revisar lo antes posible.',
+                      '',
+                      'Ver solicitud:',
+                      APP_URL + '/solicitudes/' + solicitud.id
+                    ].join('\n');
+                    window.open(buildWhatsAppLink(logisticaPhone, msg), '_blank');
+                  }}
+                  className="w-full h-12 rounded-xl text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 text-sm font-semibold"
+                >
+                  <AlertCircle className="mr-2 h-4 w-4" />
+                  Reportar Problema por WhatsApp
+                </Button>
+
+              </div>
+            </div>
+          )}
+
+          {/* COMPROBANTE FINAL - cuando el pedido esta Confirmado */}
+          {(solicitud.status === 'Confirmada' || showReceipt) && (
+            <div className="pt-4">
+              <div ref={receiptRef} className="bg-white border-2 border-slate-200 rounded-2xl overflow-hidden shadow-lg">
+                {/* Header del comprobante con logo */}
+                <div className="bg-gradient-to-r from-peie-blue to-peie-light p-5 text-white text-center relative">
+                  <img 
+                    src="/logo-peie.png" 
+                    alt="PEIE" 
+                    className="h-10 mx-auto mb-2 brightness-0 invert"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                  <h3 className="text-lg font-bold tracking-wide">PEIE TOOLS</h3>
+                  <p className="text-[10px] text-white/70 font-medium tracking-widest uppercase mt-0.5">Comprobante de Traslado</p>
+                  <div className="absolute top-3 right-4 text-[9px] text-white/50 font-mono">
+                    #{solicitud.id.slice(0, 8).toUpperCase()}
+                  </div>
+                </div>
+
+                {/* Cuerpo del comprobante */}
+                <div className="p-5 space-y-4">
+                  <div className="flex justify-between items-center pb-3 border-b border-dashed border-slate-200">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Fecha de emision</span>
+                    <span className="text-xs font-mono text-slate-700">{new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
+                  </div>
+
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400 text-xs">Herramienta</span>
+                      <span className="font-bold text-slate-800">{solicitud.herramientas.name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400 text-xs">Codigo</span>
+                      <span className="font-mono text-slate-700">{solicitud.herramientas.code}</span>
+                    </div>
+                    {solicitud.herramientas.brand && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-400 text-xs">Marca / Modelo</span>
+                        <span className="text-slate-700">{solicitud.herramientas.brand} {solicitud.herramientas.model || ''}</span>
+                      </div>
+                    )}
+                    
+                    <div className="h-px bg-slate-100 my-2" />
+                    
+                    <div className="flex justify-between">
+                      <span className="text-slate-400 text-xs">Origen</span>
+                      <span className="text-red-600 font-medium">{solicitud.herramientas.obras?.name || '-'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400 text-xs">Destino</span>
+                      <span className="text-green-600 font-medium">{solicitud.target_obra.name}</span>
+                    </div>
+                    
+                    <div className="h-px bg-slate-100 my-2" />
+                    
+                    <div className="flex justify-between">
+                      <span className="text-slate-400 text-xs">Solicitante</span>
+                      <span className="font-medium text-slate-800">{solicitud.profiles.full_name}</span>
+                    </div>
+                    {solicitud.assigned && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-400 text-xs">Responsable Logistica</span>
+                        <span className="font-medium text-slate-800">{solicitud.assigned.full_name}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-slate-400 text-xs">Prioridad</span>
+                      <span className="text-slate-700">{solicitud.priority}</span>
+                    </div>
+                  </div>
+
+                  {/* Estado final */}
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center mt-4">
+                    <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Estado</p>
+                    <p className="text-lg font-black text-emerald-700 mt-0.5">TRASLADO COMPLETADO</p>
+                  </div>
+
+                  {/* Firmas */}
+                  <div className="grid grid-cols-2 gap-4 pt-4 mt-2 border-t border-dashed border-slate-200">
+                    <div className="text-center">
+                      <div className="h-8 border-b border-slate-300 mb-1" />
+                      <p className="text-[10px] text-slate-400 font-medium">Entrego (Logistica)</p>
+                      <p className="text-[11px] font-semibold text-slate-600">{solicitud.assigned?.full_name || '-'}</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="h-8 border-b border-slate-300 mb-1" />
+                      <p className="text-[10px] text-slate-400 font-medium">Recibio (Encargado)</p>
+                      <p className="text-[11px] font-semibold text-slate-600">{solicitud.profiles.full_name}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="bg-slate-50 px-5 py-3 text-center border-t border-slate-100">
+                  <p className="text-[9px] text-slate-400 font-mono">PEIE Tools - Sistema de Trazabilidad de Herramientas</p>
+                  <p className="text-[9px] text-slate-300 font-mono mt-0.5">Generado automaticamente el {new Date().toLocaleString('es-AR')}</p>
+                </div>
+              </div>
+
+              {/* Boton para capturar screenshot del comprobante */}
+              <p className="text-center text-xs text-slate-400 mt-3">
+                Hace una captura de pantalla para guardar el comprobante
+              </p>
+            </div>
+          )}
+
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
