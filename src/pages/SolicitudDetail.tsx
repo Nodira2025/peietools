@@ -4,9 +4,10 @@ import { supabase } from '../lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Clock, CheckCircle, Truck, AlertCircle, Package, FileText, Download } from 'lucide-react';
+import { ArrowLeft, Clock, CheckCircle, Truck, AlertCircle, Package, FileText, Download, Search, User } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { buildWhatsAppLink, APP_URL } from '../lib/whatsapp';
+import { Input } from '@/components/ui/input';
 
 export default function SolicitudDetail() {
   const { id } = useParams();
@@ -17,13 +18,27 @@ export default function SolicitudDetail() {
   const [loading, setLoading] = useState(true);
   const [showReceipt, setShowReceipt] = useState(false);
   const receiptRef = useRef<HTMLDivElement>(null);
+  const [empleados, setEmpleados] = useState<{id: string; full_name: string}[]>([]);
+  const [empleadoSearch, setEmpleadoSearch] = useState('');
+  const [selectedEmpleado, setSelectedEmpleado] = useState<string>('');
+  const [receivedByName, setReceivedByName] = useState<string>('');
 
   const isLogistica = profile?.role === 'logistica' || profile?.role === 'admin';
   const isRequester = solicitud?.requester_id === profile?.id;
 
   useEffect(() => {
     if (id) fetchSolicitud();
+    fetchEmpleados();
   }, [id]);
+
+  const fetchEmpleados = async () => {
+    const { data } = await supabase.from('empleados').select('id, full_name').eq('active', true).order('full_name');
+    if (data) setEmpleados(data);
+  };
+
+  const filteredEmpleados = empleados.filter(e =>
+    e.full_name.toLowerCase().includes(empleadoSearch.toLowerCase())
+  );
 
   const fetchSolicitud = async () => {
     setLoading(true);
@@ -76,12 +91,16 @@ export default function SolicitudDetail() {
     }
 
     // Registrar movimiento en bitacora
+    const movNotes = newStatus === 'Confirmada' && selectedEmpleado
+      ? 'Recibio en obra: ' + selectedEmpleado + ' | Confirmado por ' + profile.full_name
+      : 'Gestionado por ' + profile.full_name;
+    
     await supabase.from('movimientos').insert([{
       herramienta_id: solicitud.herramienta_id,
       solicitud_id: solicitud.id,
       user_id: profile.id,
       action: 'Cambio de estado a: ' + newStatus,
-      notes: 'Gestionado por ' + profile.full_name
+      notes: movNotes
     }]);
 
     // --- SINCRONIZAR ESTADO DE LA HERRAMIENTA ---
@@ -127,6 +146,7 @@ export default function SolicitudDetail() {
     } else if (newStatus === 'Confirmada') {
       // Encargado confirma recepcion → avisar al de logistica
       toast({ title: 'Recepcion Confirmada!', description: 'Generando comprobante y avisando a Logistica...' });
+      setReceivedByName(selectedEmpleado);
       setShowReceipt(true);
       const logisticaPhone = solicitud.assigned?.whatsapp;
       if (logisticaPhone) {
@@ -138,6 +158,7 @@ export default function SolicitudDetail() {
           '- *Equipo:* ' + solicitud.herramientas.name,
           '- *Codigo:* ' + solicitud.herramientas.code,
           '- *Destino:* ' + solicitud.target_obra.name,
+          '- *Recibio:* ' + selectedEmpleado,
           '',
           'El traslado fue completado exitosamente.',
           '',
@@ -252,13 +273,53 @@ export default function SolicitudDetail() {
 
                 {/* Confirmar recepcion - solo cuando Logistica marco Entregada */}
                 {solicitud.status === 'Entregada' && (
-                  <Button 
-                    onClick={() => updateStatus('Confirmada')} 
-                    className="bg-gradient-to-r from-emerald-600 to-green-500 hover:from-emerald-700 hover:to-green-600 text-white font-bold w-full h-14 rounded-xl shadow-lg text-base"
-                  >
-                    <CheckCircle className="mr-2 h-5 w-5" />
-                    Confirmar Recepcion y Generar Comprobante
-                  </Button>
+                  <div className="space-y-3">
+                    {/* Buscador de empleado que recibe */}
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-3">
+                      <p className="text-xs font-bold text-emerald-700 uppercase tracking-wider flex items-center gap-1">
+                        <User className="h-3.5 w-3.5" /> Quien recibe la herramienta en obra?
+                      </p>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        <Input
+                          placeholder="Buscar empleado..."
+                          value={empleadoSearch}
+                          onChange={(e) => { setEmpleadoSearch(e.target.value); setSelectedEmpleado(''); }}
+                          className="pl-9 h-10 rounded-lg text-sm"
+                        />
+                      </div>
+                      {empleadoSearch.length > 0 && !selectedEmpleado && (
+                        <div className="max-h-40 overflow-y-auto rounded-lg border border-slate-200 bg-white divide-y divide-slate-100">
+                          {filteredEmpleados.map(emp => (
+                            <button
+                              key={emp.id}
+                              onClick={() => { setSelectedEmpleado(emp.full_name); setEmpleadoSearch(emp.full_name); }}
+                              className="w-full text-left px-3 py-2.5 text-sm hover:bg-emerald-50 active:bg-emerald-100 transition-colors"
+                            >
+                              {emp.full_name}
+                            </button>
+                          ))}
+                          {filteredEmpleados.length === 0 && (
+                            <p className="px-3 py-2 text-xs text-slate-400">No se encontro ese empleado</p>
+                          )}
+                        </div>
+                      )}
+                      {selectedEmpleado && (
+                        <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 border border-emerald-300">
+                          <User className="h-4 w-4 text-emerald-600" />
+                          <span className="text-sm font-semibold text-emerald-800">{selectedEmpleado}</span>
+                        </div>
+                      )}
+                    </div>
+                    <Button 
+                      onClick={() => updateStatus('Confirmada')}
+                      disabled={!selectedEmpleado}
+                      className="bg-gradient-to-r from-emerald-600 to-green-500 hover:from-emerald-700 hover:to-green-600 text-white font-bold w-full h-14 rounded-xl shadow-lg text-base disabled:opacity-40"
+                    >
+                      <CheckCircle className="mr-2 h-5 w-5" />
+                      Confirmar Recepcion y Generar Comprobante
+                    </Button>
+                  </div>
                 )}
 
                 {/* Mensaje de estado para el encargado */}
@@ -382,6 +443,12 @@ export default function SolicitudDetail() {
                       <span className="text-slate-400 text-xs">Prioridad</span>
                       <span className="text-slate-700">{solicitud.priority}</span>
                     </div>
+                    {receivedByName && (
+                      <div className="flex justify-between bg-emerald-50 px-2 py-1.5 rounded-lg -mx-1">
+                        <span className="text-emerald-600 text-xs font-bold">Recibio en obra</span>
+                        <span className="font-bold text-emerald-800">{receivedByName}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Estado final */}
