@@ -295,8 +295,8 @@ export default function HerramientaDetail() {
               </Button>
             )}
 
-            {/* LIBERAR HERRAMIENTA - solo admin/logistica cuando esta En uso/Reservada */}
-            {isAdmin && (herramienta.status === 'En uso' || herramienta.status === 'Reservada' || herramienta.status === 'En traslado') && (
+            {/* LIBERAR HERRAMIENTA - solo admin/logistica */}
+            {isAdmin && (herramienta.status === 'En uso' || herramienta.status === 'Reservada' || herramienta.status === 'En traslado' || herramienta.status === 'En mantenimiento' || herramienta.status === 'Fuera de servicio') && (
               <Button 
                 className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-12 rounded-xl"
                 onClick={async () => {
@@ -307,14 +307,13 @@ export default function HerramientaDetail() {
                   if (error) {
                     toast({ variant: 'destructive', title: 'Error', description: error.message });
                   } else {
-                    // Registrar movimiento
                     await supabase.from('movimientos').insert([{
                       herramienta_id: herramienta.id,
                       user_id: profile?.id,
                       action: 'Herramienta liberada a Disponible',
                       notes: 'Liberada por ' + (profile?.full_name || 'Admin')
                     }]);
-                    toast({ title: 'Herramienta Liberada', description: herramienta.name + ' ahora esta disponible para solicitar.' });
+                    toast({ title: 'Herramienta Liberada', description: herramienta.name + ' ahora esta disponible.' });
                     fetchHerramienta();
                   }
                 }}
@@ -323,9 +322,78 @@ export default function HerramientaDetail() {
               </Button>
             )}
 
-            {herramienta.status !== 'Disponible' && !isAdmin && (
+            {/* Aviso cuando ya esta reportada */}
+            {(herramienta.status === 'Fuera de servicio' || herramienta.status === 'En mantenimiento') && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-center">
+                <AlertTriangle className="mx-auto h-6 w-6 text-red-400 mb-1" />
+                <p className="text-xs text-red-600 font-semibold">
+                  {herramienta.status === 'Fuera de servicio' ? 'Herramienta reportada como ROTA' : 'Herramienta EN REPARACION'}
+                </p>
+              </div>
+            )}
+
+            {herramienta.status !== 'Disponible' && !isAdmin && herramienta.status !== 'Fuera de servicio' && herramienta.status !== 'En mantenimiento' && (
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
                 <p className="text-xs text-slate-400 font-semibold">Esta herramienta no esta disponible actualmente</p>
+              </div>
+            )}
+
+            {/* ================================================ */}
+            {/* REPORTAR ESTADO - VISIBLE PARA TODOS LOS ROLES   */}
+            {/* ================================================ */}
+            {herramienta.status !== 'Fuera de servicio' && herramienta.status !== 'En mantenimiento' && (
+              <div className="pt-2 border-t border-slate-100 mt-2 space-y-2">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Reportar problema</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button 
+                    variant="outline" 
+                    className="h-11 rounded-xl text-red-600 border-red-200 hover:bg-red-50 text-xs font-semibold"
+                    onClick={async () => {
+                      const { error } = await supabase
+                        .from('herramientas')
+                        .update({ status: 'Fuera de servicio' })
+                        .eq('id', herramienta.id);
+                      if (error) {
+                        toast({ variant: 'destructive', title: 'Error', description: error.message });
+                      } else {
+                        await supabase.from('movimientos').insert([{
+                          herramienta_id: herramienta.id,
+                          user_id: profile?.id,
+                          action: 'Reportada como Fuera de servicio (Rota)',
+                          notes: 'Reportada por ' + (profile?.full_name || 'Usuario')
+                        }]);
+                        toast({ title: 'Reportada', description: 'Herramienta marcada como rota.' });
+                        fetchHerramienta();
+                      }
+                    }}
+                  >
+                    <AlertTriangle className="mr-1 h-3.5 w-3.5" /> Rota
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    className="h-11 rounded-xl text-orange-600 border-orange-200 hover:bg-orange-50 text-xs font-semibold"
+                    onClick={async () => {
+                      const { error } = await supabase
+                        .from('herramientas')
+                        .update({ status: 'En mantenimiento' })
+                        .eq('id', herramienta.id);
+                      if (error) {
+                        toast({ variant: 'destructive', title: 'Error', description: error.message });
+                      } else {
+                        await supabase.from('movimientos').insert([{
+                          herramienta_id: herramienta.id,
+                          user_id: profile?.id,
+                          action: 'Enviada a mantenimiento / reparacion',
+                          notes: 'Reportada por ' + (profile?.full_name || 'Usuario')
+                        }]);
+                        toast({ title: 'Reportada', description: 'Herramienta marcada en reparacion.' });
+                        fetchHerramienta();
+                      }
+                    }}
+                  >
+                    <Edit className="mr-1 h-3.5 w-3.5" /> En Reparacion
+                  </Button>
+                </div>
               </div>
             )}
           </div>
