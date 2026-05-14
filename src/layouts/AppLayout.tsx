@@ -23,6 +23,7 @@ export default function AppLayout() {
   const isLogistica = profile.role === 'logistica';
 
   const navItems = [
+    { name: 'Inicio', path: '/dashboard', icon: Sparkles, show: true },
     { name: 'Pedidos', path: '/solicitudes', icon: Home, show: true },
     { name: 'Herramientas', path: '/herramientas', icon: Wrench, show: true },
     { name: 'Mis Obras', path: '/mis-obras', icon: Building, show: true },
