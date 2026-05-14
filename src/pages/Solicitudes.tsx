@@ -4,9 +4,11 @@ import { supabase } from '../lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { MessageCircle, Clock, CheckCircle, Truck, AlertCircle, FileText } from 'lucide-react';
+import { MessageCircle, Clock, CheckCircle, Truck, AlertCircle, FileText, Search } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { buildWhatsAppLink, APP_URL } from '../lib/whatsapp';
+import { Input } from '@/components/ui/input';
+import FilterBar from '../components/FilterBar';
 
 interface Solicitud {
   id: string;
@@ -28,6 +30,9 @@ interface Solicitud {
 export default function Solicitudes() {
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterPriority, setFilterPriority] = useState('');
   const { toast } = useToast();
   const { profile } = useAuthStore();
   const navigate = useNavigate();
@@ -118,20 +123,43 @@ export default function Solicitudes() {
     window.open(buildWhatsAppLink(phone, message), '_blank');
   };
 
+  const statusOpciones = ['Pendiente', 'Asignada', 'En retiro', 'En traslado', 'Entregada', 'Confirmada'];
+  const prioridadOpciones = ['Baja', 'Normal', 'Alta', 'Urgente'];
+
+  const filtered = solicitudes.filter(s => {
+    const matchSearch = !searchTerm || s.herramientas.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.herramientas.code.toLowerCase().includes(searchTerm.toLowerCase()) || s.profiles.full_name.toLowerCase().includes(searchTerm.toLowerCase()) || s.target_obra.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchStatus = !filterStatus || s.status === filterStatus;
+    const matchPriority = !filterPriority || s.priority === filterPriority;
+    return matchSearch && matchStatus && matchPriority;
+  });
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-peie-blue">Solicitudes</h1>
-          <p className="text-muted-foreground">Gestiona las solicitudes de traslado de herramientas.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-peie-blue">Pedidos</h1>
+          <p className="text-sm text-muted-foreground">{filtered.length} de {solicitudes.length} solicitudes</p>
         </div>
       </div>
+
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input placeholder="Buscar herramienta, solicitante, obra..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-9 h-10 rounded-xl" />
+      </div>
+
+      <FilterBar
+        filters={[
+          { key: 'status', label: 'Estado', value: filterStatus, options: statusOpciones.map(s => ({ value: s, label: s })) },
+          { key: 'priority', label: 'Prioridad', value: filterPriority, options: prioridadOpciones.map(p => ({ value: p, label: p })) },
+        ]}
+        onFilterChange={(key, val) => { if (key === 'status') setFilterStatus(val); else setFilterPriority(val); }}
+      />
 
       {loading ? (
         <div className="text-center py-8 text-muted-foreground">Cargando solicitudes...</div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {solicitudes.map(solicitud => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {filtered.map(solicitud => (
             <Card key={solicitud.id} className="relative">
               <CardHeader className="pb-2">
                 <div className="flex justify-between items-start mb-2">

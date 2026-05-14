@@ -5,11 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { ShoppingCart, Plus, CheckCircle, Clock, AlertCircle, RefreshCw, MessageCircle } from 'lucide-react';
+import { ShoppingCart, Plus, CheckCircle, Clock, AlertCircle, RefreshCw, MessageCircle, Search } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuthStore } from '../store/auth';
 import { buildWhatsAppLink, APP_URL } from '../lib/whatsapp';
+import FilterBar from '../components/FilterBar';
 
 interface Compra {
   id: string;
@@ -41,6 +42,9 @@ export default function Compras() {
   
   const { toast } = useToast();
   const { profile } = useAuthStore();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterPriority, setFilterPriority] = useState('');
 
   const isComprasRole = profile?.role === 'compras' || profile?.role === 'admin';
 
@@ -76,7 +80,12 @@ export default function Compras() {
     fetchData();
   }, []);
 
-
+  const filteredCompras = compras.filter(c => {
+    const matchSearch = !searchTerm || c.tool_name.toLowerCase().includes(searchTerm.toLowerCase()) || (c.profiles?.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) || (c.obras?.name || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchStatus = !filterStatus || c.status === filterStatus;
+    const matchPriority = !filterPriority || c.priority === filterPriority;
+    return matchSearch && matchStatus && matchPriority;
+  });
 
   const resetForm = () => {
     setToolName(''); setDescription(''); setQuantity(1); setPriority('Normal'); setJustification(''); setObraId('');
@@ -218,8 +227,8 @@ ${APP_URL}/compras/${compra.id}`;
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-peie-blue">Solicitudes de Compra</h1>
-          <p className="text-muted-foreground">Gestiona los requerimientos de nuevas herramientas.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-peie-blue">Solicitudes de Compra</h1>
+          <p className="text-sm text-muted-foreground">{filteredCompras.length} de {compras.length} solicitudes</p>
         </div>
 
         <Dialog open={isDialogOpen} onOpenChange={(open) => { if(!open) resetForm(); setIsDialogOpen(open); }}>
@@ -308,11 +317,24 @@ ${APP_URL}/compras/${compra.id}`;
         </Dialog>
       </div>
 
+      {/* Buscador y filtros */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input placeholder="Buscar herramienta, solicitante, obra..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-9 h-10 rounded-xl" />
+      </div>
+      <FilterBar
+        filters={[
+          { key: 'status', label: 'Estado', value: filterStatus, options: ['Pendiente','En evaluacion','Aprobada','Rechazada','Comprada','Recibida','Cerrada'].map(s => ({ value: s, label: s })) },
+          { key: 'priority', label: 'Prioridad', value: filterPriority, options: ['Baja','Normal','Alta','Urgente'].map(p => ({ value: p, label: p })) },
+        ]}
+        onFilterChange={(key, val) => { if (key === 'status') setFilterStatus(val); else setFilterPriority(val); }}
+      />
+
       {loading ? (
         <div className="text-center py-8 text-muted-foreground">Cargando solicitudes...</div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {compras.map(compra => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {filteredCompras.map(compra => (
             <Card key={compra.id} className="relative">
               <CardHeader className="pb-2">
                 <div className="flex justify-between items-start mb-2">

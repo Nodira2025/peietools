@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Building2, Wrench, Users, MapPin, ChevronRight, Search, User, HardHat } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
+import FilterBar from '../components/FilterBar';
 
 interface Obra {
   id: string;
@@ -38,6 +39,7 @@ export default function MisObras() {
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [filterEncargado, setFilterEncargado] = useState('');
 
   useEffect(() => {
     fetchObras();
@@ -90,11 +92,13 @@ export default function MisObras() {
     }
   };
 
-  const filteredObras = obras.filter(o =>
-    o.name.toLowerCase().includes(search.toLowerCase()) ||
-    (o.address || '').toLowerCase().includes(search.toLowerCase()) ||
-    (o.encargado_name || '').toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredObras = obras.filter(o => {
+    const matchSearch = !search || o.name.toLowerCase().includes(search.toLowerCase()) || (o.address || '').toLowerCase().includes(search.toLowerCase()) || (o.encargado_name || '').toLowerCase().includes(search.toLowerCase());
+    const matchEncargado = !filterEncargado || o.encargado_name === filterEncargado;
+    return matchSearch && matchEncargado;
+  });
+
+  const encargadosUnicos = [...new Set(obras.map(o => o.encargado_name).filter(Boolean))].sort();
 
   // Vista de detalle de obra seleccionada
   if (selectedObra) {
@@ -224,6 +228,11 @@ export default function MisObras() {
           className="pl-9 h-11 rounded-xl"
         />
       </div>
+
+      <FilterBar
+        filters={[{ key: 'encargado', label: 'Encargado', value: filterEncargado, options: encargadosUnicos.map(e => ({ value: e!, label: e! })) }]}
+        onFilterChange={(_, val) => setFilterEncargado(val)}
+      />
 
       {loading ? (
         <div className="text-center py-12 text-muted-foreground">Cargando obras...</div>
