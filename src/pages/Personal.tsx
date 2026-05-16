@@ -11,6 +11,7 @@ import { useAuthStore } from '../store/auth';
 interface Empleado {
   id: string;
   full_name: string;
+  obra_id: string | null;
   obras: { name: string } | null;
 }
 
@@ -29,6 +30,9 @@ export default function Personal() {
   const [trasladosPendientes, setTrasladosPendientes] = useState<TrasladoPendiente[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [filterType, setFilterType] = useState<'all' | 'free' | 'busy'>('all');
+  const [activeTab, setActiveTab] = useState<'staff' | 'history'>('staff');
+  const [historial, setHistorial] = useState<any[]>([]);
 
   useEffect(() => {
     fetchData();
@@ -41,8 +45,7 @@ export default function Personal() {
     // Fetch Empleados
     const { data: empData, error: empError } = await supabase
       .from('empleados')
-      .select('id, full_name, obras(name)')
-      .eq('active', true)
+      .select('id, full_name, obra_id, obras:obra_id(name)')
       .order('full_name');
       
     if (empError) {
@@ -65,17 +68,52 @@ export default function Personal() {
     setLoading(false);
   };
 
-  const filteredEmpleados = empleados.filter(e =>
-    !search || 
-    e.full_name.toLowerCase().includes(search.toLowerCase()) || 
-    (e.obras?.name || '').toLowerCase().includes(search.toLowerCase())
-  );
+  const handleRelease = async (id: string) => {
+    if (!window.confirm('¿Liberar a este empleado? Quedará sin obra asignada.')) return;
+    const { error } = await supabase.from('empleados').update({ obra_id: null }).eq('id', id);
+    if (error) {
+      toast({ variant: 'destructive', title: 'Error', description: error.message });
+    } else {
+      toast({ title: 'Empleado Liberado', description: 'Ahora se puede asignar a otra obra.' });
+      fetchData();
+    }
+  };
+
+  const filteredEmpleados = empleados.filter(e => {
+    const matchesSearch = !search || 
+      e.full_name.toLowerCase().includes(search.toLowerCase()) || 
+      (e.obras?.name || '').toLowerCase().includes(search.toLowerCase());
+    
+    if (filterType === 'free') return matchesSearch && !e.obra_id;
+    if (filterType === 'busy') return matchesSearch && !!e.obra_id;
+    return matchesSearch;
+  });
 
   return (
     <div className="space-y-5 pb-safe">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-peie-blue">Personal</h1>
-        <p className="text-sm text-muted-foreground mt-1">Gestión y traslado de electricistas</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-peie-blue">Personal</h1>
+          <p className="text-sm text-muted-foreground mt-1">Gestión y traslado de electricistas</p>
+        </div>
+        <div className="flex bg-slate-100 p-1 rounded-xl">
+          <Button 
+            variant={activeTab === 'staff' ? 'default' : 'ghost'} 
+            size="sm" 
+            onClick={() => setActiveTab('staff')}
+            className={`rounded-lg text-xs h-8 ${activeTab === 'staff' ? 'bg-white shadow-sm text-peie-blue' : 'text-slate-500'}`}
+          >
+            Equipo
+          </Button>
+          <Button 
+            variant={activeTab === 'history' ? 'default' : 'ghost'} 
+            size="sm" 
+            onClick={() => setActiveTab('history')}
+            className={`rounded-lg text-xs h-8 ${activeTab === 'history' ? 'bg-white shadow-sm text-peie-blue' : 'text-slate-500'}`}
+          >
+            Movimientos
+          </Button>
+        </div>
       </div>
 
       {/* Alerta de traslados pendientes */}
@@ -107,22 +145,48 @@ export default function Personal() {
         </div>
       )}
 
-      {/* Buscador */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-        <Input
-          placeholder="Buscar empleado o por obra..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="pl-9 h-11 rounded-xl"
-        />
+      <div className="space-y-3">
+        <div className="relative group">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-peie-blue" />
+          <Input
+            placeholder="Buscar empleado o por obra..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="pl-9 h-11 rounded-xl border-slate-200 shadow-sm focus:ring-peie-blue/20"
+          />
+        </div>
+
+        <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
+          <Button 
+            variant={filterType === 'all' ? 'default' : 'ghost'} 
+            onClick={() => setFilterType('all')}
+            className={`flex-1 rounded-lg text-xs h-9 ${filterType === 'all' ? 'bg-peie-blue shadow-sm' : 'text-slate-500'}`}
+          >
+            Todos
+          </Button>
+          <Button 
+            variant={filterType === 'free' ? 'default' : 'ghost'} 
+            onClick={() => setFilterType('free')}
+            className={`flex-1 rounded-lg text-xs h-9 ${filterType === 'free' ? 'bg-emerald-600 shadow-sm text-white' : 'text-slate-500'}`}
+          >
+            Libres
+          </Button>
+          <Button 
+            variant={filterType === 'busy' ? 'default' : 'ghost'} 
+            onClick={() => setFilterType('busy')}
+            className={`flex-1 rounded-lg text-xs h-9 ${filterType === 'busy' ? 'bg-amber-600 shadow-sm text-white' : 'text-slate-500'}`}
+          >
+            En Obra
+          </Button>
+        </div>
       </div>
 
       {loading ? (
-        <div className="text-center py-12 text-muted-foreground">Cargando personal...</div>
-      ) : (
+        <div className="text-center py-12 text-muted-foreground">Cargando...</div>
+      ) : activeTab === 'staff' ? (
         <div className="space-y-2">
           {filteredEmpleados.map(emp => (
+            // ... (Card logic for staff)
             <Card key={emp.id} className="overflow-hidden rounded-xl border-slate-200">
               <CardContent className="p-0">
                 <div className="flex items-center p-4 gap-3">
@@ -135,14 +199,24 @@ export default function Personal() {
                       <MapPin className="h-3 w-3" /> {emp.obras?.name || 'Sin obra asignada'}
                     </p>
                   </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="shrink-0 text-peie-blue border-peie-blue/30 hover:bg-peie-blue/5 h-8 px-3 text-xs rounded-lg"
-                    onClick={() => navigate(`/personal/trasladar/${emp.id}`)}
-                  >
-                    <ArrowRightLeft className="h-3.5 w-3.5 mr-1" /> Trasladar
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      className="shrink-0 text-slate-400 hover:text-red-500 h-8 px-2 text-[10px] rounded-lg"
+                      onClick={() => handleRelease(emp.id)}
+                    >
+                      Liberar
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="shrink-0 text-peie-blue border-peie-blue/30 hover:bg-peie-blue/5 h-8 px-3 text-xs rounded-lg"
+                      onClick={() => navigate(`/personal/trasladar/${emp.id}`)}
+                    >
+                      <ArrowRightLeft className="h-3.5 w-3.5 mr-1" /> Trasladar
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -152,6 +226,32 @@ export default function Personal() {
               <HardHat className="mx-auto h-10 w-10 text-slate-300 mb-2" />
               <p className="text-sm text-slate-400">No se encontraron empleados</p>
             </div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {historial.map(h => (
+            <Card key={h.id} className="rounded-xl border-slate-100 shadow-sm" onClick={() => navigate(`/personal/traslados/${h.id}`)}>
+              <CardContent className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors">
+                <div className="space-y-1">
+                  <p className="text-sm font-bold text-slate-800">{h.empleados?.full_name}</p>
+                  <p className="text-[10px] text-slate-400 flex items-center gap-1">
+                    {h.source_obra?.name || 'Origen'} → {h.target_obra?.name || 'Destino'}
+                  </p>
+                  <p className="text-[9px] text-slate-300">Solicitado: {new Date(h.created_at).toLocaleDateString()}</p>
+                </div>
+                <div className={`px-2 py-1 rounded-full text-[10px] font-bold ${
+                  h.status === 'Pendiente' ? 'bg-orange-100 text-orange-700' : 
+                  h.status === 'Completado' ? 'bg-green-100 text-green-700' : 
+                  'bg-slate-100 text-slate-600'
+                }`}>
+                  {h.status}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+          {historial.length === 0 && (
+            <div className="text-center py-12 text-slate-400">No hay movimientos registrados.</div>
           )}
         </div>
       )}

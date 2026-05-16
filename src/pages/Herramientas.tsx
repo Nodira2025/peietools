@@ -37,17 +37,20 @@ export default function Herramientas() {
   const isAdmin = profile?.role === 'admin';
 
   const fetchHerramientas = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('herramientas')
-      .select('*, obras(name, encargado_name)')
-      .order('name');
-    if (error) {
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar las herramientas' });
-    } else {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('herramientas')
+        .select('*, obras(name, encargado_name)')
+        .order('name');
+      if (error) throw error;
       setHerramientas(data || []);
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar las herramientas' });
+      console.error(error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => { fetchHerramientas(); }, []);

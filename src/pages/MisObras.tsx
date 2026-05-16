@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Building2, Wrench, Users, MapPin, ChevronRight, Search, User, HardHat } from 'lucide-react';
@@ -79,6 +80,26 @@ export default function MisObras() {
       .eq('active', true)
       .order('full_name');
     setEmpleados(emps || []);
+  };
+
+  const releaseHerramienta = async (hId: string) => {
+    if (!window.confirm('¿Liberar esta herramienta de la obra? Volverá al depósito virtual.')) return;
+    const { error } = await supabase.from('herramientas').update({ current_obra_id: null }).eq('id', hId);
+    if (error) toast({ variant: 'destructive', title: 'Error', description: error.message });
+    else {
+      toast({ title: 'Liberada', description: 'La herramienta ya no pertenece a esta obra.' });
+      if (selectedObra) selectObra(selectedObra);
+    }
+  };
+
+  const releaseEmpleado = async (eId: string) => {
+    if (!window.confirm('¿Liberar este empleado de la obra? Quedará disponible para nuevos traslados.')) return;
+    const { error } = await supabase.from('empleados').update({ obra_id: null }).eq('id', eId);
+    if (error) toast({ variant: 'destructive', title: 'Error', description: error.message });
+    else {
+      toast({ title: 'Liberado', description: 'El empleado ya no pertenece a esta obra.' });
+      if (selectedObra) selectObra(selectedObra);
+    }
   };
 
   const getStatusColor = (s: string) => {
@@ -197,11 +218,21 @@ export default function MisObras() {
           ) : (
             <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
               {empleados.map(emp => (
-                <div key={emp.id} className="flex items-center gap-3 px-4 py-3">
-                  <div className="w-8 h-8 rounded-full bg-peie-blue/10 flex items-center justify-center shrink-0">
-                    <User className="h-4 w-4 text-peie-blue" />
+                <div key={emp.id} className="flex items-center justify-between px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-peie-blue/10 flex items-center justify-center shrink-0">
+                      <User className="h-4 w-4 text-peie-blue" />
+                    </div>
+                    <span className="text-sm font-medium text-slate-700">{emp.full_name}</span>
                   </div>
-                  <span className="text-sm font-medium text-slate-700">{emp.full_name}</span>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="text-[10px] text-slate-400 hover:text-red-500 h-7"
+                    onClick={() => releaseEmpleado(emp.id)}
+                  >
+                    Liberar
+                  </Button>
                 </div>
               ))}
             </div>

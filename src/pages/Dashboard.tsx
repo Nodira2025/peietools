@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useAuthStore } from '../store/auth';
-import { Wrench, Truck, FileText, CheckCircle2, ShoppingCart, MapPin, AlertTriangle, QrCode, Search, PlusCircle } from 'lucide-react';
+import { Wrench, Truck, FileText, CheckCircle2, ShoppingCart, MapPin, AlertTriangle, QrCode, Search, PlusCircle, Home, Users, ClipboardList } from 'lucide-react';
 
 interface DashboardStats {
   disponibles: number;
@@ -110,8 +110,46 @@ export default function Dashboard() {
   }
 
   // =========================================================================
-  // VISTA OPTIMIZADA EXCLUSIVA PARA ENCARGADOS (BOTONES GRANDES TOUCH)
+  // BOTONERA PRINCIPAL DE ACCESOS RÁPIDOS (PARA TODOS LOS USUARIOS)
   // =========================================================================
+  const MainMenu = () => (
+    <div className="space-y-4">
+      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">
+        Menú Principal
+      </h3>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <Card onClick={() => navigate('/solicitudes')} className="border-0 ring-1 ring-slate-100 hover:ring-peie-blue/30 shadow-sm transition-all cursor-pointer bg-white active:scale-95 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 h-24">
+          <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><Home size={20} /></div>
+          <span className="text-[10px] font-bold text-slate-700 uppercase">Pedidos</span>
+        </Card>
+        <Card onClick={() => navigate('/herramientas')} className="border-0 ring-1 ring-slate-100 hover:ring-peie-blue/30 shadow-sm transition-all cursor-pointer bg-white active:scale-95 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 h-24">
+          <div className="p-2 bg-peie-blue/10 text-peie-blue rounded-lg"><Wrench size={20} /></div>
+          <span className="text-[10px] font-bold text-slate-700 uppercase">Herramientas</span>
+        </Card>
+        <Card onClick={() => navigate('/mis-obras')} className="border-0 ring-1 ring-slate-100 hover:ring-peie-blue/30 shadow-sm transition-all cursor-pointer bg-white active:scale-95 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 h-24">
+          <div className="p-2 bg-slate-50 text-slate-600 rounded-lg"><MapPin size={20} /></div>
+          <span className="text-[10px] font-bold text-slate-700 uppercase">Mis Obras</span>
+        </Card>
+        <Card onClick={() => navigate('/personal')} className="border-0 ring-1 ring-slate-100 hover:ring-peie-blue/30 shadow-sm transition-all cursor-pointer bg-white active:scale-95 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 h-24">
+          <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><Users size={20} /></div>
+          <span className="text-[10px] font-bold text-slate-700 uppercase">Personal</span>
+        </Card>
+        <Card onClick={() => navigate('/ordenes')} className="border-0 ring-1 ring-slate-100 hover:ring-peie-blue/30 shadow-sm transition-all cursor-pointer bg-white active:scale-95 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 h-24">
+          <div className="p-2 bg-purple-50 text-purple-600 rounded-lg"><ClipboardList size={20} /></div>
+          <span className="text-[10px] font-bold text-slate-700 uppercase">Órdenes</span>
+        </Card>
+        <Card onClick={() => navigate('/herramientas/scanner')} className="border-0 ring-1 ring-slate-100 hover:ring-peie-blue/30 shadow-sm transition-all cursor-pointer bg-white active:scale-95 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 h-24 border-dashed border-2 border-peie-blue/20">
+          <div className="p-2 bg-amber-50 text-amber-600 rounded-lg"><QrCode size={20} /></div>
+          <span className="text-[10px] font-bold text-slate-700 uppercase tracking-tighter">Escanear QR</span>
+        </Card>
+      </div>
+    </div>
+  );
+
+  if (loading) {
+// ... (omitting some unchanged code)
+  }
+
   if (isEncargado) {
     return (
       <div className="space-y-6 max-w-md mx-auto pb-safe">
@@ -120,94 +158,20 @@ export default function Dashboard() {
         <div className="bg-gradient-to-br from-peie-blue to-peie-light text-white p-6 rounded-3xl shadow-lg relative overflow-hidden">
           <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/10 rounded-full blur-xl" />
           <div className="flex items-center gap-4 relative z-10">
-            {profile?.photo_url ? (
-              <img 
-                src={profile.photo_url} 
-                alt={profile.full_name || ''} 
-                className="w-14 h-14 rounded-full object-cover ring-2 ring-white/50 shadow-md"
-                onError={(e) => e.currentTarget.style.display = 'none'}
-              />
-            ) : (
-              <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center font-bold text-xl border border-white/30">
-                {profile?.full_name?.charAt(0) || 'E'}
-              </div>
-            )}
+            <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center font-bold text-xl border border-white/30">
+              {profile?.full_name?.charAt(0) || 'E'}
+            </div>
             <div>
-              <p className="text-xs text-peie-light font-medium uppercase tracking-wider">Panel de Encargado</p>
-              <h2 className="text-xl font-bold line-clamp-1">{profile?.full_name || 'Operario'}</h2>
+              <p className="text-xs text-peie-light font-medium uppercase tracking-wider">Panel de Operaciones</p>
+              <h2 className="text-xl font-bold line-clamp-1">{profile?.full_name || 'Usuario'}</h2>
               <span className="inline-block text-[10px] bg-white/20 px-2 py-0.5 rounded-full mt-1">
-                Obra Asignada
+                Conectado
               </span>
             </div>
           </div>
         </div>
 
-        <div>
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 px-1">
-            Accesos Rápidos Directos
-          </h3>
-          
-          {/* GRID DE BOTONERA GIGANTE PARA CELULAR */}
-          <div className="grid grid-cols-2 gap-3.5">
-            
-            {/* 1. Buscar Herramienta */}
-            <Card 
-              onClick={() => navigate('/herramientas')} 
-              className="border-0 ring-1 ring-slate-100 hover:ring-peie-blue/30 shadow-sm hover:shadow-md transition-all cursor-pointer bg-white active:scale-95 rounded-2xl p-4 flex flex-col justify-between h-32"
-            >
-              <div className="w-10 h-10 rounded-xl bg-peie-blue/10 flex items-center justify-center text-peie-blue">
-                <Search size={22} />
-              </div>
-              <div>
-                <h4 className="font-bold text-slate-800 text-sm leading-tight">Buscar Herramienta</h4>
-                <p className="text-[10px] text-slate-400 mt-0.5">Por código o nombre</p>
-              </div>
-            </Card>
-
-            {/* 2. Escanear QR */}
-            <Card 
-              onClick={() => navigate('/herramientas/scanner')} 
-              className="border-0 ring-1 ring-slate-100 hover:ring-peie-blue/30 shadow-sm hover:shadow-md transition-all cursor-pointer bg-white active:scale-95 rounded-2xl p-4 flex flex-col justify-between h-32"
-            >
-              <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
-                <QrCode size={22} />
-              </div>
-              <div>
-                <h4 className="font-bold text-slate-800 text-sm leading-tight">Escanear Etiqueta</h4>
-                <p className="text-[10px] text-slate-400 mt-0.5">Cámara del dispositivo</p>
-              </div>
-            </Card>
-
-            {/* 3. Solicitar Traslado Directo */}
-            <Card 
-              onClick={() => navigate('/solicitudes/nueva')} 
-              className="border-0 ring-1 ring-slate-100 hover:ring-peie-blue/30 shadow-sm hover:shadow-md transition-all cursor-pointer bg-white active:scale-95 rounded-2xl p-4 flex flex-col justify-between h-32"
-            >
-              <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
-                <PlusCircle size={22} />
-              </div>
-              <div>
-                <h4 className="font-bold text-slate-800 text-sm leading-tight">Pedir Traslado</h4>
-                <p className="text-[10px] text-slate-400 mt-0.5">Aviso directo por WA</p>
-              </div>
-            </Card>
-
-            {/* 4. Ver Mis Pedidos en Curso */}
-            <Card 
-              onClick={() => navigate('/solicitudes')} 
-              className="border-0 ring-1 ring-slate-100 hover:ring-peie-blue/30 shadow-sm hover:shadow-md transition-all cursor-pointer bg-white active:scale-95 rounded-2xl p-4 flex flex-col justify-between h-32"
-            >
-              <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600">
-                <Truck size={22} />
-              </div>
-              <div>
-                <h4 className="font-bold text-slate-800 text-sm leading-tight">Estado de Pedidos</h4>
-                <p className="text-[10px] text-slate-400 mt-0.5">Seguimiento en vivo</p>
-              </div>
-            </Card>
-
-          </div>
-        </div>
+        <MainMenu />
 
         {/* Tarjeta de Soporte Simple */}
         <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-center">
@@ -235,6 +199,8 @@ export default function Dashboard() {
           <p className="text-muted-foreground text-sm">Resumen de operaciones logísticas e inventario</p>
         </div>
       </div>
+
+      <MainMenu />
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {statCards.map((stat, index) => {

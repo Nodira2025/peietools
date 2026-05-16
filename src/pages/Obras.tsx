@@ -13,7 +13,7 @@ interface Obra {
   code: string | null;
   name: string;
   address: string | null;
-  manager_name: string | null;
+  encargado_name: string | null;
   phone: string | null;
   latitude: number | null;
   longitude: number | null;
@@ -39,14 +39,16 @@ export default function Obras() {
   const [active, setActive] = useState(true);
 
   const fetchObras = async () => {
-    setLoading(true);
-    const { data, error } = await supabase.from('obras').select('*').order('name');
-    if (error) {
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar las obras' });
-    } else {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.from('obras').select('*').order('name');
+      if (error) throw error;
       setObras(data || []);
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar las obras' });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -69,7 +71,7 @@ export default function Obras() {
     setCode(obra.code || '');
     setName(obra.name);
     setAddress(obra.address || '');
-    setManager(obra.manager_name || '');
+    setManager(obra.encargado_name || '');
     setPhone(obra.phone || '');
     setLatitude(obra.latitude ? obra.latitude.toString() : '');
     setLongitude(obra.longitude ? obra.longitude.toString() : '');
@@ -85,7 +87,7 @@ export default function Obras() {
       code: code || null, 
       name, 
       address, 
-      manager_name: manager, 
+      encargado_name: manager, 
       phone,
       latitude: latitude ? parseFloat(latitude) : null,
       longitude: longitude ? parseFloat(longitude) : null,
@@ -227,7 +229,7 @@ export default function Obras() {
               </CardHeader>
               <CardContent className="text-sm space-y-1 mt-2 text-muted-foreground">
                 <p><strong>📍</strong> {obra.address || 'Sin dirección'}</p>
-                <p><strong>👤</strong> {obra.manager_name || 'Sin encargado'}</p>
+                <p><strong>👤</strong> {obra.encargado_name || 'Sin encargado'}</p>
                 <p><strong>📞</strong> {obra.phone || 'Sin teléfono'}</p>
                 {!obra.active && <p className="text-red-500 font-semibold mt-2">Inactiva</p>}
               </CardContent>

@@ -53,7 +53,7 @@ export default function OrdenDetail() {
     setLoading(true);
     const { data, error } = await supabase
       .from('ordenes_trabajo')
-      .select('*, profiles:assigned_to(full_name, whatsapp), creator:created_by(full_name, whatsapp)')
+      .select('*, assigned_to(full_name, whatsapp), created_by(full_name, whatsapp)')
       .eq('id', id)
       .single();
 
@@ -84,7 +84,7 @@ export default function OrdenDetail() {
       toast({ title: 'Estado actualizado', description: `La orden ahora está en estado: ${newStatus}` });
       
       // Notificar por WhatsApp el cambio de estado
-      const recipient = (newStatus === 'Realizada' || newStatus === 'Finalizada') ? orden.creator : orden.profiles;
+      const recipient = (newStatus === 'Realizada' || newStatus === 'Finalizada') ? orden.created_by : (orden as any).assigned_to;
       
       if (recipient?.whatsapp) {
         const msg = [
@@ -105,7 +105,7 @@ export default function OrdenDetail() {
   };
 
   const sendWhatsApp = () => {
-    if (!orden || !orden.profiles.whatsapp) {
+    if (!orden || !(orden as any).assigned_to?.whatsapp) {
       toast({ variant: 'destructive', title: 'Error', description: 'El usuario asignado no tiene WhatsApp configurado.' });
       return;
     }
@@ -119,7 +119,7 @@ export default function OrdenDetail() {
       `Ver más detalles en: ${window.location.origin}/ordenes/${orden.id}`;
 
     const encodedMessage = encodeURIComponent(message);
-    window.open(`https://wa.me/${orden.profiles.whatsapp}?text=${encodedMessage}`, '_blank');
+    window.open(`https://wa.me/${(orden as any).assigned_to.whatsapp}?text=${encodedMessage}`, '_blank');
   };
 
   if (loading) return (
@@ -277,7 +277,7 @@ export default function OrdenDetail() {
                 </div>
                 <div>
                   <p className="text-[10px] text-slate-400 font-bold uppercase">Asignado a</p>
-                  <p className="text-sm font-medium text-slate-700">{orden.profiles.full_name || 'Sin nombre'}</p>
+                  <p className="text-sm font-medium text-slate-700">{(orden as any).assigned_to?.full_name || 'Sin nombre'}</p>
                 </div>
               </div>
 
@@ -313,14 +313,14 @@ export default function OrdenDetail() {
             </CardContent>
           </Card>
 
-          {orden.profiles.whatsapp && (
+          {(orden as any).assigned_to?.whatsapp && (
              <Card className="bg-green-600 border-none text-white shadow-lg overflow-hidden relative">
                <div className="absolute top-0 right-0 p-4 opacity-10">
                  <MessageCircle size={80} />
                </div>
                <CardContent className="p-6 relative z-10">
                  <h4 className="font-bold mb-1">WhatsApp Directo</h4>
-                 <p className="text-xs text-green-50 mb-4">¿Necesitas coordinar con {orden.profiles.full_name?.split(' ')[0]}?</p>
+                 <p className="text-xs text-green-50 mb-4">¿Necesitas coordinar con {(orden as any).assigned_to.full_name?.split(' ')[0]}?</p>
                  <Button 
                    onClick={sendWhatsApp}
                    className="w-full bg-white text-green-600 hover:bg-green-50 font-bold rounded-xl"

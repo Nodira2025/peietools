@@ -45,7 +45,7 @@ export default function Ordenes() {
     setLoading(true);
     let query = supabase
       .from('ordenes_trabajo')
-      .select('*, profiles:assigned_to(full_name)')
+      .select('*, assigned_to(full_name)')
       .order('created_at', { ascending: false });
 
     if (filters.status) query = query.eq('status', filters.status);
@@ -206,7 +206,7 @@ export default function Ordenes() {
                       </div>
                       <div className="flex items-center gap-1">
                         <User size={12} />
-                        <span>Para: {orden.profiles?.full_name || 'Sin asignar'}</span>
+                        <span>Para: {(orden as any).assigned_to?.full_name || 'Sin asignar'}</span>
                       </div>
                     </div>
                   </div>

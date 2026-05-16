@@ -132,7 +132,7 @@ export default function AppLayout() {
       </main>
 
       {/* Barra de Navegación Inferior (Exclusiva para Móviles) */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-100 shadow-[0_-4px_12px_rgba(0,0,0,0.04)] z-40 flex justify-around pb-safe pt-1 px-1">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-100 shadow-[0_-4px_12px_rgba(0,0,0,0.04)] z-40 flex overflow-x-auto no-scrollbar justify-start pb-safe pt-1 px-1">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname.startsWith(item.path);
@@ -140,7 +140,7 @@ export default function AppLayout() {
             <Link
               key={item.path}
               to={item.path}
-              className={`flex flex-col items-center justify-center py-2 px-1.5 flex-1 rounded-xl transition-all duration-150 ${
+              className={`flex flex-col items-center justify-center py-2 px-3 min-w-[70px] rounded-xl transition-all duration-150 ${
                 isActive 
                   ? 'text-peie-blue scale-105' 
                   : 'text-slate-400 hover:text-slate-600'

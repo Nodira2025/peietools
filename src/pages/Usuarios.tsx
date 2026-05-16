@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Users as UsersIcon, ShieldAlert, Edit } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -163,6 +163,9 @@ export default function Usuarios() {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Crear Nuevo Usuario</DialogTitle>
+                <DialogDescription>
+                  Completa los datos para registrar un nuevo usuario en el sistema.
+                </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleCreateUser} className="space-y-4 pt-4">
                 <div className="space-y-2">
@@ -217,6 +220,9 @@ export default function Usuarios() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Editar Usuario: {selectedUser?.full_name}</DialogTitle>
+            <DialogDescription>
+              Modifica los permisos o datos de contacto del usuario seleccionado.
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleUpdate} className="space-y-4 pt-4">
             <div className="space-y-2">

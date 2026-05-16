@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, HardHat, MapPin, Building2, Send } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { buildWhatsAppLink, APP_URL } from '../lib/whatsapp';
+import { Input } from '@/components/ui/input';
 
 export default function NuevoTrasladoPersonal() {
   const { id } = useParams();
@@ -30,7 +31,7 @@ export default function NuevoTrasladoPersonal() {
     // Traer datos del empleado
     const { data: empData, error: empError } = await supabase
       .from('empleados')
-      .select('id, full_name, obra_id, obras(name)')
+      .select('id, full_name, obra_id, obras:obra_id(name)')
       .eq('id', id)
       .single();
 
@@ -41,14 +42,13 @@ export default function NuevoTrasladoPersonal() {
     }
     setEmpleado(empData);
 
-    // Traer lista de obras (menos la actual)
+    // Traer lista de obras (todas menos la de origen)
     const { data: obrasData } = await supabase
       .from('obras')
-      .select('id, name')
+      .select('id, name, encargado_name, status')
       .neq('id', empData.obra_id || '00000000-0000-0000-0000-000000000000')
       .order('name');
     
-    setObras(obrasData || []);
     setObras(obrasData || []);
     setLoading(false);
   };
@@ -76,21 +76,24 @@ export default function NuevoTrasladoPersonal() {
           requester_id: profile.id,
           status: 'Pendiente'
         }])
-        .select()
+        .select('id')
         .single();
 
       if (trasladoError) throw trasladoError;
 
-      // 2. Buscar al encargado de la obra destino para mandarle un WhatsApp
-      const { data: targetProfileData } = await supabase
-        .from('profiles')
-        .select('full_name, whatsapp')
-        .eq('obra_id', targetObraId)
-        .not('whatsapp', 'is', null)
-        .limit(1)
-        .single();
-
       const targetObra = obras.find(o => o.id === targetObraId);
+      
+      let targetProfileData = null;
+      if (targetObra?.encargado_name) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('full_name, whatsapp')
+          .ilike('full_name', `%${targetObra.encargado_name}%`)
+          .not('whatsapp', 'is', null)
+          .limit(1)
+          .maybeSingle();
+        targetProfileData = profileData;
+      }
 
       toast({ 
         title: 'Traslado Iniciado', 
@@ -198,8 +201,12 @@ export default function NuevoTrasladoPersonal() {
                   }`}
                 >
                   <div className="flex justify-between items-center">
-                    <span>{obra.name}</span>
-                    {obra.encargado_name && <span className="text-[10px] text-slate-400 font-normal">Enc: {obra.encargado_name}</span>}
+                    <div className="flex flex-col">
+                      <span>{obra.name}</span>
+                      <span className="text-[10px] text-slate-400 font-normal">
+                        {obra.status || 'En Proceso'} • {obra.encargado_name || 'Sin Encargado'}
+                      </span>
+                    </div>
                   </div>
                 </button>
               ))}
