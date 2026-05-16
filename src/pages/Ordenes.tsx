@@ -22,8 +22,14 @@ interface Orden {
   };
 }
 
+interface UserProfile {
+  id: string;
+  full_name: string;
+}
+
 export default function Ordenes() {
   const [ordenes, setOrdenes] = useState<Orden[]>([]);
+  const [availableProfiles, setAvailableProfiles] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [visibleCount, setVisibleCount] = useState(5);
   const { toast } = useToast();
@@ -31,6 +37,7 @@ export default function Ordenes() {
   const [filters, setFilters] = useState({
     status: '',
     date: '',
+    assigned_to: '',
     search: ''
   });
 
@@ -42,6 +49,7 @@ export default function Ordenes() {
       .order('created_at', { ascending: false });
 
     if (filters.status) query = query.eq('status', filters.status);
+    if (filters.assigned_to) query = query.eq('assigned_to', filters.assigned_to);
     if (filters.date) {
       query = query.gte('created_at', `${filters.date}T00:00:00Z`)
                    .lte('created_at', `${filters.date}T23:59:59Z`);
@@ -64,9 +72,18 @@ export default function Ordenes() {
     setLoading(false);
   };
 
+  const fetchProfiles = async () => {
+    const { data } = await supabase.from('profiles').select('id, full_name').eq('active', true).order('full_name');
+    if (data) setAvailableProfiles(data);
+  };
+
   useEffect(() => {
     fetchOrdenes();
-  }, [filters.status, filters.date]);
+  }, [filters.status, filters.date, filters.assigned_to]);
+
+  useEffect(() => {
+    fetchProfiles();
+  }, []);
 
   const handleFilterChange = (key: string, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -134,6 +151,12 @@ export default function Ordenes() {
               label: 'Fecha',
               value: filters.date,
               type: 'date'
+            },
+            {
+              key: 'assigned_to',
+              label: 'A cargo de',
+              value: filters.assigned_to,
+              options: availableProfiles.map(p => ({ value: p.id, label: p.full_name }))
             }
           ]}
           onFilterChange={handleFilterChange}

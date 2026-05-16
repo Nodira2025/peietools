@@ -33,7 +33,11 @@ export default function Usuarios() {
   const [role, setRole] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
   const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isActive, setIsActive] = useState(true);
+  
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   const fetchUsuarios = async () => {
     setLoading(true);
@@ -82,6 +86,45 @@ export default function Usuarios() {
     }
   };
 
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    const loginEmail = email.includes('@') ? email : `${email}@peie.com`;
+
+    try {
+      // Intentamos registrar al nuevo usuario
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: loginEmail,
+        password: password,
+        options: {
+          data: {
+            full_name: fullName,
+            role: role,
+            whatsapp: whatsapp
+          }
+        }
+      });
+
+      if (authError) throw authError;
+
+      toast({ 
+        title: 'Usuario Creado', 
+        description: `Se ha registrado a ${fullName}. Si la confirmación de email está activa, el usuario deberá revisar su correo.` 
+      });
+      setIsCreateDialogOpen(false);
+      fetchUsuarios();
+      
+      // Limpiar campos
+      setEmail(''); setPassword(''); setFullName(''); setWhatsapp(''); setRole('solicitante');
+      
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error al crear usuario', description: error.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAutoElevate = async () => {
     if (!profile) return;
     setElevating(true);
@@ -107,6 +150,54 @@ export default function Usuarios() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-peie-blue">Gestión de Usuarios</h1>
           <p className="text-muted-foreground">Administra los roles y contactos del personal.</p>
+        </div>
+
+        <div className="flex gap-2">
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-peie-blue hover:bg-peie-blue/90 text-white rounded-xl shadow-md flex items-center gap-2">
+                <UsersIcon size={18} />
+                <span>Nuevo Usuario</span>
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Crear Nuevo Usuario</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleCreateUser} className="space-y-4 pt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="createFullName">Nombre Completo</Label>
+                  <Input id="createFullName" value={fullName} onChange={e => setFullName(e.target.value)} required placeholder="Ej: Juan Pérez" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="createEmail">Nombre de Usuario (ej: juan)</Label>
+                  <Input id="createEmail" value={email} onChange={e => setEmail(e.target.value)} required placeholder="juan" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="createPassword">Contraseña</Label>
+                  <Input id="createPassword" type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="min. 6 caracteres" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Rol Inicial</Label>
+                  <Select value={role} onValueChange={setRole}>
+                    <SelectTrigger><SelectValue placeholder="Seleccionar rol" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin">Administrador</SelectItem>
+                      <SelectItem value="solicitante">Solicitante (Encargado)</SelectItem>
+                      <SelectItem value="logistica">Logística</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="createWhatsapp">WhatsApp</Label>
+                  <Input id="createWhatsapp" value={whatsapp} onChange={e => setWhatsapp(e.target.value)} placeholder="549XXXXXXXXXX" />
+                </div>
+                <Button type="submit" disabled={loading} className="w-full bg-peie-blue hover:bg-peie-blue/90">
+                  {loading ? 'Creando...' : 'Registrar Usuario'}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {/* BOTÓN DISCRETO PARA QUE TE CONVIERTAS EN ADMIN SI ESTÁS CON OTRO USUARIO */}

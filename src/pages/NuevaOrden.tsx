@@ -10,13 +10,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Upload, FileText, X, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
+import { buildWhatsAppLink, APP_URL } from '../lib/whatsapp';
 
 export default function NuevaOrden() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [usuarios, setUsuarios] = useState<{id: string, full_name: string}[]>([]);
+  const [usuarios, setUsuarios] = useState<{id: string, full_name: string, whatsapp: string | null}[]>([]);
   
   const [formData, setFormData] = useState({
     title: '',
@@ -32,7 +33,7 @@ export default function NuevaOrden() {
 
   useEffect(() => {
     const fetchUsuarios = async () => {
-      const { data } = await supabase.from('profiles').select('id, full_name').eq('active', true).order('full_name');
+      const { data } = await supabase.from('profiles').select('id, full_name, whatsapp').eq('active', true).order('full_name');
       if (data) setUsuarios(data);
     };
     fetchUsuarios();
@@ -81,6 +82,26 @@ export default function NuevaOrden() {
       });
 
       if (error) throw error;
+
+      // 3. Notificar por WhatsApp al asignado
+      const assignedUser = usuarios.find(u => u.id === formData.assigned_to);
+      if (assignedUser?.whatsapp) {
+        const msg = [
+          '*NUEVA ORDEN DE TRABAJO*',
+          '',
+          `Hola *${assignedUser.full_name.split(' ')[0]}*!`,
+          `Se te ha asignado una nueva tarea: *${formData.title}*`,
+          '',
+          `*Objetivo:* ${formData.objective}`,
+          `*Prioridad:* ${formData.priority}`,
+          `*Vencimiento:* ${formData.due_date || 'Sin fecha'}`,
+          '',
+          'Podés ver los detalles aquí:',
+          `${APP_URL}/ordenes`
+        ].join('\n');
+        
+        window.open(buildWhatsAppLink(assignedUser.whatsapp, msg), '_blank');
+      }
 
       toast({ title: 'Orden creada', description: 'La orden de trabajo ha sido registrada con éxito.' });
       navigate('/ordenes');

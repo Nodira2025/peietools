@@ -26,6 +26,8 @@ export default function Herramientas() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterObra, setFilterObra] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
   const [filterEncargado, setFilterEncargado] = useState('');
   const [filterDate, setFilterDate] = useState('');
   const [visibleCount, setVisibleCount] = useState(6);

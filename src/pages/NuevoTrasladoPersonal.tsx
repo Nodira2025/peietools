@@ -18,6 +18,8 @@ export default function NuevoTrasladoPersonal() {
   const [targetObraId, setTargetObraId] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterEncargado, setFilterEncargado] = useState('');
 
   useEffect(() => {
     if (id) fetchDetails();
@@ -47,8 +49,17 @@ export default function NuevoTrasladoPersonal() {
       .order('name');
     
     setObras(obrasData || []);
+    setObras(obrasData || []);
     setLoading(false);
   };
+
+  const filteredObras = obras.filter(o => {
+    const matchSearch = !searchTerm || o.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchEncargado = !filterEncargado || (o.encargado_name === filterEncargado);
+    return matchSearch && matchEncargado;
+  });
+
+  const encargadosUnicos = [...new Set(obras.map(o => o.encargado_name).filter(Boolean))].sort();
 
   const handleTransfer = async () => {
     if (!targetObraId || !profile || !empleado) return;
@@ -156,8 +167,27 @@ export default function NuevoTrasladoPersonal() {
             <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1">
               <Building2 className="h-4 w-4" /> Obra de Destino
             </label>
+            <div className="flex flex-col gap-2">
+              <Input 
+                placeholder="Buscar obra por nombre..." 
+                value={searchTerm} 
+                onChange={e => setSearchTerm(e.target.value)}
+                className="h-10 rounded-xl"
+              />
+              <select
+                value={filterEncargado}
+                onChange={e => setFilterEncargado(e.target.value)}
+                className="h-10 px-3 rounded-xl border border-slate-200 bg-white text-sm"
+              >
+                <option value="">Todos los encargados</option>
+                {encargadosUnicos.map(e => (
+                  <option key={e!} value={e!}>{e}</option>
+                ))}
+              </select>
+            </div>
+
             <div className="grid gap-2 max-h-60 overflow-y-auto pr-1">
-              {obras.map(obra => (
+              {filteredObras.map(obra => (
                 <button
                   key={obra.id}
                   onClick={() => setTargetObraId(obra.id)}
@@ -167,9 +197,15 @@ export default function NuevoTrasladoPersonal() {
                       : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
                   }`}
                 >
-                  {obra.name}
+                  <div className="flex justify-between items-center">
+                    <span>{obra.name}</span>
+                    {obra.encargado_name && <span className="text-[10px] text-slate-400 font-normal">Enc: {obra.encargado_name}</span>}
+                  </div>
                 </button>
               ))}
+              {filteredObras.length === 0 && (
+                <p className="text-center py-4 text-xs text-slate-400">No se encontraron obras con esos filtros.</p>
+              )}
             </div>
           </div>
 

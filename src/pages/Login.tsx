@@ -95,7 +95,7 @@ export default function Login() {
                 <Input 
                   id="username" 
                   type="text" 
-                  placeholder="Ej: santiago" 
+                  placeholder="Usuario (ej: martin)" 
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   autoCapitalize="none"

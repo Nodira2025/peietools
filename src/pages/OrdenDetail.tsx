@@ -34,6 +34,10 @@ interface Orden {
     full_name: string | null;
     whatsapp: string | null;
   };
+  creator?: {
+    full_name: string | null;
+    whatsapp: string | null;
+  };
 }
 
 export default function OrdenDetail() {
@@ -49,7 +53,7 @@ export default function OrdenDetail() {
     setLoading(true);
     const { data, error } = await supabase
       .from('ordenes_trabajo')
-      .select('*, profiles:assigned_to(full_name, whatsapp)')
+      .select('*, profiles:assigned_to(full_name, whatsapp), creator:created_by(full_name, whatsapp)')
       .eq('id', id)
       .single();
 
@@ -78,6 +82,23 @@ export default function OrdenDetail() {
       toast({ variant: 'destructive', title: 'Error', description: error.message });
     } else {
       toast({ title: 'Estado actualizado', description: `La orden ahora está en estado: ${newStatus}` });
+      
+      // Notificar por WhatsApp el cambio de estado
+      const recipient = (newStatus === 'Realizada' || newStatus === 'Finalizada') ? orden.creator : orden.profiles;
+      
+      if (recipient?.whatsapp) {
+        const msg = [
+          `*ACTUALIZACIÓN DE ORDEN #${orden.id.slice(0, 8)}*`,
+          '',
+          `Hola *${recipient.full_name?.split(' ')[0]}*!`,
+          `La tarea "*${orden.title}*" cambió su estado a: *${newStatus}*`,
+          '',
+          `Ver detalles: ${window.location.origin}/ordenes/${orden.id}`
+        ].join('\n');
+        
+        window.open(`https://wa.me/${recipient.whatsapp}?text=${encodeURIComponent(msg)}`, '_blank');
+      }
+
       fetchOrden();
     }
     setUpdating(false);
@@ -204,16 +225,41 @@ export default function OrdenDetail() {
                   En Progreso
                 </Button>
                 <Button 
-                  disabled={updating || orden.status === 'Finalizada'}
-                  onClick={() => updateStatus('Finalizada')}
+                  disabled={updating || (orden.status === 'Realizada' || orden.status === 'Finalizada')}
+                  onClick={() => updateStatus('Realizada')}
                   className="rounded-xl flex items-center gap-2 h-12 bg-green-600 hover:bg-green-700 text-white shadow-md"
                 >
                   <CheckCircle2 size={18} />
-                  Finalizar
+                  Marcar Realizada
                 </Button>
               </div>
+
+              {/* Boton de confirmación final para el creador */}
+              {profile?.id === orden.created_by && orden.status === 'Realizada' && (
+                <div className="mt-6 pt-6 border-t border-slate-100 animate-in fade-in slide-in-from-top-2">
+                  <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 flex flex-col items-center text-center">
+                    <CheckCircle2 className="text-emerald-500 mb-2" size={32} />
+                    <h4 className="font-bold text-emerald-900">¿La tarea fue completada correctamente?</h4>
+                    <p className="text-xs text-emerald-700 mt-1 mb-4">Como solicitante, debés confirmar que el trabajo se realizó según lo esperado.</p>
+                    <Button 
+                      onClick={() => updateStatus('Finalizada')}
+                      disabled={updating}
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-12 font-bold shadow-lg shadow-emerald-200/50"
+                    >
+                      Sí, Confirmar y Finalizar
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {orden.status === 'Finalizada' && (
+                <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-center">
+                  <p className="text-sm font-bold text-slate-500">Esta orden ha sido FINALIZADA y confirmada.</p>
+                </div>
+              )}
+
               <p className="text-[10px] text-center text-slate-400 mt-4">
-                * El cambio de estado queda registrado inmediatamente en la bitácora del sistema.
+                * El cambio de estado queda registrado inmediatamente y se enviará una notificación a la otra parte.
               </p>
             </CardContent>
           </Card>
