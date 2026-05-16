@@ -59,6 +59,8 @@ export default function Usuarios() {
     setRole(user.role);
     setWhatsapp(user.whatsapp || '');
     setFullName(user.full_name || '');
+    setEmail(user.username || ''); // Cargamos el username actual
+    setPassword(''); // No cargamos la contraseña por seguridad
     setIsActive(user.active);
     setIsDialogOpen(true);
   };
@@ -66,23 +68,28 @@ export default function Usuarios() {
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser) return;
+    setLoading(true);
 
-    const { error } = await supabase
-      .from('profiles')
-      .update({ 
-        role, 
-        whatsapp, 
-        full_name: fullName, 
-        active: isActive 
-      })
-      .eq('id', selectedUser.id);
+    try {
+      // Usamos la nueva función RPC para actualizar datos sensibles (auth.users) y perfil
+      const { error } = await supabase.rpc('admin_update_user', {
+        p_user_id: selectedUser.id,
+        p_new_username: email, // El campo 'email' actúa como username
+        p_new_password: password || null, // Solo se cambia si se escribe algo
+        p_new_full_name: fullName,
+        p_new_role: role,
+        p_new_whatsapp: whatsapp
+      });
 
-    if (error) {
-      toast({ variant: 'destructive', title: 'Error', description: error.message });
-    } else {
-      toast({ title: 'Éxito', description: 'Usuario actualizado' });
+      if (error) throw error;
+
+      toast({ title: 'Éxito', description: 'Usuario actualizado correctamente' });
       setIsDialogOpen(false);
       fetchUsuarios();
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.message });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -90,27 +97,21 @@ export default function Usuarios() {
     e.preventDefault();
     setLoading(true);
 
-    const loginEmail = email.includes('@') ? email : `${email}@peie.com`;
-
     try {
-      // Intentamos registrar al nuevo usuario
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: loginEmail,
-        password: password,
-        options: {
-          data: {
-            full_name: fullName,
-            role: role,
-            whatsapp: whatsapp
-          }
-        }
+      // Usamos la nueva función RPC para crear el usuario con confirmación automática
+      const { data: newUserId, error } = await supabase.rpc('admin_create_user', {
+        p_username: email, // Usamos el campo 'email' como username
+        p_password: password,
+        p_full_name: fullName,
+        p_role: role,
+        p_whatsapp: whatsapp
       });
 
-      if (authError) throw authError;
+      if (error) throw error;
 
       toast({ 
         title: 'Usuario Creado', 
-        description: `Se ha registrado a ${fullName}. Si la confirmación de email está activa, el usuario deberá revisar su correo.` 
+        description: `Se ha registrado a ${fullName} correctamente. Ya puede ingresar.` 
       });
       setIsCreateDialogOpen(false);
       fetchUsuarios();
@@ -239,6 +240,25 @@ export default function Usuarios() {
               </Select>
             </div>
             <div className="space-y-2">
+              <Label htmlFor="username">Nombre de Usuario (para ingresar)</Label>
+              <Input 
+                id="username" 
+                value={email} 
+                onChange={e => setEmail(e.target.value)} 
+                placeholder="Ej: franco"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Nueva Contraseña (dejar en blanco para no cambiar)</Label>
+              <Input 
+                id="password" 
+                type="password"
+                value={password} 
+                onChange={e => setPassword(e.target.value)} 
+                placeholder="••••••••"
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="fullName">Nombre Completo</Label>
               <Input 
                 id="fullName" 
@@ -266,7 +286,9 @@ export default function Usuarios() {
               />
               <Label htmlFor="active">Usuario Activo</Label>
             </div>
-            <Button type="submit" className="w-full bg-peie-blue hover:bg-peie-blue/90">Guardar Cambios</Button>
+            <Button type="submit" disabled={loading} className="w-full bg-peie-blue hover:bg-peie-blue/90">
+              {loading ? 'Guardando...' : 'Guardar Cambios'}
+            </Button>
           </form>
         </DialogContent>
       </Dialog>

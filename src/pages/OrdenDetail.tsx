@@ -14,7 +14,8 @@ import {
   CheckCircle2, 
   PlayCircle,
   ExternalLink,
-  Loader2
+  Loader2,
+  Trash2
 } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 
@@ -27,10 +28,10 @@ interface Orden {
   priority: string;
   status: string;
   attachment_url: string | null;
-  assigned_to: string;
-  created_by: string;
+  assigned_to: string; // The ID
+  created_by: string;  // The ID
   created_at: string;
-  profiles: {
+  assigned?: {
     full_name: string | null;
     whatsapp: string | null;
   };
@@ -53,7 +54,7 @@ export default function OrdenDetail() {
     setLoading(true);
     const { data, error } = await supabase
       .from('ordenes_trabajo')
-      .select('*, assigned_to(full_name, whatsapp), created_by(full_name, whatsapp)')
+      .select('*, assigned:assigned_to(full_name, whatsapp), creator:created_by(full_name, whatsapp)')
       .eq('id', id)
       .single();
 
@@ -84,7 +85,10 @@ export default function OrdenDetail() {
       toast({ title: 'Estado actualizado', description: `La orden ahora está en estado: ${newStatus}` });
       
       // Notificar por WhatsApp el cambio de estado
-      const recipient = (newStatus === 'Realizada' || newStatus === 'Finalizada') ? orden.created_by : (orden as any).assigned_to;
+      // Si se marca como Realizada o Finalizada, notificamos al creador.
+      // Si se marca como Aceptada o En Progreso, notificamos al asignado.
+      const isFinishing = newStatus === 'Realizada' || newStatus === 'Finalizada';
+      const recipient = isFinishing ? orden.creator : orden.assigned;
       
       if (recipient?.whatsapp) {
         const msg = [
@@ -96,7 +100,7 @@ export default function OrdenDetail() {
           `Ver detalles: ${window.location.origin}/ordenes/${orden.id}`
         ].join('\n');
         
-        window.open(`https://wa.me/${recipient.whatsapp}?text=${encodeURIComponent(msg)}`, '_blank');
+        window.open(`https://wa.me/${recipient.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`, '_blank');
       }
 
       fetchOrden();
@@ -105,7 +109,7 @@ export default function OrdenDetail() {
   };
 
   const sendWhatsApp = () => {
-    if (!orden || !(orden as any).assigned_to?.whatsapp) {
+    if (!orden || !orden.assigned?.whatsapp) {
       toast({ variant: 'destructive', title: 'Error', description: 'El usuario asignado no tiene WhatsApp configurado.' });
       return;
     }
@@ -119,7 +123,26 @@ export default function OrdenDetail() {
       `Ver más detalles en: ${window.location.origin}/ordenes/${orden.id}`;
 
     const encodedMessage = encodeURIComponent(message);
-    window.open(`https://wa.me/${(orden as any).assigned_to.whatsapp}?text=${encodedMessage}`, '_blank');
+    window.open(`https://wa.me/${orden.assigned.whatsapp.replace(/\D/g, '')}?text=${encodedMessage}`, '_blank');
+  };
+
+  const handleDelete = async () => {
+    if (!orden) return;
+    if (!window.confirm('¿Estás seguro de que deseas eliminar esta orden? Esta acción no se puede deshacer.')) return;
+
+    setUpdating(true);
+    const { error } = await supabase
+      .from('ordenes_trabajo')
+      .delete()
+      .eq('id', orden.id);
+
+    if (error) {
+      toast({ variant: 'destructive', title: 'Error', description: error.message });
+      setUpdating(false);
+    } else {
+      toast({ title: 'Orden eliminada', description: 'La orden ha sido borrada correctamente.' });
+      navigate('/ordenes');
+    }
   };
 
   if (loading) return (
@@ -277,7 +300,17 @@ export default function OrdenDetail() {
                 </div>
                 <div>
                   <p className="text-[10px] text-slate-400 font-bold uppercase">Asignado a</p>
-                  <p className="text-sm font-medium text-slate-700">{(orden as any).assigned_to?.full_name || 'Sin nombre'}</p>
+                  <p className="text-sm font-medium text-slate-700">{orden.assigned?.full_name || 'Sin nombre'}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-slate-100 rounded-lg">
+                  <User size={18} className="text-slate-500" />
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase">Creado por</p>
+                  <p className="text-sm font-medium text-slate-700">{orden.creator?.full_name || 'Desconocido'}</p>
                 </div>
               </div>
 
@@ -313,14 +346,14 @@ export default function OrdenDetail() {
             </CardContent>
           </Card>
 
-          {(orden as any).assigned_to?.whatsapp && (
+          {orden.assigned?.whatsapp && (
              <Card className="bg-green-600 border-none text-white shadow-lg overflow-hidden relative">
                <div className="absolute top-0 right-0 p-4 opacity-10">
                  <MessageCircle size={80} />
                </div>
                <CardContent className="p-6 relative z-10">
                  <h4 className="font-bold mb-1">WhatsApp Directo</h4>
-                 <p className="text-xs text-green-50 mb-4">¿Necesitas coordinar con {(orden as any).assigned_to.full_name?.split(' ')[0]}?</p>
+                 <p className="text-xs text-green-50 mb-4">¿Necesitas coordinar con {orden.assigned.full_name?.split(' ')[0]}?</p>
                  <Button 
                    onClick={sendWhatsApp}
                    className="w-full bg-white text-green-600 hover:bg-green-50 font-bold rounded-xl"
@@ -329,6 +362,20 @@ export default function OrdenDetail() {
                  </Button>
                </CardContent>
              </Card>
+          )}
+
+          {(isAdmin || profile?.id === orden.created_by) && (
+            <div className="pt-4">
+              <Button 
+                variant="outline" 
+                onClick={handleDelete}
+                disabled={updating}
+                className="w-full border-red-200 text-red-600 hover:bg-red-50 rounded-xl flex items-center gap-2 h-12"
+              >
+                <Trash2 size={18} />
+                Eliminar Orden
+              </Button>
+            </div>
           )}
         </div>
       </div>

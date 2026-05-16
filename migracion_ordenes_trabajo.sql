@@ -24,6 +24,10 @@ ALTER TABLE ordenes_trabajo ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Ordenes viewable by everyone" ON ordenes_trabajo FOR SELECT USING (true);
 CREATE POLICY "Anyone can insert ordenes" ON ordenes_trabajo FOR INSERT WITH CHECK (auth.uid() = created_by);
 CREATE POLICY "Anyone can update ordenes" ON ordenes_trabajo FOR UPDATE USING (true);
+CREATE POLICY "Anyone can delete ordenes" ON ordenes_trabajo FOR DELETE USING (
+  auth.uid() = created_by OR 
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+);
 
 -- 4. Configuración de Storage para adjuntos (Bucket 'ordenes')
 -- Nota: El bucket debe crearse en el dashboard o vía API de Storage.
