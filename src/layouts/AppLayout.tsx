@@ -1,6 +1,6 @@
 import { Navigate, Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
-import { Home, Wrench, FileText, Truck, Users, Building, LogOut, ShoppingCart, Sparkles } from 'lucide-react';
+import { Home, Wrench, FileText, Truck, Users, Building, LogOut, ShoppingCart, Sparkles, HardHat, ClipboardList } from 'lucide-react';
 
 export default function AppLayout() {
   const { user, profile, loading, signOut } = useAuthStore();
@@ -27,6 +27,8 @@ export default function AppLayout() {
     { name: 'Pedidos', path: '/solicitudes', icon: Home, show: true },
     { name: 'Herramientas', path: '/herramientas', icon: Wrench, show: true },
     { name: 'Mis Obras', path: '/mis-obras', icon: Building, show: true },
+    { name: 'Personal', path: '/personal', icon: HardHat, show: true },
+    { name: 'Órdenes', path: '/ordenes', icon: ClipboardList, show: true },
     { name: 'Logística', path: '/logistica', icon: Truck, show: isLogistica || isAdmin },
     { name: 'Compras', path: '/compras', icon: ShoppingCart, show: true },
     { name: 'Obras (Admin)', path: '/obras', icon: Building, show: isAdmin },

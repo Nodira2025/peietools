@@ -32,6 +32,8 @@ export default function Usuarios() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [role, setRole] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [isActive, setIsActive] = useState(true);
 
   const fetchUsuarios = async () => {
     setLoading(true);
@@ -52,6 +54,8 @@ export default function Usuarios() {
     setSelectedUser(user);
     setRole(user.role);
     setWhatsapp(user.whatsapp || '');
+    setFullName(user.full_name || '');
+    setIsActive(user.active);
     setIsDialogOpen(true);
   };
 
@@ -61,7 +65,12 @@ export default function Usuarios() {
 
     const { error } = await supabase
       .from('profiles')
-      .update({ role, whatsapp })
+      .update({ 
+        role, 
+        whatsapp, 
+        full_name: fullName, 
+        active: isActive 
+      })
       .eq('id', selectedUser.id);
 
     if (error) {
@@ -133,6 +142,15 @@ export default function Usuarios() {
               </Select>
             </div>
             <div className="space-y-2">
+              <Label htmlFor="fullName">Nombre Completo</Label>
+              <Input 
+                id="fullName" 
+                value={fullName} 
+                onChange={e => setFullName(e.target.value)} 
+                placeholder="Nombre y Apellido"
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="whatsapp">Número de WhatsApp (con código de país, ej: 54911...)</Label>
               <Input 
                 id="whatsapp" 
@@ -140,6 +158,16 @@ export default function Usuarios() {
                 onChange={e => setWhatsapp(e.target.value)} 
                 placeholder="549XXXXXXXXXX"
               />
+            </div>
+            <div className="flex items-center space-x-2 pt-2">
+              <input 
+                type="checkbox" 
+                id="active" 
+                checked={isActive} 
+                onChange={e => setIsActive(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-peie-blue focus:ring-peie-blue"
+              />
+              <Label htmlFor="active">Usuario Activo</Label>
             </div>
             <Button type="submit" className="w-full bg-peie-blue hover:bg-peie-blue/90">Guardar Cambios</Button>
           </form>

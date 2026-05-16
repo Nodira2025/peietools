@@ -45,6 +45,8 @@ export default function Compras() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterPriority, setFilterPriority] = useState('');
+  const [filterDate, setFilterDate] = useState('');
+  const [visibleCount, setVisibleCount] = useState(6);
 
   const isComprasRole = profile?.role === 'compras' || profile?.role === 'admin';
 
@@ -84,7 +86,8 @@ export default function Compras() {
     const matchSearch = !searchTerm || c.tool_name.toLowerCase().includes(searchTerm.toLowerCase()) || (c.profiles?.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) || (c.obras?.name || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchStatus = !filterStatus || c.status === filterStatus;
     const matchPriority = !filterPriority || c.priority === filterPriority;
-    return matchSearch && matchStatus && matchPriority;
+    const matchDate = !filterDate || c.created_at.startsWith(filterDate);
+    return matchSearch && matchStatus && matchPriority && matchDate;
   });
 
   const resetForm = () => {
@@ -326,15 +329,20 @@ ${APP_URL}/compras/${compra.id}`;
         filters={[
           { key: 'status', label: 'Estado', value: filterStatus, options: ['Pendiente','En evaluacion','Aprobada','Rechazada','Comprada','Recibida','Cerrada'].map(s => ({ value: s, label: s })) },
           { key: 'priority', label: 'Prioridad', value: filterPriority, options: ['Baja','Normal','Alta','Urgente'].map(p => ({ value: p, label: p })) },
+          { key: 'date', label: 'Fecha Solicitud', value: filterDate, type: 'date' },
         ]}
-        onFilterChange={(key, val) => { if (key === 'status') setFilterStatus(val); else setFilterPriority(val); }}
+        onFilterChange={(key, val) => { 
+          if (key === 'status') setFilterStatus(val); 
+          else if (key === 'priority') setFilterPriority(val);
+          else if (key === 'date') setFilterDate(val);
+        }}
       />
 
       {loading ? (
         <div className="text-center py-8 text-muted-foreground">Cargando solicitudes...</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {filteredCompras.map(compra => (
+          {filteredCompras.slice(0, visibleCount).map(compra => (
             <Card key={compra.id} className="relative">
               <CardHeader className="pb-2">
                 <div className="flex justify-between items-start mb-2">
@@ -372,6 +380,18 @@ ${APP_URL}/compras/${compra.id}`;
               </CardContent>
             </Card>
           ))}
+          
+          {visibleCount < filteredCompras.length && (
+            <div className="col-span-full pt-4">
+              <Button 
+                variant="ghost" 
+                className="w-full py-6 text-peie-blue hover:bg-peie-blue/5 font-bold rounded-xl"
+                onClick={() => setVisibleCount(prev => prev + 6)}
+              >
+                Ver más solicitudes ({filteredCompras.length - visibleCount} restantes)
+              </Button>
+            </div>
+          )}
           {compras.length === 0 && (
             <div className="col-span-full text-center py-12 bg-white rounded-lg border border-dashed border-gray-300">
               <ShoppingCart className="mx-auto h-12 w-12 text-gray-400 mb-3" />

@@ -22,6 +22,13 @@ import Logistica from './pages/Logistica';
 import Compras from './pages/Compras';
 import CompraDetail from './pages/CompraDetail';
 import MisObras from './pages/MisObras';
+import Personal from './pages/Personal';
+import NuevoTrasladoPersonal from './pages/NuevoTrasladoPersonal';
+import TrasladoPersonalDetail from './pages/TrasladoPersonalDetail';
+import Ordenes from './pages/Ordenes';
+import NuevaOrden from './pages/NuevaOrden';
+import OrdenDetail from './pages/OrdenDetail';
+
 
 export default function App() {
   const { checkUser, loading } = useAuthStore();
@@ -63,6 +70,12 @@ export default function App() {
           <Route path="/logistica" element={<Logistica />} />
           <Route path="/obras" element={<Obras />} />
           <Route path="/mis-obras" element={<MisObras />} />
+          <Route path="/personal" element={<Personal />} />
+          <Route path="/personal/trasladar/:id" element={<NuevoTrasladoPersonal />} />
+          <Route path="/personal/traslados/:id" element={<TrasladoPersonalDetail />} />
+          <Route path="/ordenes" element={<Ordenes />} />
+          <Route path="/ordenes/nueva" element={<NuevaOrden />} />
+          <Route path="/ordenes/:id" element={<OrdenDetail />} />
           <Route path="/usuarios" element={<Usuarios />} />
         </Route>
 

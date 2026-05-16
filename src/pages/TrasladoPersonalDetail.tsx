@@ -1,0 +1,255 @@
+import { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { ArrowLeft, Clock, CheckCircle, MapPin, HardHat, AlertCircle } from 'lucide-react';
+import { useAuthStore } from '../store/auth';
+import { buildWhatsAppLink, APP_URL } from '../lib/whatsapp';
+
+export default function TrasladoPersonalDetail() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const { profile } = useAuthStore();
+  const [traslado, setTraslado] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [showReceipt, setShowReceipt] = useState(false);
+  const receiptRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (id) fetchTraslado();
+  }, [id]);
+
+  const fetchTraslado = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('traslados_personal')
+      .select(`
+        *,
+        empleados(full_name),
+        source_obra:obras!traslados_personal_source_obra_id_fkey(name),
+        target_obra:obras!traslados_personal_target_obra_id_fkey(name),
+        requester:profiles!traslados_personal_requester_id_fkey(full_name, whatsapp),
+        confirmed_profile:profiles!traslados_personal_confirmed_by_fkey(full_name)
+      `)
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Traslado no encontrado.' });
+      navigate('/personal');
+    } else {
+      setTraslado(data);
+      if (data.status === 'Confirmado') setShowReceipt(true);
+    }
+    setLoading(false);
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch(status) {
+      case 'Pendiente': return <span className="flex items-center text-orange-600 bg-orange-100 px-3 py-1.5 rounded-full text-xs font-bold"><Clock className="w-3 h-3 mr-1" /> Pendiente</span>;
+      case 'Confirmado': return <span className="flex items-center text-emerald-700 bg-emerald-100 px-3 py-1.5 rounded-full text-xs font-bold"><CheckCircle className="w-3 h-3 mr-1" /> Confirmado</span>;
+      case 'Cancelado': return <span className="flex items-center text-red-600 bg-red-100 px-3 py-1.5 rounded-full text-xs font-bold"><AlertCircle className="w-3 h-3 mr-1" /> Cancelado</span>;
+      default: return <span className="bg-gray-100 px-3 py-1.5 rounded-full text-xs">{status}</span>;
+    }
+  };
+
+  const confirmarRecepcion = async () => {
+    if (!traslado || !profile) return;
+
+    try {
+      // 1. Actualizar estado del traslado
+      const { error: trasError } = await supabase
+        .from('traslados_personal')
+        .update({
+          status: 'Confirmado',
+          confirmed_by: profile.id,
+          confirmed_at: new Date().toISOString()
+        })
+        .eq('id', traslado.id);
+
+      if (trasError) throw trasError;
+
+      // 2. Actualizar la ubicación del empleado
+      const { error: empError } = await supabase
+        .from('empleados')
+        .update({ obra_id: traslado.target_obra_id })
+        .eq('id', traslado.empleado_id);
+
+      if (empError) throw empError;
+
+      toast({ 
+        title: 'Recepción Confirmada!', 
+        description: 'Generando comprobante y avisando al origen...',
+        className: 'bg-emerald-50 border-emerald-200'
+      });
+
+      // 3. Generar WhatsApp al Encargado Origen (requester)
+      if (traslado.requester?.whatsapp) {
+        const msg = [
+          '*RECEPCIÓN DE PERSONAL CONFIRMADA*',
+          '',
+          `*${profile.full_name}* confirmó la llegada del personal a *${traslado.target_obra.name}*:`,
+          '',
+          `- *Empleado:* ${traslado.empleados.full_name}`,
+          `- *Origen:* ${traslado.source_obra?.name || 'Desconocida'}`,
+          '',
+          'El traslado se completó con éxito.',
+          '',
+          'Ver comprobante:',
+          `${APP_URL}/personal/traslados/${traslado.id}`
+        ].join('\n');
+
+        setTimeout(() => { 
+          window.open(buildWhatsAppLink(traslado.requester.whatsapp, msg), '_blank'); 
+          fetchTraslado();
+        }, 500);
+      } else {
+        fetchTraslado();
+      }
+
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Error', description: err.message });
+    }
+  };
+
+  if (loading) return <div className="p-8 text-center text-muted-foreground">Cargando traslado...</div>;
+  if (!traslado) return null;
+
+  const canConfirm = traslado.status === 'Pendiente' && 
+    (profile?.obra_id === traslado.target_obra_id || profile?.role === 'admin');
+
+  return (
+    <div className="space-y-6 max-w-2xl mx-auto pb-safe">
+      <div className="flex items-center mb-4">
+        <Button variant="ghost" onClick={() => navigate('/personal')} className="p-0 hover:bg-transparent">
+          <ArrowLeft className="mr-2 h-4 w-4" /> Volver
+        </Button>
+      </div>
+
+      <Card className="shadow-sm border-0 ring-1 ring-slate-100 rounded-2xl overflow-hidden">
+        <div className="h-1.5 bg-gradient-to-r from-peie-light via-peie-blue to-peie-light" />
+        <CardHeader className="pb-4 pt-6">
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle className="text-xl font-bold text-peie-blue flex items-center gap-2">
+                <HardHat className="h-5 w-5" />
+                {traslado.empleados.full_name}
+              </CardTitle>
+              <CardDescription className="text-sm mt-1">
+                Traslado de Personal
+              </CardDescription>
+            </div>
+            {getStatusBadge(traslado.status)}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {/* Info del traslado */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-red-50 p-3 rounded-xl border border-red-100">
+              <p className="text-[10px] font-bold text-red-400 uppercase tracking-wider flex items-center gap-1"><MapPin className="w-3 h-3"/> Origen</p>
+              <p className="font-semibold text-red-700 text-sm mt-0.5">{traslado.source_obra?.name || 'Sin obra previa'}</p>
+            </div>
+            <div className="bg-green-50 p-3 rounded-xl border border-green-100">
+              <p className="text-[10px] font-bold text-green-400 uppercase tracking-wider flex items-center gap-1"><MapPin className="w-3 h-3"/> Destino</p>
+              <p className="font-semibold text-green-700 text-sm mt-0.5">{traslado.target_obra?.name}</p>
+            </div>
+          </div>
+
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2 text-sm">
+            <p><strong className="text-slate-500">Solicitado por:</strong> <span className="text-slate-800 font-medium">{traslado.requester?.full_name || '-'}</span></p>
+            <p><strong className="text-slate-500">Fecha de inicio:</strong> <span className="text-slate-800 font-medium">{new Date(traslado.created_at).toLocaleString()}</span></p>
+          </div>
+
+          {/* Acciones */}
+          {canConfirm && (
+            <div className="pt-4 border-t border-slate-100 space-y-3">
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Tus Acciones</h4>
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center mb-3">
+                <CheckCircle className="mx-auto h-8 w-8 text-emerald-400 mb-2" />
+                <p className="text-sm font-semibold text-emerald-700">El personal ha sido enviado a tu obra.</p>
+                <p className="text-xs text-emerald-600/80 mt-1">Presioná confirmar cuando el empleado llegue al lugar.</p>
+              </div>
+              <Button 
+                onClick={confirmarRecepcion}
+                className="bg-gradient-to-r from-emerald-600 to-green-500 hover:from-emerald-700 hover:to-green-600 text-white font-bold w-full h-14 rounded-xl shadow-lg text-base"
+              >
+                <CheckCircle className="mr-2 h-5 w-5" />
+                Confirmar Recepción
+              </Button>
+            </div>
+          )}
+
+          {!canConfirm && traslado.status === 'Pendiente' && (
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-center mt-4">
+              <Clock className="mx-auto h-8 w-8 text-orange-400 mb-2" />
+              <p className="text-sm font-semibold text-orange-700">Esperando confirmación de destino</p>
+              <p className="text-xs text-orange-500 mt-1">El encargado de {traslado.target_obra?.name} debe confirmar la recepción al llegar.</p>
+            </div>
+          )}
+
+          {/* COMPROBANTE FINAL */}
+          {(showReceipt) && (
+            <div className="pt-4 mt-4 border-t border-slate-100">
+              <div ref={receiptRef} className="bg-white border-2 border-slate-200 rounded-2xl overflow-hidden shadow-lg">
+                <div className="bg-gradient-to-r from-peie-blue to-peie-light p-5 text-white text-center relative">
+                  <h3 className="text-lg font-bold tracking-wide">PEIE TOOLS</h3>
+                  <p className="text-[10px] text-white/70 font-medium tracking-widest uppercase mt-0.5">Comprobante de Personal</p>
+                  <div className="absolute top-3 right-4 text-[9px] text-white/50 font-mono">
+                    #{traslado.id.slice(0, 8).toUpperCase()}
+                  </div>
+                </div>
+
+                <div className="p-5 space-y-4">
+                  <div className="flex justify-between items-center pb-3 border-b border-dashed border-slate-200">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Fecha</span>
+                    <span className="text-xs font-mono text-slate-700">{new Date(traslado.confirmed_at).toLocaleDateString('es-AR')}</span>
+                  </div>
+
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400 text-xs">Empleado</span>
+                      <span className="font-bold text-slate-800">{traslado.empleados.full_name}</span>
+                    </div>
+                    
+                    <div className="h-px bg-slate-100 my-2" />
+                    
+                    <div className="flex justify-between">
+                      <span className="text-slate-400 text-xs">Origen</span>
+                      <span className="text-red-600 font-medium">{traslado.source_obra?.name || '-'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400 text-xs">Destino</span>
+                      <span className="text-green-600 font-medium">{traslado.target_obra?.name}</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center mt-4">
+                    <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Estado</p>
+                    <p className="text-lg font-black text-emerald-700 mt-0.5">TRASLADO COMPLETADO</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 pt-4 mt-2 border-t border-dashed border-slate-200">
+                    <div className="text-center">
+                      <div className="h-8 border-b border-slate-300 mb-1" />
+                      <p className="text-[10px] text-slate-400 font-medium">Envió</p>
+                      <p className="text-[11px] font-semibold text-slate-600">{traslado.requester?.full_name}</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="h-8 border-b border-slate-300 mb-1" />
+                      <p className="text-[10px] text-slate-400 font-medium">Recibió</p>
+                      <p className="text-[11px] font-semibold text-slate-600">{traslado.confirmed_profile?.full_name}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

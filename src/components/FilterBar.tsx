@@ -10,7 +10,8 @@ interface FilterBarProps {
     key: string;
     label: string;
     value: string;
-    options: FilterOption[];
+    type?: 'select' | 'date';
+    options?: FilterOption[];
   }[];
   onFilterChange: (key: string, value: string) => void;
 }
@@ -22,21 +23,36 @@ export default function FilterBar({ filters, onFilterChange }: FilterBarProps) {
     <div className="flex flex-wrap gap-2">
       {filters.map(filter => (
         <div key={filter.key} className="relative">
-          <select
-            value={filter.value}
-            onChange={e => onFilterChange(filter.key, e.target.value)}
-            className={`appearance-none text-xs font-semibold pl-3 pr-7 py-2 rounded-full border cursor-pointer transition-colors ${
-              filter.value 
-                ? 'bg-peie-blue text-white border-peie-blue' 
-                : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
-            }`}
-          >
-            <option value="">{filter.label}</option>
-            {filter.options.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-          <ChevronDown className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 pointer-events-none ${filter.value ? 'text-white' : 'text-slate-400'}`} />
+          {filter.type === 'date' ? (
+            <input
+              type="date"
+              value={filter.value}
+              onChange={e => onFilterChange(filter.key, e.target.value)}
+              className={`appearance-none text-xs font-semibold px-3 py-2 rounded-full border cursor-pointer transition-colors ${
+                filter.value 
+                  ? 'bg-peie-blue text-white border-peie-blue' 
+                  : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+              }`}
+            />
+          ) : (
+            <>
+              <select
+                value={filter.value}
+                onChange={e => onFilterChange(filter.key, e.target.value)}
+                className={`appearance-none text-xs font-semibold pl-3 pr-7 py-2 rounded-full border cursor-pointer transition-colors ${
+                  filter.value 
+                    ? 'bg-peie-blue text-white border-peie-blue' 
+                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <option value="">{filter.label}</option>
+                {filter.options?.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              <ChevronDown className={`absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 pointer-events-none ${filter.value ? 'text-white' : 'text-slate-400'}`} />
+            </>
+          )}
         </div>
       ))}
       {activeCount > 0 && (

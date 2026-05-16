@@ -20,12 +20,12 @@ DROP TABLE IF EXISTS obras CASCADE;
 DELETE FROM auth.identities WHERE user_id IN (
   SELECT id FROM auth.users WHERE email IN (
     'admin@peie.com', 'santiago@peie.com', 'martin@peie.com', 'franco@peie.com', 
-    'cristian@peie.com', 'federico@peie.com'
+    'cristian@peie.com', 'federico@peie.com', 'florencia@peie.com', 'melisa@peie.com'
   )
 );
 DELETE FROM auth.users WHERE email IN (
   'admin@peie.com', 'santiago@peie.com', 'martin@peie.com', 'franco@peie.com', 
-  'cristian@peie.com', 'federico@peie.com'
+  'cristian@peie.com', 'federico@peie.com', 'florencia@peie.com', 'melisa@peie.com'
 );
 
 -- 3. Borrar trigger y función antiguos
@@ -238,6 +238,8 @@ DECLARE
   franco_id UUID := gen_random_uuid();
   cristian_id UUID := gen_random_uuid();
   federico_id UUID := gen_random_uuid();
+  florencia_id UUID := gen_random_uuid();
+  melisa_id UUID := gen_random_uuid();
   obra_id UUID := gen_random_uuid();
 BEGIN
 
@@ -286,7 +288,7 @@ BEGIN
     crypt('martin123', gen_salt('bf')), now(),
     '', '', '', '',
     '{"provider":"email","providers":["email"]}',
-    '{"full_name":"Martin Grande","role":"encargado","whatsapp":"+543816490060","photo_url":"/img/foto_empleado_martin.jpg"}',
+    '{"full_name":"Martin Grande","role":"encargado","whatsapp":"+54 9 3816 69-8316","photo_url":"/img/foto_empleado_martin.jpg"}',
     now(), now(), 'authenticated', 'authenticated', false
   );
   INSERT INTO auth.identities (id, user_id, provider_id, identity_data, provider, created_at, updated_at, last_sign_in_at)
@@ -337,11 +339,45 @@ BEGIN
     crypt('federico123', gen_salt('bf')), now(),
     '', '', '', '',
     '{"provider":"email","providers":["email"]}',
-    '{"full_name":"Federico Grande","role":"encargado","whatsapp":"+543816490060","photo_url":"/img/foto_empleado_santiago.jpg"}',
+    '{"full_name":"Federico Grande","role":"admin","whatsapp":"+54 9 3814 01-5738","photo_url":"/img/foto_empleado_santiago.jpg"}',
     now(), now(), 'authenticated', 'authenticated', false
   );
   INSERT INTO auth.identities (id, user_id, provider_id, identity_data, provider, created_at, updated_at, last_sign_in_at)
   VALUES (gen_random_uuid(), federico_id, federico_id, format('{"sub":"%s","email":"federico@peie.com","email_verified":true}', federico_id::text)::jsonb, 'email', now(), now(), now());
+
+  -- 6. Florencia Grande (Admin)
+  INSERT INTO auth.users (
+    id, instance_id, email, encrypted_password, email_confirmed_at,
+    confirmation_token, email_change, email_change_token_new, recovery_token,
+    raw_app_meta_data, raw_user_meta_data,
+    created_at, updated_at, role, aud, is_sso_user
+  ) VALUES (
+    florencia_id, '00000000-0000-0000-0000-000000000000', 'florencia@peie.com',
+    crypt('admin123', gen_salt('bf')), now(),
+    '', '', '', '',
+    '{"provider":"email","providers":["email"]}',
+    '{"full_name":"Florencia Grande","role":"admin","whatsapp":"+54 9 3813 32-3666","photo_url":"/img/foto_empleado_santiago.jpg"}',
+    now(), now(), 'authenticated', 'authenticated', false
+  );
+  INSERT INTO auth.identities (id, user_id, provider_id, identity_data, provider, created_at, updated_at, last_sign_in_at)
+  VALUES (gen_random_uuid(), florencia_id, florencia_id, format('{"sub":"%s","email":"florencia@peie.com","email_verified":true}', florencia_id::text)::jsonb, 'email', now(), now(), now());
+
+  -- 7. Melisa Gonzales (Admin)
+  INSERT INTO auth.users (
+    id, instance_id, email, encrypted_password, email_confirmed_at,
+    confirmation_token, email_change, email_change_token_new, recovery_token,
+    raw_app_meta_data, raw_user_meta_data,
+    created_at, updated_at, role, aud, is_sso_user
+  ) VALUES (
+    melisa_id, '00000000-0000-0000-0000-000000000000', 'melisa@peie.com',
+    crypt('admin123', gen_salt('bf')), now(),
+    '', '', '', '',
+    '{"provider":"email","providers":["email"]}',
+    '{"full_name":"Melisa Gonzales","role":"admin","whatsapp":"+54 9 3816 29-5626","photo_url":"/img/foto_empleado_santiago.jpg"}',
+    now(), now(), 'authenticated', 'authenticated', false
+  );
+  INSERT INTO auth.identities (id, user_id, provider_id, identity_data, provider, created_at, updated_at, last_sign_in_at)
+  VALUES (gen_random_uuid(), melisa_id, melisa_id, format('{"sub":"%s","email":"melisa@peie.com","email_verified":true}', melisa_id::text)::jsonb, 'email', now(), now(), now());
 
   -- Crear Obra de Prueba
   INSERT INTO obras (id, code, name, address, active, photo_url)
@@ -362,7 +398,9 @@ END $$;
 --   martin@peie.com   / martin123    (rol: encargado)
 --   franco@peie.com   / franco123    (rol: encargado)
 --   cristian@peie.com / cristian123  (rol: encargado)
---   federico@peie.com / federico123  (rol: encargado)
+--   federico@peie.com / federico123  (rol: admin)
+--   florencia@peie.com / admin123    (rol: admin)
+--   melisa@peie.com    / admin123    (rol: admin)
 --
 -- En la app, solo escribí el nombre (ej: "admin" o "santiago") y la contraseña.
 -- El @peie.com se agrega automáticamente.

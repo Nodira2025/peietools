@@ -40,6 +40,7 @@ export default function MisObras() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterEncargado, setFilterEncargado] = useState('');
+  const [visibleCount, setVisibleCount] = useState(10);
 
   useEffect(() => {
     fetchObras();
@@ -238,7 +239,7 @@ export default function MisObras() {
         <div className="text-center py-12 text-muted-foreground">Cargando obras...</div>
       ) : (
         <div className="space-y-2">
-          {filteredObras.map(obra => (
+          {filteredObras.slice(0, visibleCount).map(obra => (
             <Card
               key={obra.id}
               className="cursor-pointer hover:shadow-md active:scale-[0.98] transition-all rounded-xl"
@@ -259,6 +260,16 @@ export default function MisObras() {
               </CardContent>
             </Card>
           ))}
+          
+          {visibleCount < filteredObras.length && (
+            <Button 
+              variant="ghost" 
+              className="w-full py-6 text-peie-blue hover:bg-peie-blue/5 font-bold rounded-xl"
+              onClick={() => setVisibleCount(prev => prev + 10)}
+            >
+              Ver más obras ({filteredObras.length - visibleCount} restantes)
+            </Button>
+          )}
           {filteredObras.length === 0 && (
             <div className="text-center py-12 bg-white rounded-xl border border-dashed border-slate-200">
               <Building2 className="mx-auto h-10 w-10 text-slate-300 mb-2" />

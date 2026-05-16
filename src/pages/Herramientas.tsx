@@ -26,9 +26,9 @@ export default function Herramientas() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterObra, setFilterObra] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
-  const [filterCategory, setFilterCategory] = useState('');
   const [filterEncargado, setFilterEncargado] = useState('');
+  const [filterDate, setFilterDate] = useState('');
+  const [visibleCount, setVisibleCount] = useState(6);
   const { toast } = useToast();
   const navigate = useNavigate();
   const { profile } = useAuthStore();
@@ -62,7 +62,8 @@ export default function Herramientas() {
     const matchStatus = !filterStatus || h.status === filterStatus;
     const matchCategory = !filterCategory || (h.category || 'Otros') === filterCategory;
     const matchEncargado = !filterEncargado || h.obras?.encargado_name === filterEncargado;
-    return matchSearch && matchObra && matchStatus && matchCategory && matchEncargado;
+    const matchDate = !filterDate || (h as any).created_at?.startsWith(filterDate);
+    return matchSearch && matchObra && matchStatus && matchCategory && matchEncargado && matchDate;
   });
 
   const getStatusColor = (status: string) => {
@@ -82,6 +83,7 @@ export default function Herramientas() {
     else if (key === 'status') setFilterStatus(value);
     else if (key === 'category') setFilterCategory(value);
     else if (key === 'encargado') setFilterEncargado(value);
+    else if (key === 'date') setFilterDate(value);
   };
 
   return (
@@ -116,6 +118,7 @@ export default function Herramientas() {
           { key: 'category', label: 'Categoria', value: filterCategory, options: categoriasUnicas.map(c => ({ value: c, label: c })) },
           { key: 'obra', label: 'Obra', value: filterObra, options: obrasUnicas.map(o => ({ value: o!, label: o! })) },
           { key: 'encargado', label: 'Encargado', value: filterEncargado, options: encargadosUnicos.map(e => ({ value: e!, label: e! })) },
+          { key: 'date', label: 'Fecha Alta', value: filterDate, type: 'date' },
         ]}
         onFilterChange={handleFilterChange}
       />
@@ -124,7 +127,7 @@ export default function Herramientas() {
         <div className="text-center py-8 text-muted-foreground">Cargando herramientas...</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {filtered.map(h => (
+          {filtered.slice(0, visibleCount).map(h => (
             <Card key={h.id} className="relative hover:shadow-md transition-shadow cursor-pointer overflow-hidden flex flex-col rounded-xl" onClick={() => navigate('/herramientas/' + h.id)}>
               {h.photo_url && (
                 <div className="h-32 w-full bg-slate-50 border-b border-slate-100">
@@ -144,6 +147,18 @@ export default function Herramientas() {
               </CardContent>
             </Card>
           ))}
+          
+          {visibleCount < filtered.length && (
+            <div className="col-span-full pt-4">
+              <Button 
+                variant="ghost" 
+                className="w-full py-6 text-peie-blue hover:bg-peie-blue/5 font-bold rounded-xl"
+                onClick={() => setVisibleCount(prev => prev + 6)}
+              >
+                Ver más herramientas ({filtered.length - visibleCount} restantes)
+              </Button>
+            </div>
+          )}
           {filtered.length === 0 && (
             <div className="col-span-full text-center py-12 bg-white rounded-xl border border-dashed border-gray-200">
               <Wrench className="mx-auto h-10 w-10 text-gray-300 mb-2" />
