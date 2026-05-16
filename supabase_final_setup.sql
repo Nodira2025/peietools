@@ -45,7 +45,7 @@ CREATE TABLE obras (
     code TEXT UNIQUE,
     name TEXT NOT NULL,
     address TEXT,
-    manager_name TEXT,
+    encargado_name TEXT,
     phone TEXT,
     latitude DOUBLE PRECISION,
     longitude DOUBLE PRECISION,
@@ -380,8 +380,8 @@ BEGIN
   VALUES (gen_random_uuid(), melisa_id, melisa_id, format('{"sub":"%s","email":"melisa@peie.com","email_verified":true}', melisa_id::text)::jsonb, 'email', now(), now(), now());
 
   -- Crear Obra de Prueba
-  INSERT INTO obras (id, code, name, address, active, photo_url)
-  VALUES (obra_id, 'OBRA-001', 'Obra Central', 'Santiago del Estero, Argentina', true, '/img/foto_obra_central.jpg');
+  INSERT INTO obras (id, code, name, address, encargado_name, active, photo_url)
+  VALUES (obra_id, 'OBRA-001', 'Obra Central', 'Santiago del Estero, Argentina', 'Martin Grande', true, '/img/foto_obra_central.jpg');
 
   -- Crear Herramienta de Prueba
   INSERT INTO herramientas (code, name, brand, model, status, current_obra_id, photo_url)

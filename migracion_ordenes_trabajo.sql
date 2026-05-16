@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS ordenes_trabajo (
     start_date TIMESTAMP WITH TIME ZONE DEFAULT now(),
     due_date TIMESTAMP WITH TIME ZONE,
     priority TEXT DEFAULT 'Normal' CHECK (priority IN ('Baja', 'Normal', 'Alta', 'Urgente')),
-    status TEXT DEFAULT 'Pendiente' CHECK (status IN ('Pendiente', 'Aceptada', 'En Progreso', 'Finalizada', 'Cancelada')),
+    status TEXT DEFAULT 'Pendiente' CHECK (status IN ('Pendiente', 'Aceptada', 'En Progreso', 'Realizada', 'Finalizada', 'Cancelada')),
     assigned_to UUID REFERENCES profiles(id) NOT NULL,
     created_by UUID REFERENCES profiles(id) NOT NULL,
     attachment_url TEXT,
