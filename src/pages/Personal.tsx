@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { HardHat, Search, MapPin, ArrowRightLeft, Clock } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
+import FilterBar from '../components/FilterBar';
 
 interface Empleado {
   id: string;
@@ -33,6 +34,12 @@ export default function Personal() {
   const [filterType, setFilterType] = useState<'all' | 'free' | 'busy'>('all');
   const [activeTab, setActiveTab] = useState<'staff' | 'history'>('staff');
   const [historial, setHistorial] = useState<any[]>([]);
+  const [filterObra, setFilterObra] = useState('');
+  const [filterManager, setFilterManager] = useState('');
+  
+  // Opciones para filtros
+  const [obrasOpciones, setObrasOpciones] = useState<{value: string, label: string}[]>([]);
+  const [managersOpciones, setManagersOpciones] = useState<{value: string, label: string}[]>([]);
 
   useEffect(() => {
     fetchData();
@@ -65,6 +72,14 @@ export default function Personal() {
       setTrasladosPendientes(trasData || []);
     }
 
+    // Fetch Filter Options
+    const { data: obrasData } = await supabase.from('obras').select('id, name, encargado_name').eq('active', true);
+    if (obrasData) {
+      setObrasOpciones(obrasData.map(o => ({ value: o.id, label: o.name })));
+      const uniqueManagers = [...new Set(obrasData.map(o => o.encargado_name).filter(Boolean))].sort();
+      setManagersOpciones(uniqueManagers.map(m => ({ value: m!, label: m! })));
+    }
+
     setLoading(false);
   };
 
@@ -78,15 +93,16 @@ export default function Personal() {
       fetchData();
     }
   };
-
   const filteredEmpleados = empleados.filter(e => {
     const matchesSearch = !search || 
       e.full_name.toLowerCase().includes(search.toLowerCase()) || 
       (e.obras?.name || '').toLowerCase().includes(search.toLowerCase());
     
-    if (filterType === 'free') return matchesSearch && !e.obra_id;
-    if (filterType === 'busy') return matchesSearch && !!e.obra_id;
-    return matchesSearch;
+    const matchesObra = !filterObra || e.obra_id === filterObra;
+    
+    if (filterType === 'free') return matchesSearch && !e.obra_id && matchesObra;
+    if (filterType === 'busy') return matchesSearch && !!e.obra_id && matchesObra;
+    return matchesSearch && matchesObra;
   });
 
   return (
@@ -155,7 +171,6 @@ export default function Personal() {
             className="pl-9 h-11 rounded-xl border-slate-200 shadow-sm focus:ring-peie-blue/20"
           />
         </div>
-
         <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
           <Button 
             variant={filterType === 'all' ? 'default' : 'ghost'} 
@@ -179,6 +194,17 @@ export default function Personal() {
             En Obra
           </Button>
         </div>
+
+        <FilterBar
+          filters={[
+            { key: 'obra', label: 'Obra', value: filterObra, options: obrasOpciones },
+            { key: 'manager', label: 'Encargado', value: filterManager, options: managersOpciones },
+          ]}
+          onFilterChange={(key, val) => {
+            if (key === 'obra') setFilterObra(val);
+            if (key === 'manager') setFilterManager(val);
+          }}
+        />
       </div>
 
       {loading ? (

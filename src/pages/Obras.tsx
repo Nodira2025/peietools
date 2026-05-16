@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Building, Plus, Trash2, Edit } from 'lucide-react';
+import { Building, Plus, Trash2, Edit, Search } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import FilterBar from '../components/FilterBar';
 
 interface Obra {
   id: string;
@@ -27,6 +28,9 @@ export default function Obras() {
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const { toast } = useToast();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterManager, setFilterManager] = useState('');
+  const [filterActive, setFilterActive] = useState('');
 
   // Form state
   const [code, setCode] = useState('');
@@ -113,17 +117,19 @@ export default function Obras() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('¿Seguro que deseas eliminar esta obra? Alternativamente, puedes editarla y marcarla como inactiva.')) return;
+  const filteredObras = obras.filter(o => {
+    const matchSearch = !searchTerm || 
+      o.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      (o.address || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (o.code || '').toLowerCase().includes(searchTerm.toLowerCase());
     
-    const { error } = await supabase.from('obras').delete().eq('id', id);
-    if (error) {
-      toast({ variant: 'destructive', title: 'Error', description: 'No se puede eliminar, puede que tenga herramientas asignadas.' });
-    } else {
-      toast({ title: 'Eliminada', description: 'Obra eliminada.' });
-      fetchObras();
-    }
-  };
+    const matchManager = !filterManager || o.encargado_name === filterManager;
+    const matchActive = !filterActive || (filterActive === 'true' ? o.active : !o.active);
+    
+    return matchSearch && matchManager && matchActive;
+  });
+
+  const encargadosUnicos = [...new Set(obras.map(o => o.encargado_name).filter(Boolean))].sort().map(e => ({ value: e!, label: e! }));
 
   return (
     <div className="space-y-6">
@@ -192,11 +198,34 @@ export default function Obras() {
         </Dialog>
       </div>
 
+      <div className="space-y-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Input 
+            placeholder="Buscar por nombre, código o dirección..." 
+            value={searchTerm} 
+            onChange={e => setSearchTerm(e.target.value)} 
+            className="pl-9 h-11 rounded-xl"
+          />
+        </div>
+        
+        <FilterBar
+          filters={[
+            { key: 'manager', label: 'Encargado', value: filterManager, options: encargadosUnicos },
+            { key: 'active', label: 'Estado', value: filterActive, options: [{ value: 'true', label: 'En proceso' }, { value: 'false', label: 'Finalizado' }] },
+          ]}
+          onFilterChange={(key, val) => {
+            if (key === 'manager') setFilterManager(val);
+            if (key === 'active') setFilterActive(val);
+          }}
+        />
+      </div>
+
       {loading ? (
         <div className="text-center py-8 text-muted-foreground">Cargando obras...</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {obras.map(obra => (
+          {filteredObras.map(obra => (
             <Card key={obra.id} className={`relative group ${!obra.active ? 'opacity-60 grayscale' : ''}`}>
               <CardHeader className="pb-2 flex flex-row items-start justify-between space-y-0">
                 <div className="flex items-center space-x-2">

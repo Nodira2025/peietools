@@ -8,6 +8,8 @@ import { ArrowLeft, Clock, CheckCircle, Truck, AlertCircle, Package, FileText, D
 import { useAuthStore } from '../store/auth';
 import { buildWhatsAppLink, APP_URL } from '../lib/whatsapp';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 
 export default function SolicitudDetail() {
   const { id } = useParams();
@@ -22,6 +24,8 @@ export default function SolicitudDetail() {
   const [empleadoSearch, setEmpleadoSearch] = useState('');
   const [selectedEmpleado, setSelectedEmpleado] = useState<string>('');
   const [receivedByName, setReceivedByName] = useState<string>('');
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [rejecting, setRejecting] = useState(false);
 
   const isLogistica = profile?.role === 'logistica' || profile?.role === 'admin';
   const isRequester = solicitud?.requester_id === profile?.id;
@@ -71,6 +75,7 @@ export default function SolicitudDetail() {
       case 'En traslado': return <span className="flex items-center text-peie-blue bg-peie-light/20 px-3 py-1.5 rounded-full text-xs font-bold"><Truck className="w-3 h-3 mr-1" /> En Traslado</span>;
       case 'Entregada': return <span className="flex items-center text-green-600 bg-green-100 px-3 py-1.5 rounded-full text-xs font-bold"><CheckCircle className="w-3 h-3 mr-1" /> Entregada</span>;
       case 'Confirmada': return <span className="flex items-center text-emerald-700 bg-emerald-100 px-3 py-1.5 rounded-full text-xs font-bold"><CheckCircle className="w-3 h-3 mr-1" /> Confirmada</span>;
+      case 'Rechazada': return <span className="flex items-center text-red-700 bg-red-100 px-3 py-1.5 rounded-full text-xs font-bold"><AlertCircle className="w-3 h-3 mr-1" /> Rechazada</span>;
       default: return <span className="bg-gray-100 px-3 py-1.5 rounded-full text-xs">{status}</span>;
     }
   };
@@ -174,10 +179,64 @@ export default function SolicitudDetail() {
     fetchSolicitud();
   };
 
+  const handleReject = async () => {
+    if (!solicitud || !profile || !rejectionReason.trim()) return;
+    
+    setRejecting(true);
+    const { error } = await supabase
+      .from('solicitudes')
+      .update({ 
+        status: 'Rechazada', 
+        rejection_reason: rejectionReason 
+      })
+      .eq('id', solicitud.id);
+
+    if (error) {
+      toast({ variant: 'destructive', title: 'Error', description: error.message });
+      setRejecting(false);
+      return;
+    }
+
+    // Registrar movimiento
+    await supabase.from('movimientos').insert([{
+      herramienta_id: solicitud.herramienta_id,
+      solicitud_id: solicitud.id,
+      user_id: profile.id,
+      action: 'Solicitud RECHAZADA',
+      notes: 'Motivo: ' + rejectionReason
+    }]);
+
+    // Devolver herramienta a Disponible
+    await supabase.from('herramientas')
+      .update({ status: 'Disponible' })
+      .eq('id', solicitud.herramienta_id);
+
+    toast({ title: 'Solicitud Rechazada', description: 'Notificando al encargado...' });
+
+    const requesterPhone = solicitud.profiles?.whatsapp;
+    if (requesterPhone) {
+      const msg = [
+        '*SOLICITUD RECHAZADA*',
+        '',
+        'Hola *' + solicitud.profiles.full_name.split(' ')[0] + '*!',
+        'Tu solicitud de traslado para *' + solicitud.herramientas.name + '* fue rechazada.',
+        '',
+        '*Motivo:* ' + rejectionReason,
+        '',
+        'Podés ver los detalles o volver a solicitar acá:',
+        APP_URL + '/solicitudes/' + solicitud.id
+      ].join('\n');
+      window.open(buildWhatsAppLink(requesterPhone, msg), '_blank');
+    }
+
+    setRejecting(false);
+    fetchSolicitud();
+  };
+
   if (loading) return <div className="p-8 text-center text-muted-foreground">Cargando solicitud...</div>;
   if (!solicitud) return null;
 
-  const canAct = solicitud.status !== 'Confirmada' && solicitud.status !== 'Cancelada';
+  const canAct = solicitud.status !== 'Confirmada' && solicitud.status !== 'Cancelada' && solicitud.status !== 'Rechazada';
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto pb-safe">
@@ -223,6 +282,14 @@ export default function SolicitudDetail() {
             <p><strong className="text-slate-500">Fecha:</strong> <span className="text-slate-800 font-medium">{new Date(solicitud.created_at).toLocaleString()}</span></p>
             {solicitud.assigned && <p><strong className="text-slate-500">Responsable:</strong> <span className="text-slate-800 font-medium">{solicitud.assigned.full_name}</span></p>}
             {solicitud.comments && <p><strong className="text-slate-500">Notas:</strong> <span className="text-slate-800">{solicitud.comments}</span></p>}
+            {solicitud.status === 'Rechazada' && solicitud.rejection_reason && (
+              <div className="mt-3 p-3 bg-red-50 border border-red-100 rounded-lg">
+                <p className="text-xs font-bold text-red-600 uppercase mb-1 flex items-center gap-1">
+                  <AlertCircle size={12} /> Motivo del Rechazo
+                </p>
+                <p className="text-sm text-red-800 italic">"{solicitud.rejection_reason}"</p>
+              </div>
+            )}
           </div>
 
           {/* ========================================================= */}
@@ -261,6 +328,42 @@ export default function SolicitudDetail() {
                     Marcar Entregada
                   </Button>
                 )}
+
+                {/* BOTON DE RECHAZO */}
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" className="w-full h-12 rounded-xl text-red-600 border-red-200 hover:bg-red-50 font-bold mt-2">
+                      <AlertCircle className="mr-2 h-4 w-4" />
+                      Rechazar Solicitud
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="rounded-3xl w-[90%] max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Rechazar Solicitud</DialogTitle>
+                      <CardDescription>
+                        Por favor, explicá el motivo del rechazo para informar al encargado.
+                      </CardDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                      <Textarea 
+                        placeholder="Ej: La herramienta no se encuentra en condiciones, obra destino con deudas, etc."
+                        value={rejectionReason}
+                        onChange={(e) => setRejectionReason(e.target.value)}
+                        className="min-h-[100px] rounded-xl"
+                      />
+                    </div>
+                    <DialogFooter className="flex-row gap-2">
+                      <Button variant="ghost" className="flex-1 rounded-xl" disabled={rejecting}>Cancelar</Button>
+                      <Button 
+                        onClick={handleReject} 
+                        disabled={!rejectionReason.trim() || rejecting}
+                        className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl"
+                      >
+                        {rejecting ? 'Rechazando...' : 'Confirmar Rechazo'}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </div>
             </div>
           )}

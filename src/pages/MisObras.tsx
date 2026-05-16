@@ -41,6 +41,7 @@ export default function MisObras() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterEncargado, setFilterEncargado] = useState('');
+  const [filterActive, setFilterActive] = useState('true');
   const [visibleCount, setVisibleCount] = useState(10);
 
   useEffect(() => {
@@ -49,10 +50,17 @@ export default function MisObras() {
 
   const fetchObras = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    let query = supabase
       .from('obras')
-      .select('id, name, address, encargado_name')
+      .select('id, name, address, encargado_name, active')
       .order('name');
+    
+    // Si es encargado, solo ver las suyas
+    if (profile?.role === 'encargado' && profile.full_name) {
+      query = query.eq('encargado_name', profile.full_name);
+    }
+
+    const { data, error } = await query;
     if (error) {
       toast({ variant: 'destructive', title: 'Error', description: error.message });
     } else {
@@ -115,9 +123,15 @@ export default function MisObras() {
   };
 
   const filteredObras = obras.filter(o => {
-    const matchSearch = !search || o.name.toLowerCase().includes(search.toLowerCase()) || (o.address || '').toLowerCase().includes(search.toLowerCase()) || (o.encargado_name || '').toLowerCase().includes(search.toLowerCase());
+    const matchSearch = !search || 
+      o.name.toLowerCase().includes(search.toLowerCase()) || 
+      (o.address || '').toLowerCase().includes(search.toLowerCase()) || 
+      (o.encargado_name || '').toLowerCase().includes(search.toLowerCase());
+    
     const matchEncargado = !filterEncargado || o.encargado_name === filterEncargado;
-    return matchSearch && matchEncargado;
+    const matchActive = !filterActive || (filterActive === 'true' ? o.active : !o.active);
+    
+    return matchSearch && matchEncargado && matchActive;
   });
 
   const encargadosUnicos = [...new Set(obras.map(o => o.encargado_name).filter(Boolean))].sort();
@@ -262,8 +276,14 @@ export default function MisObras() {
       </div>
 
       <FilterBar
-        filters={[{ key: 'encargado', label: 'Encargado', value: filterEncargado, options: encargadosUnicos.map(e => ({ value: e!, label: e! })) }]}
-        onFilterChange={(_, val) => setFilterEncargado(val)}
+        filters={[
+          ...(profile?.role !== 'encargado' ? [{ key: 'encargado', label: 'Encargado', value: filterEncargado, options: encargadosUnicos.map(e => ({ value: e!, label: e! })) }] : []),
+          { key: 'active', label: 'Estado', value: filterActive, options: [{ value: 'true', label: 'Activa' }, { value: 'false', label: 'Inactiva' }] }
+        ]}
+        onFilterChange={(key, val) => {
+          if (key === 'encargado') setFilterEncargado(val);
+          if (key === 'active') setFilterActive(val);
+        }}
       />
 
       {loading ? (

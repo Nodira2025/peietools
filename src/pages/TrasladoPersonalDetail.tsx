@@ -8,6 +8,8 @@ import { ArrowLeft, Clock, CheckCircle, MapPin, HardHat, AlertCircle } from 'luc
 import { useAuthStore } from '../store/auth';
 import { buildWhatsAppLink, APP_URL } from '../lib/whatsapp';
 import { ExternalLink, MessageCircle, FileText, Share2, Trash2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 
 export default function TrasladoPersonalDetail() {
   const { id } = useParams();
@@ -18,6 +20,8 @@ export default function TrasladoPersonalDetail() {
   const [loading, setLoading] = useState(true);
   const [showReceipt, setShowReceipt] = useState(false);
   const receiptRef = useRef<HTMLDivElement>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [rejecting, setRejecting] = useState(false);
 
   useEffect(() => {
     if (id) fetchTraslado();
@@ -52,6 +56,7 @@ export default function TrasladoPersonalDetail() {
     switch(status) {
       case 'Pendiente': return <span className="flex items-center text-orange-600 bg-orange-100 px-3 py-1.5 rounded-full text-xs font-bold"><Clock className="w-3 h-3 mr-1" /> Pendiente</span>;
       case 'Confirmado': return <span className="flex items-center text-emerald-700 bg-emerald-100 px-3 py-1.5 rounded-full text-xs font-bold"><CheckCircle className="w-3 h-3 mr-1" /> Confirmado</span>;
+      case 'Rechazado': return <span className="flex items-center text-red-700 bg-red-100 px-3 py-1.5 rounded-full text-xs font-bold"><AlertCircle className="w-3 h-3 mr-1" /> Rechazado</span>;
       case 'Cancelado': return <span className="flex items-center text-red-600 bg-red-100 px-3 py-1.5 rounded-full text-xs font-bold"><AlertCircle className="w-3 h-3 mr-1" /> Cancelado</span>;
       default: return <span className="bg-gray-100 px-3 py-1.5 rounded-full text-xs">{status}</span>;
     }
@@ -113,6 +118,46 @@ export default function TrasladoPersonalDetail() {
     }
   };
 
+  const handleReject = async () => {
+    if (!traslado || !profile || !rejectionReason.trim()) return;
+    
+    setRejecting(true);
+    const { error } = await supabase
+      .from('traslados_personal')
+      .update({ 
+        status: 'Rechazado', 
+        rejection_reason: rejectionReason 
+      })
+      .eq('id', traslado.id);
+
+    if (error) {
+      toast({ variant: 'destructive', title: 'Error', description: error.message });
+      setRejecting(false);
+      return;
+    }
+
+    toast({ title: 'Traslado Rechazado', description: 'Notificando al encargado...' });
+
+    const requesterPhone = traslado.requester?.whatsapp;
+    if (requesterPhone) {
+      const msg = [
+        '*TRASLADO DE PERSONAL RECHAZADO*',
+        '',
+        'Hola *' + traslado.requester.full_name.split(' ')[0] + '*!',
+        'La solicitud de traslado para *' + traslado.empleados.full_name + '* fue rechazada.',
+        '',
+        '*Motivo:* ' + rejectionReason,
+        '',
+        'Podés ver los detalles acá:',
+        APP_URL + '/personal/traslados/' + traslado.id
+      ].join('\n');
+      window.open(buildWhatsAppLink(requesterPhone, msg), '_blank');
+    }
+
+    setRejecting(false);
+    fetchTraslado();
+  };
+
   const handleWhatsAppShare = () => {
     if (!traslado) return;
     
@@ -136,6 +181,8 @@ export default function TrasladoPersonalDetail() {
 
   const canConfirm = traslado.status === 'Pendiente' && 
     (profile?.obra_id === traslado.target_obra_id || profile?.role === 'admin');
+  
+  const isLogistica = profile?.role === 'logistica' || profile?.role === 'admin';
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto pb-safe">
@@ -182,6 +229,14 @@ export default function TrasladoPersonalDetail() {
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2 text-sm">
             <p><strong className="text-slate-500">Solicitado por:</strong> <span className="text-slate-800 font-medium">{traslado.requester?.full_name || '-'}</span></p>
             <p><strong className="text-slate-500">Fecha de inicio:</strong> <span className="text-slate-800 font-medium">{new Date(traslado.created_at).toLocaleString()}</span></p>
+            {traslado.status === 'Rechazado' && traslado.rejection_reason && (
+              <div className="mt-3 p-3 bg-red-50 border border-red-100 rounded-lg">
+                <p className="text-xs font-bold text-red-600 uppercase mb-1 flex items-center gap-1">
+                  <AlertCircle size={12} /> Motivo del Rechazo
+                </p>
+                <p className="text-sm text-red-800 italic">"{traslado.rejection_reason}"</p>
+              </div>
+            )}
           </div>
 
           {/* Acciones */}
@@ -200,6 +255,45 @@ export default function TrasladoPersonalDetail() {
                 <CheckCircle className="mr-2 h-5 w-5" />
                 Confirmar Recepción
               </Button>
+            </div>
+          )}
+
+          {isLogistica && traslado.status === 'Pendiente' && (
+            <div className="pt-4 border-t border-slate-100">
+               <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" className="w-full h-12 rounded-xl text-red-600 border-red-200 hover:bg-red-50 font-bold">
+                      <AlertCircle className="mr-2 h-4 w-4" />
+                      Rechazar Traslado
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="rounded-3xl w-[90%] max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Rechazar Traslado de Personal</DialogTitle>
+                      <CardDescription>
+                        Por favor, explicá el motivo del rechazo.
+                      </CardDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                      <Textarea 
+                        placeholder="Ej: Falta de documentación, obra destino completa, etc."
+                        value={rejectionReason}
+                        onChange={(e) => setRejectionReason(e.target.value)}
+                        className="min-h-[100px] rounded-xl"
+                      />
+                    </div>
+                    <DialogFooter className="flex-row gap-2">
+                      <Button variant="ghost" className="flex-1 rounded-xl" disabled={rejecting}>Cancelar</Button>
+                      <Button 
+                        onClick={handleReject} 
+                        disabled={!rejectionReason.trim() || rejecting}
+                        className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl"
+                      >
+                        {rejecting ? 'Rechazando...' : 'Confirmar Rechazo'}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
             </div>
           )}
 

@@ -6,6 +6,9 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Truck, Clock, Package, CheckCircle, ArrowRight, Wrench } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
+import FilterBar from '../components/FilterBar';
+import { Input } from '@/components/ui/input';
+import { Search } from 'lucide-react';
 
 interface LogisticaItem {
   id: string;
@@ -26,10 +29,31 @@ export default function Logistica() {
   const { toast } = useToast();
   const { profile } = useAuthStore();
   const navigate = useNavigate();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState('');
+  const [filterManager, setFilterManager] = useState('');
+  const [filterRequester, setFilterRequester] = useState('');
+  const [filterDate, setFilterDate] = useState('');
+  
+  // Opciones para filtros
+  const [managers, setManagers] = useState<{value: string, label: string}[]>([]);
+  const [requesters, setRequesters] = useState<{value: string, label: string}[]>([]);
 
   useEffect(() => {
     fetchSolicitudes();
+    fetchFilterOptions();
   }, []);
+
+  const fetchFilterOptions = async () => {
+    const { data: profiles } = await supabase.from('profiles').select('full_name, role').eq('active', true);
+    if (profiles) {
+      const logs = profiles.filter(p => p.role === 'logistica' || p.role === 'admin')
+        .map(p => ({ value: p.full_name, label: p.full_name }));
+      const reqs = profiles.map(p => ({ value: p.full_name, label: p.full_name }));
+      setManagers(logs);
+      setRequesters(reqs);
+    }
+  };
 
   const fetchSolicitudes = async () => {
     setLoading(true);
@@ -116,15 +140,55 @@ export default function Logistica() {
     }
   };
 
-  const pendientes = items.filter(s => s.status === 'Pendiente');
-  const enCurso = items.filter(s => s.status !== 'Pendiente');
+  const filteredItems = items.filter(s => {
+    const matchSearch = !searchTerm || 
+      s.item_name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      s.item_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.requester_name.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchType = !filterType || s.type === filterType;
+    const matchRequester = !filterRequester || s.requester_name === filterRequester;
+    const matchDate = !filterDate || s.created_at.startsWith(filterDate);
+    // Nota: filterManager no se aplica directamente aca porque no tenemos el manager en LogisticaItem aun,
+    // lo agregare a la interfaz.
+    return matchSearch && matchType && matchRequester && matchDate;
+  });
+
+  const pendientes = filteredItems.filter(s => s.status === 'Pendiente');
+  const enCurso = filteredItems.filter(s => s.status !== 'Pendiente');
 
   return (
     <div className="space-y-6 pb-safe">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-peie-blue">Panel de Logistica</h1>
-        <p className="text-sm text-muted-foreground mt-1">Toca un pedido para gestionarlo</p>
+        <h1 className="text-2xl font-bold tracking-tight text-peie-blue">Panel de Logística</h1>
+        <p className="text-sm text-muted-foreground mt-1">Gestión unificada de pedidos y traslados</p>
+      </div>
+
+      {/* Buscador y Filtros */}
+      <div className="space-y-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Input 
+            placeholder="Buscar herramienta, código o solicitante..." 
+            value={searchTerm} 
+            onChange={e => setSearchTerm(e.target.value)} 
+            className="pl-9 h-11 rounded-xl"
+          />
+        </div>
+        
+        <FilterBar
+          filters={[
+            { key: 'type', label: 'Tipo', value: filterType, options: [{ value: 'herramienta', label: 'Herramienta' }, { value: 'personal', label: 'Personal' }] },
+            { key: 'requester', label: 'Solicitante', value: filterRequester, options: requesters },
+            { key: 'date', label: 'Fecha', value: filterDate, type: 'date' },
+          ]}
+          onFilterChange={(key, val) => {
+            if (key === 'type') setFilterType(val);
+            if (key === 'requester') setFilterRequester(val);
+            if (key === 'date') setFilterDate(val);
+          }}
+        />
       </div>
 
       {/* Contadores rapidos */}
