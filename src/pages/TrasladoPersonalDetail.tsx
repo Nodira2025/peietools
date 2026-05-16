@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Clock, CheckCircle, MapPin, HardHat, AlertCircle } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { buildWhatsAppLink, APP_URL } from '../lib/whatsapp';
+import { ExternalLink, MessageCircle, FileText, Share2, Trash2 } from 'lucide-react';
 
 export default function TrasladoPersonalDetail() {
   const { id } = useParams();
@@ -28,7 +29,7 @@ export default function TrasladoPersonalDetail() {
       .from('traslados_personal')
       .select(`
         *,
-        empleados(full_name),
+        empleados!traslados_personal_empleado_id_fkey(full_name),
         source_obra:obras!traslados_personal_source_obra_id_fkey(name),
         target_obra:obras!traslados_personal_target_obra_id_fkey(name),
         requester:profiles!traslados_personal_requester_id_fkey(full_name, whatsapp),
@@ -82,7 +83,7 @@ export default function TrasladoPersonalDetail() {
 
       toast({ 
         title: 'Recepción Confirmada!', 
-        description: 'Generando comprobante y avisando al origen...',
+        description: 'El personal ya figura en su nueva obra.',
         className: 'bg-emerald-50 border-emerald-200'
       });
 
@@ -102,17 +103,32 @@ export default function TrasladoPersonalDetail() {
           `${APP_URL}/personal/traslados/${traslado.id}`
         ].join('\n');
 
-        setTimeout(() => { 
-          window.open(buildWhatsAppLink(traslado.requester.whatsapp, msg), '_blank'); 
-          fetchTraslado();
-        }, 500);
-      } else {
-        fetchTraslado();
+        window.open(buildWhatsAppLink(traslado.requester.whatsapp.replace(/\D/g, ''), msg), '_blank'); 
       }
+      
+      fetchTraslado();
 
     } catch (err: any) {
       toast({ variant: 'destructive', title: 'Error', description: err.message });
     }
+  };
+
+  const handleWhatsAppShare = () => {
+    if (!traslado) return;
+    
+    const msg = [
+      '*SOLICITUD DE TRASLADO DE PERSONAL*',
+      '',
+      `Se solicita trasladar a: *${traslado.empleados.full_name}*`,
+      `- *Desde:* ${traslado.source_obra?.name || 'Sin obra'}`,
+      `- *Hacia:* ${traslado.target_obra.name}`,
+      '',
+      'Ver detalles y confirmar:',
+      `${APP_URL}/personal/traslados/${traslado.id}`
+    ].join('\n');
+
+    const phone = traslado.requester?.whatsapp || '';
+    window.open(buildWhatsAppLink(phone.replace(/\D/g, ''), msg), '_blank');
   };
 
   if (loading) return <div className="p-8 text-center text-muted-foreground">Cargando traslado...</div>;
@@ -134,18 +150,23 @@ export default function TrasladoPersonalDetail() {
         <CardHeader className="pb-4 pt-6">
           <div className="flex justify-between items-start">
             <div>
-              <CardTitle className="text-xl font-bold text-peie-blue flex items-center gap-2">
-                <HardHat className="h-5 w-5" />
+              <CardTitle className="text-2xl font-bold text-peie-blue flex items-center gap-2">
+                <HardHat className="h-6 w-6" />
                 {traslado.empleados.full_name}
               </CardTitle>
-              <CardDescription className="text-sm mt-1">
-                Traslado de Personal
+              <CardDescription className="text-sm mt-1 flex items-center gap-1">
+                <FileText size={14} /> ID: {traslado.id.slice(0, 8).toUpperCase()}
               </CardDescription>
             </div>
             {getStatusBadge(traslado.status)}
           </div>
         </CardHeader>
-        <CardContent className="space-y-5">
+        <CardContent className="space-y-6">
+          <div className="flex justify-center py-2">
+             <Button variant="outline" size="sm" onClick={handleWhatsAppShare} className="rounded-full gap-2 text-green-600 border-green-200 hover:bg-green-50">
+               <Share2 size={16} /> Compartir por WhatsApp
+             </Button>
+          </div>
           {/* Info del traslado */}
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-red-50 p-3 rounded-xl border border-red-100">

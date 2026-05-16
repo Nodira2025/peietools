@@ -12,25 +12,27 @@ import FilterBar from '../components/FilterBar';
 
 interface Solicitud {
   id: string;
+  type: 'herramienta' | 'personal';
   requester_id: string;
-  herramienta_id: string;
-  source_obra_id: string | null;
-  target_obra_id: string;
-  assigned_to: string | null;
   priority: string;
   status: string;
-  comments: string | null;
   created_at: string;
-  profiles: { full_name: string, whatsapp: string | null };
-  herramientas: { name: string, code: string, obras: { name: string } | null };
-  target_obra: { name: string };
-  assigned?: { full_name: string };
+  source_name?: string;
+  target_name?: string;
+  item_name?: string;
+  item_code?: string;
+  requester_name: string;
+  requester_whatsapp: string | null;
+  assigned_name?: string;
+  // Raw data for backward compatibility or detail navigation
+  raw_id?: string;
 }
 
 export default function Solicitudes() {
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState(''); // herramienta | personal
   const [filterStatus, setFilterStatus] = useState('');
   const [filterPriority, setFilterPriority] = useState('');
   const [filterDate, setFilterDate] = useState('');
@@ -41,21 +43,69 @@ export default function Solicitudes() {
 
   const fetchSolicitudes = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('solicitudes')
-      .select(`
-        *,
-        profiles!solicitudes_requester_id_fkey(full_name, whatsapp),
-        herramientas!solicitudes_herramienta_id_fkey(name, code, obras!herramientas_current_obra_id_fkey(name)),
-        target_obra:obras!solicitudes_target_obra_id_fkey(name),
-        assigned:profiles!solicitudes_assigned_to_fkey(full_name)
-      `)
-      .order('created_at', { ascending: false });
+    try {
+      // 1. Fetch Herramientas (Solicitudes)
+      const { data: toolsData, error: toolsError } = await supabase
+        .from('solicitudes')
+        .select(`
+          id, requester_id, priority, status, created_at,
+          profiles!solicitudes_requester_id_fkey(full_name, whatsapp),
+          herramientas!solicitudes_herramienta_id_fkey(name, code, obras!herramientas_current_obra_id_fkey(name)),
+          target_obra:obras!solicitudes_target_obra_id_fkey(name),
+          assigned:profiles!solicitudes_assigned_to_fkey(full_name)
+        `);
 
-    if (error) {
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar las solicitudes' });
-    } else {
-      setSolicitudes(data as unknown as Solicitud[]);
+      if (toolsError) throw toolsError;
+
+      // 2. Fetch Personal (Traslados)
+      const { data: personalData, error: personalError } = await supabase
+        .from('traslados_personal')
+        .select(`
+          id, requester_id, status, created_at,
+          empleados!traslados_personal_empleado_id_fkey(full_name),
+          source_obra:obras!traslados_personal_source_obra_id_fkey(name),
+          target_obra:obras!traslados_personal_target_obra_id_fkey(name),
+          requester:profiles!traslados_personal_requester_id_fkey(full_name, whatsapp)
+        `);
+
+      if (personalError) throw personalError;
+
+      // 3. Unify data
+      const unified: Solicitud[] = [
+        ...(toolsData || []).map((s: any) => ({
+          id: s.id,
+          type: 'herramienta' as const,
+          requester_id: s.requester_id,
+          priority: s.priority,
+          status: s.status,
+          created_at: s.created_at,
+          source_name: s.herramientas?.obras?.name || 'Desconocida',
+          target_name: s.target_obra?.name || 'Desconocida',
+          item_name: s.herramientas?.name,
+          item_code: s.herramientas?.code,
+          requester_name: s.profiles?.full_name,
+          requester_whatsapp: s.profiles?.whatsapp,
+          assigned_name: s.assigned?.full_name
+        })),
+        ...(personalData || []).map((s: any) => ({
+          id: s.id,
+          type: 'personal' as const,
+          requester_id: s.requester_id,
+          priority: 'Normal', // Traslados de personal no tienen prioridad en schema
+          status: s.status,
+          created_at: s.created_at,
+          source_name: s.source_obra?.name || 'Sin obra',
+          target_name: s.target_obra?.name || 'Desconocida',
+          item_name: s.empleados?.full_name,
+          item_code: 'PERSONAL',
+          requester_name: s.requester?.full_name,
+          requester_whatsapp: s.requester?.whatsapp
+        }))
+      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      setSolicitudes(unified);
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.message });
     }
     setLoading(false);
   };
@@ -98,8 +148,8 @@ export default function Solicitudes() {
         phone = recipient.whatsapp;
       }
     } else {
-      phone = solicitud.profiles.whatsapp || '';
-      recipientName = solicitud.profiles.full_name;
+      phone = solicitud.requester_whatsapp || '';
+      recipientName = solicitud.requester_name;
     }
 
     if (!phone) {
@@ -107,20 +157,21 @@ export default function Solicitudes() {
       return;
     }
 
+    const itemLabel = solicitud.type === 'herramienta' ? 'herramienta' : 'personal';
     const message = [
       'Hola ' + recipientName + '.',
       '',
-      solicitud.profiles.full_name + ' solicita la siguiente herramienta:',
+      solicitud.requester_name + ' solicita el siguiente traslado de ' + itemLabel + ':',
       '',
-      '- *Herramienta:* ' + solicitud.herramientas.name,
-      '- *Codigo:* ' + solicitud.herramientas.code,
-      '- *Ubicacion actual:* ' + (solicitud.herramientas.obras?.name || 'Desconocida'),
-      '- *Destino:* ' + solicitud.target_obra.name,
+      '- *' + (solicitud.type === 'herramienta' ? 'Herramienta' : 'Empleado') + ':* ' + solicitud.item_name,
+      solicitud.item_code !== 'PERSONAL' ? '- *Codigo:* ' + solicitud.item_code : '',
+      '- *Ubicacion actual:* ' + solicitud.source_name,
+      '- *Destino:* ' + solicitud.target_name,
       '- *Prioridad:* ' + solicitud.priority,
       '',
       'Revisar solicitud:',
-      APP_URL + '/solicitudes/' + solicitud.id
-    ].join('\n');
+      APP_URL + (solicitud.type === 'herramienta' ? '/solicitudes/' : '/personal/traslados/') + solicitud.id
+    ].filter(line => line !== '').join('\n');
 
     window.open(buildWhatsAppLink(phone, message), '_blank');
   };
@@ -129,11 +180,18 @@ export default function Solicitudes() {
   const prioridadOpciones = ['Baja', 'Normal', 'Alta', 'Urgente'];
 
   const filtered = solicitudes.filter(s => {
-    const matchSearch = !searchTerm || s.herramientas.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.herramientas.code.toLowerCase().includes(searchTerm.toLowerCase()) || s.profiles.full_name.toLowerCase().includes(searchTerm.toLowerCase()) || s.target_obra.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchSearch = !searchTerm || 
+      s.item_name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      s.item_code?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      s.requester_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      s.target_name?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchType = !filterType || s.type === filterType;
     const matchStatus = !filterStatus || s.status === filterStatus;
     const matchPriority = !filterPriority || s.priority === filterPriority;
     const matchDate = !filterDate || s.created_at.startsWith(filterDate);
-    return matchSearch && matchStatus && matchPriority && matchDate;
+    
+    return matchSearch && matchType && matchStatus && matchPriority && matchDate;
   });
 
   return (
@@ -152,12 +210,14 @@ export default function Solicitudes() {
 
       <FilterBar
         filters={[
+          { key: 'type', label: 'Tipo', value: filterType, options: [{ value: 'herramienta', label: 'Herramienta' }, { value: 'personal', label: 'Personal' }] },
           { key: 'status', label: 'Estado', value: filterStatus, options: statusOpciones.map(s => ({ value: s, label: s })) },
           { key: 'priority', label: 'Prioridad', value: filterPriority, options: prioridadOpciones.map(p => ({ value: p, label: p })) },
           { key: 'date', label: 'Fecha Solicitud', value: filterDate, type: 'date' },
         ]}
         onFilterChange={(key, val) => { 
-          if (key === 'status') setFilterStatus(val); 
+          if (key === 'type') setFilterType(val);
+          else if (key === 'status') setFilterStatus(val); 
           else if (key === 'priority') setFilterPriority(val);
           else if (key === 'date') setFilterDate(val);
         }}
@@ -171,16 +231,19 @@ export default function Solicitudes() {
             <Card key={solicitud.id} className="relative">
               <CardHeader className="pb-2">
                 <div className="flex justify-between items-start mb-2">
-                  <span className="text-xs font-mono text-muted-foreground">{new Date(solicitud.created_at).toLocaleDateString()}</span>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] font-bold uppercase text-slate-400 tracking-widest">{solicitud.type}</span>
+                    <span className="text-xs font-mono text-muted-foreground">{new Date(solicitud.created_at).toLocaleDateString()}</span>
+                  </div>
                   {getStatusBadge(solicitud.status)}
                 </div>
-                <CardTitle className="text-lg line-clamp-1">{solicitud.herramientas.name}</CardTitle>
-                <p className="text-sm font-medium">De: {solicitud.herramientas.obras?.name || 'Desconocida'} ➔ A: {solicitud.target_obra.name}</p>
+                <CardTitle className="text-lg line-clamp-1">{solicitud.item_name}</CardTitle>
+                <p className="text-sm font-medium">De: {solicitud.source_name} ➔ A: {solicitud.target_name}</p>
               </CardHeader>
               <CardContent className="text-sm space-y-2 mt-2 text-muted-foreground">
-                <p><strong>Solicitante:</strong> {solicitud.profiles.full_name}</p>
-                <p><strong>Prioridad:</strong> {solicitud.priority}</p>
-                {solicitud.assigned && <p><strong>Asignado a:</strong> {solicitud.assigned.full_name}</p>}
+                <p><strong>Solicitante:</strong> {solicitud.requester_name}</p>
+                {solicitud.type === 'herramienta' && <p><strong>Prioridad:</strong> {solicitud.priority}</p>}
+                {solicitud.assigned_name && <p><strong>Asignado a:</strong> {solicitud.assigned_name}</p>}
                 
                 <div className="pt-4 flex justify-between gap-2">
                   <Button variant="outline" size="sm" className="flex-1" onClick={() => handleWhatsApp(solicitud)}>
@@ -189,8 +252,8 @@ export default function Solicitudes() {
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    className="flex-1 border-peie-blue text-peie-blue hover:bg-peie-blue/10"
-                    onClick={() => navigate('/solicitudes/' + solicitud.id)}
+                    className="flex-1 border-peie-blue text-peie-blue hover:bg-peie-blue/10 font-bold"
+                    onClick={() => navigate(solicitud.type === 'herramienta' ? '/solicitudes/' + solicitud.id : '/personal/traslados/' + solicitud.id)}
                   >
                     Ver Detalles
                   </Button>

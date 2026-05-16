@@ -7,18 +7,21 @@ import { useToast } from '@/hooks/use-toast';
 import { Truck, Clock, Package, CheckCircle, ArrowRight, Wrench } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 
-interface Solicitud {
+interface LogisticaItem {
   id: string;
+  type: 'herramienta' | 'personal';
   status: string;
   priority: string;
   created_at: string;
-  herramientas: { name: string; code: string; obras: { name: string } | null };
-  target_obra: { name: string };
-  profiles: { full_name: string };
+  item_name: string;
+  item_code: string;
+  source_name: string;
+  target_name: string;
+  requester_name: string;
 }
 
 export default function Logistica() {
-  const [solicitudes, setSolicitudes] = useState<Solicitud[]>([]);
+  const [items, setItems] = useState<LogisticaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { profile } = useAuthStore();
@@ -30,21 +33,65 @@ export default function Logistica() {
 
   const fetchSolicitudes = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('solicitudes')
-      .select(`
-        id, status, priority, created_at,
-        herramientas!solicitudes_herramienta_id_fkey(name, code, obras!herramientas_current_obra_id_fkey(name)),
-        target_obra:obras!solicitudes_target_obra_id_fkey(name),
-        profiles!solicitudes_requester_id_fkey(full_name)
-      `)
-      .in('status', ['Pendiente', 'Asignada', 'En retiro', 'En traslado', 'Entregada'])
-      .order('created_at', { ascending: false });
+    try {
+      // 1. Fetch Herramientas
+      const { data: toolsData, error: toolsError } = await supabase
+        .from('solicitudes')
+        .select(`
+          id, status, priority, created_at,
+          herramientas!solicitudes_herramienta_id_fkey(name, code, obras!herramientas_current_obra_id_fkey(name)),
+          target_obra:obras!solicitudes_target_obra_id_fkey(name),
+          profiles!solicitudes_requester_id_fkey(full_name)
+        `)
+        .in('status', ['Pendiente', 'Asignada', 'En retiro', 'En traslado', 'Entregada']);
 
-    if (error) {
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar los pedidos.' });
-    } else {
-      setSolicitudes(data as unknown as Solicitud[]);
+      if (toolsError) throw toolsError;
+
+      // 2. Fetch Personal
+      const { data: personalData, error: personalError } = await supabase
+        .from('traslados_personal')
+        .select(`
+          id, status, created_at,
+          empleados!traslados_personal_empleado_id_fkey(full_name),
+          source_obra:obras!traslados_personal_source_obra_id_fkey(name),
+          target_obra:obras!traslados_personal_target_obra_id_fkey(name),
+          requester:profiles!traslados_personal_requester_id_fkey(full_name)
+        `)
+        .eq('status', 'Pendiente'); // De personal solo mostramos los pendientes en este panel rapido
+
+      if (personalError) throw personalError;
+
+      // 3. Unified
+      const unified: LogisticaItem[] = [
+        ...(toolsData || []).map((s: any) => ({
+          id: s.id,
+          type: 'herramienta' as const,
+          status: s.status,
+          priority: s.priority,
+          created_at: s.created_at,
+          item_name: s.herramientas?.name,
+          item_code: s.herramientas?.code,
+          source_name: s.herramientas?.obras?.name || '?',
+          target_name: s.target_obra?.name,
+          requester_name: s.profiles?.full_name
+        })),
+        ...(personalData || []).map((s: any) => ({
+          id: s.id,
+          type: 'personal' as const,
+          status: s.status,
+          priority: 'Normal',
+          created_at: s.created_at,
+          item_name: s.empleados?.full_name,
+          item_code: 'PERS',
+          source_name: s.source_obra?.name || 'Sin obra',
+          target_name: s.target_obra?.name,
+          requester_name: s.requester?.full_name
+        }))
+      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      setItems(unified);
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.message });
     }
     setLoading(false);
   };
@@ -69,8 +116,8 @@ export default function Logistica() {
     }
   };
 
-  const pendientes = solicitudes.filter(s => s.status === 'Pendiente');
-  const enCurso = solicitudes.filter(s => s.status !== 'Pendiente');
+  const pendientes = items.filter(s => s.status === 'Pendiente');
+  const enCurso = items.filter(s => s.status !== 'Pendiente');
 
   return (
     <div className="space-y-6 pb-safe">
@@ -106,7 +153,7 @@ export default function Logistica() {
                   <Card 
                     key={s.id} 
                     className={`${style.bg} border-2 rounded-2xl cursor-pointer active:scale-[0.98] transition-transform shadow-sm hover:shadow-md`}
-                    onClick={() => navigate('/solicitudes/' + s.id)}
+                    onClick={() => navigate(s.type === 'herramienta' ? '/solicitudes/' + s.id : '/personal/traslados/' + s.id)}
                   >
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between mb-3">
@@ -119,15 +166,15 @@ export default function Logistica() {
                           <span className="text-[10px] text-slate-400 font-medium">{s.priority}</span>
                         </div>
                       </div>
-                      <h3 className="font-bold text-slate-800 text-base">{s.herramientas.name}</h3>
-                      <p className="text-xs font-mono text-slate-400 mt-0.5">{s.herramientas.code}</p>
+                      <h3 className="font-bold text-slate-800 text-base">{s.item_name}</h3>
+                      <p className="text-xs font-mono text-slate-400 mt-0.5">{s.item_code}</p>
                       <div className="flex items-center gap-2 mt-3 text-xs">
-                        <span className="bg-white/70 px-2 py-1 rounded-lg text-slate-600 truncate max-w-[40%]">{s.herramientas.obras?.name || '?'}</span>
+                        <span className="bg-white/70 px-2 py-1 rounded-lg text-slate-600 truncate max-w-[40%]">{s.source_name}</span>
                         <ArrowRight className="h-3 w-3 text-slate-400 shrink-0" />
-                        <span className="bg-white/70 px-2 py-1 rounded-lg text-slate-700 font-semibold truncate max-w-[40%]">{s.target_obra.name}</span>
+                        <span className="bg-white/70 px-2 py-1 rounded-lg text-slate-700 font-semibold truncate max-w-[40%]">{s.target_name}</span>
                       </div>
                       <div className="flex justify-between items-center mt-3 pt-2 border-t border-slate-200/50">
-                        <span className="text-xs text-slate-400">Solicita: <strong className="text-slate-600">{s.profiles.full_name}</strong></span>
+                        <span className="text-xs text-slate-400">Solicita: <strong className="text-slate-600">{s.requester_name}</strong></span>
                         <span className="text-[10px] text-slate-300 font-mono">{new Date(s.created_at).toLocaleDateString()}</span>
                       </div>
                     </CardContent>
@@ -147,15 +194,15 @@ export default function Logistica() {
                   <Card 
                     key={s.id} 
                     className={`${style.bg} border rounded-2xl cursor-pointer active:scale-[0.98] transition-transform`}
-                    onClick={() => navigate('/solicitudes/' + s.id)}
+                    onClick={() => navigate(s.type === 'herramienta' ? '/solicitudes/' + s.id : '/personal/traslados/' + s.id)}
                   >
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           {style.icon}
                           <div>
-                            <h3 className="font-bold text-slate-800 text-sm">{s.herramientas.name}</h3>
-                            <p className="text-[10px] text-slate-400">{s.herramientas.obras?.name || '?'} → {s.target_obra.name}</p>
+                            <h3 className="font-bold text-slate-800 text-sm">{s.item_name}</h3>
+                            <p className="text-[10px] text-slate-400">{s.source_name} → {s.target_name}</p>
                           </div>
                         </div>
                         <span className={`text-[10px] font-black uppercase ${style.color}`}>{style.label}</span>
@@ -168,7 +215,7 @@ export default function Logistica() {
           )}
 
           {/* SIN PEDIDOS */}
-          {solicitudes.length === 0 && (
+          {items.length === 0 && (
             <div className="text-center py-16 bg-white rounded-2xl border-2 border-dashed border-slate-200">
               <Truck className="mx-auto h-16 w-16 text-slate-200 mb-4" />
               <h3 className="text-lg font-bold text-slate-400">Sin pedidos pendientes</h3>
