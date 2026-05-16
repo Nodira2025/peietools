@@ -14,6 +14,8 @@ interface Obra {
   name: string;
   address: string;
   encargado_name: string | null;
+  active: boolean;
+  isDinamicaActiva?: boolean;
 }
 
 interface Herramienta {
@@ -60,12 +62,41 @@ export default function MisObras() {
       query = query.eq('encargado_name', profile.full_name);
     }
 
-    const { data, error } = await query;
+    const { data: obrasData, error } = await query;
     if (error) {
       toast({ variant: 'destructive', title: 'Error', description: error.message });
-    } else {
-      setObras(data || []);
+      setLoading(false);
+      return;
     }
+
+    // Obtener counts de herramientas y empleados
+    const { data: toolsData } = await supabase.from('herramientas').select('current_obra_id');
+    const { data: empsData } = await supabase.from('empleados').select('obra_id').eq('active', true);
+
+    const toolsMap = (toolsData || []).reduce((acc: any, t: any) => {
+      if (t.current_obra_id) acc[t.current_obra_id] = (acc[t.current_obra_id] || 0) + 1;
+      return acc;
+    }, {});
+
+    const empsMap = (empsData || []).reduce((acc: any, e: any) => {
+      if (e.obra_id) acc[e.obra_id] = (acc[e.obra_id] || 0) + 1;
+      return acc;
+    }, {});
+
+    const processedObras = (obrasData || []).map((o: any) => {
+      const toolCount = toolsMap[o.id] || 0;
+      const empCount = empsMap[o.id] || 0;
+      const hasManager = !!o.encargado_name && o.encargado_name.trim() !== '';
+      const hasAssets = toolCount > 0 || empCount > 0;
+      const isDinamicaActiva = hasManager && hasAssets;
+
+      return {
+        ...o,
+        isDinamicaActiva
+      };
+    });
+
+    setObras(processedObras);
     setLoading(false);
   };
 
@@ -129,7 +160,7 @@ export default function MisObras() {
       (o.encargado_name || '').toLowerCase().includes(search.toLowerCase());
     
     const matchEncargado = !filterEncargado || o.encargado_name === filterEncargado;
-    const matchActive = !filterActive || (filterActive === 'true' ? o.active : !o.active);
+    const matchActive = !filterActive || (filterActive === 'true' ? o.isDinamicaActiva : !o.isDinamicaActiva);
     
     return matchSearch && matchEncargado && matchActive;
   });
