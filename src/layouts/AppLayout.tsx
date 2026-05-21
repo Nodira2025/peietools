@@ -1,6 +1,6 @@
 import { Navigate, Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
-import { Home, Wrench, FileText, Truck, Users, Building, LogOut, ShoppingCart, Sparkles, HardHat, ClipboardList } from 'lucide-react';
+import { Home, Wrench, FileText, Truck, Users, Building, LogOut, ShoppingCart, Sparkles, HardHat, ClipboardList, BarChart3 } from 'lucide-react';
 
 export default function AppLayout() {
   const { user, profile, loading, signOut } = useAuthStore();
@@ -24,6 +24,7 @@ export default function AppLayout() {
 
   const navItems = [
     { name: 'Inicio', path: '/dashboard', icon: Sparkles, show: true },
+    { name: 'Reportes', path: '/reportes', icon: BarChart3, show: isAdmin || isLogistica },
     { name: 'Pedidos', path: '/solicitudes', icon: Home, show: true },
     { name: 'Herramientas', path: '/herramientas', icon: Wrench, show: true },
     { name: 'Mis Obras', path: '/mis-obras', icon: Building, show: true },
@@ -103,23 +104,23 @@ export default function AppLayout() {
       <main className="flex-1 pb-20 md:pb-0 overflow-y-auto min-h-[100svh] flex flex-col">
         
         {/* Encabezado Flotante Móvil */}
-        <header className="md:hidden bg-white/90 backdrop-blur-md border-b border-slate-100 px-4 py-3 flex justify-between items-center sticky top-0 z-30 shadow-sm pt-safe">
-          <Link to="/solicitudes" className="flex items-center gap-2">
-            <img src="/logo-peie.png" alt="PEIE" className="h-7 w-auto object-contain" />
+        <header className="md:hidden bg-gradient-to-r from-[#031530] to-[#042454] text-white shadow-md rounded-b-[28px] px-6 py-4 pt-safe flex justify-between items-center z-30 sticky top-0 border-b border-slate-800/10">
+          <Link to="/solicitudes" className="flex items-center transition-transform active:scale-95">
+            <img src="/logo-peie.png" alt="PEIE" className="h-8 w-auto object-contain brightness-0 invert" />
           </Link>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             <div className="flex flex-col text-right">
-              <span className="text-[11px] font-bold text-slate-800 leading-none">{profile.full_name?.split(' ')[0]}</span>
-              <span className="text-[9px] text-peie-light font-bold capitalize mt-0.5">{profile.role}</span>
+              <span className="text-[13px] font-black text-white leading-tight">{profile.full_name?.split(' ')[0]}</span>
+              <span className="text-[10px] text-sky-400 font-extrabold capitalize leading-none mt-0.5">{profile.role}</span>
             </div>
             
             <button 
               onClick={signOut} 
-              className="p-2 text-slate-400 hover:text-rose-600 transition-colors rounded-lg bg-slate-50 border border-slate-100"
+              className="ml-3 p-2 text-slate-300 hover:text-white transition-colors border border-slate-700/60 rounded-xl bg-[#041d44]/50 active:scale-90"
               aria-label="Cerrar sesión"
             >
-              <LogOut size={16} />
+              <LogOut size={16} className="stroke-[2.5]" />
             </button>
           </div>
         </header>
@@ -132,7 +133,7 @@ export default function AppLayout() {
       </main>
 
       {/* Barra de Navegación Inferior (Exclusiva para Móviles) */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-100 shadow-[0_-4px_12px_rgba(0,0,0,0.04)] z-40 flex overflow-x-auto no-scrollbar justify-start pb-safe pt-1 px-1">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#031530] text-white shadow-[0_-8px_30px_rgba(0,0,0,0.2)] rounded-t-[32px] z-40 flex overflow-x-auto no-scrollbar justify-start pb-safe pt-3 px-3 border-t border-slate-800/20">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname.startsWith(item.path);
@@ -140,17 +141,18 @@ export default function AppLayout() {
             <Link
               key={item.path}
               to={item.path}
-              className={`flex flex-col items-center justify-center py-2 px-3 min-w-[70px] rounded-xl transition-all duration-150 ${
-                isActive 
-                  ? 'text-peie-blue scale-105' 
-                  : 'text-slate-400 hover:text-slate-600'
-              }`}
+              className="flex flex-col items-center justify-center py-1 px-1 min-w-[70px] flex-shrink-0 transition-all duration-200 relative"
             >
-              <div className={`relative p-1 rounded-lg ${isActive ? 'bg-peie-blue/5' : ''}`}>
-                <Icon size={20} className={isActive ? 'text-peie-blue stroke-[2.5]' : 'stroke-2'} />
-                {isActive && <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-peie-light rounded-full" />}
+              <div className={`relative p-2.5 rounded-full transition-all duration-200 ${
+                isActive 
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/40 scale-110 -translate-y-1.5' 
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}>
+                <Icon size={20} className={isActive ? 'stroke-[2.5]' : 'stroke-2'} />
               </div>
-              <span className={`text-[10px] mt-0.5 tracking-tight ${isActive ? 'font-bold text-peie-blue' : 'font-medium'}`}>
+              <span className={`text-[9px] tracking-tight mt-0.5 ${
+                isActive ? 'font-black text-white' : 'font-semibold text-slate-400'
+              }`}>
                 {item.name}
               </span>
             </Link>

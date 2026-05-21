@@ -9,6 +9,7 @@ import AppLayout from './layouts/AppLayout';
 // Pages
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import Reportes from './pages/Reportes';
 import Obras from './pages/Obras';
 import Usuarios from './pages/Usuarios';
 import Herramientas from './pages/Herramientas';
@@ -54,6 +55,7 @@ export default function App() {
         <Route element={<AppLayout />}>
           <Route path="/" element={<Navigate to="/solicitudes" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/reportes" element={<Reportes />} />
           
           <Route path="/herramientas" element={<Herramientas />} />
           <Route path="/herramientas/nueva" element={<NuevaHerramienta />} />
