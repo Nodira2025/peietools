@@ -53,7 +53,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         
         <Route element={<AppLayout />}>
-          <Route path="/" element={<Navigate to="/solicitudes" replace />} />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/reportes" element={<Reportes />} />
           
@@ -81,7 +81,7 @@ export default function App() {
           <Route path="/usuarios" element={<Usuarios />} />
         </Route>
 
-        <Route path="*" element={<Navigate to="/solicitudes" replace />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
       <Toaster />
     </BrowserRouter>

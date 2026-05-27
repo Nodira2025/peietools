@@ -102,6 +102,7 @@ BEGIN
   -- 1. Actualizar auth.users
   UPDATE auth.users SET
     email = v_new_email,
+    email_confirmed_at = COALESCE(email_confirmed_at, now()),
     encrypted_password = CASE WHEN p_new_password IS NOT NULL THEN crypt(p_new_password, gen_salt('bf')) ELSE encrypted_password END,
     updated_at = now()
   WHERE id = p_user_id;

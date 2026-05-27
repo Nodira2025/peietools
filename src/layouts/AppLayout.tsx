@@ -44,7 +44,7 @@ export default function AppLayout() {
         
         {/* Cabecera Sidebar con Logo */}
         <div className="p-6 border-b border-slate-50 flex flex-col items-center">
-          <Link to="/solicitudes" className="block w-40 transition-transform hover:scale-105">
+          <Link to="/" className="block w-40 transition-transform hover:scale-105">
             <img src="/logo-peie.png" alt="PEIE Tools" className="w-full h-auto object-contain" />
           </Link>
           <div className="mt-2 text-[10px] uppercase tracking-widest text-slate-400 font-bold">
@@ -105,7 +105,7 @@ export default function AppLayout() {
         
         {/* Encabezado Flotante Móvil */}
         <header className="md:hidden bg-gradient-to-r from-[#031530] to-[#042454] text-white shadow-md rounded-b-[28px] px-6 py-4 pt-safe flex justify-between items-center z-30 sticky top-0 border-b border-slate-800/10">
-          <Link to="/solicitudes" className="flex items-center transition-transform active:scale-95">
+          <Link to="/" className="flex items-center transition-transform active:scale-95">
             <img src="/logo-peie.png" alt="PEIE" className="h-8 w-auto object-contain brightness-0 invert" />
           </Link>
 
