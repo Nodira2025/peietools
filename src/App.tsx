@@ -62,7 +62,9 @@ export default function App() {
           <Route path="/herramientas/scanner" element={<QRScanner />} />
           <Route path="/herramientas/:id" element={<HerramientaDetail />} />
           
-          <Route path="/solicitudes" element={<Solicitudes />} />
+          <Route path="/pedidos-herramientas" element={<Solicitudes />} />
+          <Route path="/pedidos-personal" element={<Solicitudes />} />
+          <Route path="/solicitudes" element={<Navigate to="/pedidos-herramientas" replace />} />
           <Route path="/solicitudes/nueva" element={<NuevaSolicitud />} />
           <Route path="/solicitudes/:id" element={<SolicitudDetail />} />
           

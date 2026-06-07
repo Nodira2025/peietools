@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,17 +29,39 @@ interface Solicitud {
 }
 
 export default function Solicitudes() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { profile } = useAuthStore();
+  const { toast } = useToast();
+
+  const isHerramientasPage = location.pathname.startsWith('/pedidos-herramientas');
+  const isPersonalPage = location.pathname.startsWith('/pedidos-personal');
+
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState(''); // herramienta | personal
+  const [filterType, setFilterType] = useState(() => {
+    if (location.pathname.startsWith('/pedidos-herramientas')) return 'herramienta';
+    if (location.pathname.startsWith('/pedidos-personal')) return 'personal';
+    return '';
+  });
   const [filterStatus, setFilterStatus] = useState('');
   const [filterPriority, setFilterPriority] = useState('');
   const [filterDate, setFilterDate] = useState('');
   const [visibleCount, setVisibleCount] = useState(6);
-  const { toast } = useToast();
-  const { profile } = useAuthStore();
-  const navigate = useNavigate();
+  const [filterMisPedidos, setFilterMisPedidos] = useState(profile?.role !== 'admin' && profile?.role !== 'logistica');
+
+  useEffect(() => {
+    if (isHerramientasPage) setFilterType('herramienta');
+    else if (isPersonalPage) setFilterType('personal');
+    else setFilterType('');
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (profile) {
+      setFilterMisPedidos(profile.role !== 'admin' && profile.role !== 'logistica');
+    }
+  }, [profile]);
 
   const fetchSolicitudes = async () => {
     setLoading(true);
@@ -190,27 +212,48 @@ export default function Solicitudes() {
     const matchStatus = !filterStatus || s.status === filterStatus;
     const matchPriority = !filterPriority || s.priority === filterPriority;
     const matchDate = !filterDate || s.created_at.startsWith(filterDate);
+    const matchUser = !filterMisPedidos || s.requester_id === profile?.id;
     
-    return matchSearch && matchType && matchStatus && matchPriority && matchDate;
+    return matchSearch && matchType && matchStatus && matchPriority && matchDate && matchUser;
   });
+
+  const pageTitle = isHerramientasPage 
+    ? 'Pedido de Herramientas' 
+    : isPersonalPage 
+      ? 'Pedido de Personal' 
+      : 'Pedidos';
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-peie-blue">Pedidos</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-peie-blue">{pageTitle}</h1>
           <p className="text-sm text-muted-foreground">{filtered.length} de {solicitudes.length} solicitudes</p>
         </div>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Buscar herramienta, solicitante, obra..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-9 h-10 rounded-xl" />
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Buscar herramienta, solicitante, obra..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-9 h-10 rounded-xl" />
+        </div>
+        <div className="flex items-center space-x-2 bg-white px-4 h-10 rounded-xl border border-slate-200/80 shadow-sm w-fit active:scale-98 transition-transform cursor-pointer" onClick={() => setFilterMisPedidos(!filterMisPedidos)}>
+          <input 
+            type="checkbox" 
+            id="misPedidos" 
+            checked={filterMisPedidos} 
+            onChange={() => {}} 
+            className="h-4 w-4 rounded border-gray-300 text-peie-blue focus:ring-peie-blue cursor-pointer" 
+          />
+          <label htmlFor="misPedidos" className="text-xs font-bold text-slate-700 cursor-pointer select-none">
+            Solo mis pedidos
+          </label>
+        </div>
       </div>
 
       <FilterBar
         filters={[
-          { key: 'type', label: 'Tipo', value: filterType, options: [{ value: 'herramienta', label: 'Herramienta' }, { value: 'personal', label: 'Personal' }] },
+          ...(!isHerramientasPage && !isPersonalPage ? [{ key: 'type', label: 'Tipo', value: filterType, options: [{ value: 'herramienta', label: 'Herramienta' }, { value: 'personal', label: 'Personal' }] }] : []),
           { key: 'status', label: 'Estado', value: filterStatus, options: statusOpciones.map(s => ({ value: s, label: s })) },
           { key: 'priority', label: 'Prioridad', value: filterPriority, options: prioridadOpciones.map(p => ({ value: p, label: p })) },
           { key: 'date', label: 'Fecha Solicitud', value: filterDate, type: 'date' },

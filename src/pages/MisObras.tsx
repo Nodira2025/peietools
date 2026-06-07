@@ -36,6 +36,7 @@ export default function MisObras() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { profile } = useAuthStore();
+  const isSpecialRole = profile?.role === 'admin' || profile?.role === 'logistica';
   const [obras, setObras] = useState<Obra[]>([]);
   const [selectedObra, setSelectedObra] = useState<Obra | null>(null);
   const [herramientas, setHerramientas] = useState<Herramienta[]>([]);
@@ -57,9 +58,13 @@ export default function MisObras() {
       .select('id, name, address, encargado_name, active')
       .order('name');
     
-    // Si es encargado, solo ver las suyas
-    if (profile?.role === 'encargado' && profile.full_name) {
-      query = query.eq('encargado_name', profile.full_name);
+    // Si no es admin ni logistica, pre-filtrar por sus obras
+    if (!isSpecialRole && profile?.full_name) {
+      if (profile.obra_id) {
+        query = query.or(`encargado_name.eq."${profile.full_name}",id.eq.${profile.obra_id}`);
+      } else {
+        query = query.eq('encargado_name', profile.full_name);
+      }
     }
 
     const { data: obrasData, error } = await query;
@@ -308,7 +313,7 @@ export default function MisObras() {
 
       <FilterBar
         filters={[
-          ...(profile?.role !== 'encargado' ? [{ key: 'encargado', label: 'Encargado', value: filterEncargado, options: encargadosUnicos.map(e => ({ value: e!, label: e! })) }] : []),
+          ...(isSpecialRole ? [{ key: 'encargado', label: 'Encargado', value: filterEncargado, options: encargadosUnicos.map(e => ({ value: e!, label: e! })) }] : []),
           { key: 'active', label: 'Estado', value: filterActive, options: [{ value: 'true', label: 'Activa' }, { value: 'false', label: 'Inactiva' }] }
         ]}
         onFilterChange={(key, val) => {

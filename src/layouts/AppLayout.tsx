@@ -24,14 +24,15 @@ export default function AppLayout() {
 
   const navItems = [
     { name: 'Inicio', path: '/dashboard', icon: Sparkles, show: true },
-    { name: 'Reportes', path: '/reportes', icon: BarChart3, show: isAdmin || isLogistica },
-    { name: 'Pedidos', path: '/solicitudes', icon: Home, show: true },
+    { name: 'Reportes', path: '/reportes', icon: BarChart3, show: false },
+    { name: 'Pedido herramientas', path: '/pedidos-herramientas', icon: FileText, show: true },
+    { name: 'Pedido personal', path: '/pedidos-personal', icon: HardHat, show: true },
     { name: 'Herramientas', path: '/herramientas', icon: Wrench, show: true },
     { name: 'Mis Obras', path: '/mis-obras', icon: Building, show: true },
     { name: 'Personal', path: '/personal', icon: HardHat, show: true },
-    { name: 'Órdenes', path: '/ordenes', icon: ClipboardList, show: true },
+    { name: 'Órdenes', path: '/ordenes', icon: ClipboardList, show: false },
     { name: 'Logística', path: '/logistica', icon: Truck, show: isLogistica || isAdmin },
-    { name: 'Compras', path: '/compras', icon: ShoppingCart, show: true },
+    { name: 'Compras', path: '/compras', icon: ShoppingCart, show: false },
     { name: 'Obras (Admin)', path: '/obras', icon: Building, show: isAdmin },
     { name: 'Usuarios', path: '/usuarios', icon: Users, show: isAdmin },
   ].filter(item => item.show);
@@ -104,20 +105,31 @@ export default function AppLayout() {
       <main className="flex-1 pb-20 md:pb-0 overflow-y-auto min-h-[100svh] flex flex-col">
         
         {/* Encabezado Flotante Móvil */}
-        <header className="md:hidden bg-gradient-to-r from-[#031530] to-[#042454] text-white shadow-md rounded-b-[28px] px-6 py-4 pt-safe flex justify-between items-center z-30 sticky top-0 border-b border-slate-800/10">
-          <Link to="/" className="flex items-center transition-transform active:scale-95">
-            <img src="/logo-peie.png" alt="PEIE" className="h-8 w-auto object-contain brightness-0 invert" />
+        <header className="md:hidden bg-gradient-to-r from-[#031530] to-[#042454] text-white shadow-md rounded-b-[28px] px-4 py-4 pt-safe flex justify-between items-center z-30 sticky top-0 border-b border-slate-800/10 gap-3">
+          {/* Botón Home Izquierdo */}
+          <Link 
+            to="/" 
+            className="p-2.5 text-white/80 hover:text-white border border-slate-700/40 rounded-xl bg-[#041d44]/40 active:scale-90 transition-all"
+            aria-label="Ir al Inicio"
+          >
+            <Home size={18} className="stroke-[2.5]" />
           </Link>
 
-          <div className="flex items-center gap-2">
+          {/* Logo Centrado */}
+          <Link to="/" className="flex-1 flex justify-center transition-transform active:scale-95">
+            <img src="/logo-peie.png" alt="PEIE" className="h-7 w-auto object-contain brightness-0 invert" />
+          </Link>
+
+          {/* Perfil de Usuario y Logout Derecho */}
+          <div className="flex items-center gap-2.5">
             <div className="flex flex-col text-right">
-              <span className="text-[13px] font-black text-white leading-tight">{profile.full_name?.split(' ')[0]}</span>
-              <span className="text-[10px] text-sky-400 font-extrabold capitalize leading-none mt-0.5">{profile.role}</span>
+              <span className="text-xs font-black text-white leading-tight">{profile.full_name?.split(' ')[0]}</span>
+              <span className="text-[9px] text-sky-400 font-black capitalize leading-none mt-0.5">{profile.role}</span>
             </div>
             
             <button 
               onClick={signOut} 
-              className="ml-3 p-2 text-slate-300 hover:text-white transition-colors border border-slate-700/60 rounded-xl bg-[#041d44]/50 active:scale-90"
+              className="p-2.5 text-white/80 hover:text-white border border-slate-700/40 rounded-xl bg-[#041d44]/40 active:scale-90 transition-all"
               aria-label="Cerrar sesión"
             >
               <LogOut size={16} className="stroke-[2.5]" />
@@ -133,15 +145,21 @@ export default function AppLayout() {
       </main>
 
       {/* Barra de Navegación Inferior (Exclusiva para Móviles) */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#031530] text-white shadow-[0_-8px_30px_rgba(0,0,0,0.2)] rounded-t-[32px] z-40 flex overflow-x-auto no-scrollbar justify-start pb-safe pt-3 px-3 border-t border-slate-800/20">
-        {navItems.map((item) => {
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#031530] text-white shadow-[0_-8px_30px_rgba(0,0,0,0.2)] rounded-t-[32px] z-40 flex overflow-x-auto no-scrollbar justify-around pb-safe pt-3 px-2 border-t border-slate-800/20">
+        {[
+          { name: 'Inicio', path: '/dashboard', icon: Home },
+          { name: 'Pedido Personal', path: '/pedidos-personal', icon: HardHat },
+          { name: 'Pedido Herramienta', path: '/pedidos-herramientas', icon: Wrench },
+          { name: 'Mis Obras', path: '/mis-obras', icon: Building },
+          { name: 'Personal', path: '/personal', icon: Users },
+        ].map((item) => {
           const Icon = item.icon;
-          const isActive = location.pathname.startsWith(item.path);
+          const isActive = location.pathname === item.path || (item.path !== '/dashboard' && location.pathname.startsWith(item.path));
           return (
             <Link
               key={item.path}
               to={item.path}
-              className="flex flex-col items-center justify-center py-1 px-1 min-w-[70px] flex-shrink-0 transition-all duration-200 relative"
+              className="flex flex-col items-center justify-center py-1 px-1 flex-1 min-w-[64px] transition-all duration-200 relative"
             >
               <div className={`relative p-2.5 rounded-full transition-all duration-200 ${
                 isActive 
@@ -150,7 +168,7 @@ export default function AppLayout() {
               }`}>
                 <Icon size={20} className={isActive ? 'stroke-[2.5]' : 'stroke-2'} />
               </div>
-              <span className={`text-[9px] tracking-tight mt-0.5 ${
+              <span className={`text-[9px] tracking-tight mt-0.5 whitespace-nowrap ${
                 isActive ? 'font-black text-white' : 'font-semibold text-slate-400'
               }`}>
                 {item.name}
