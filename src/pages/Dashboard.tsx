@@ -347,7 +347,7 @@ export default function Dashboard() {
           >
             <div className="relative w-full h-32 bg-slate-100 overflow-hidden">
               <img 
-                src="/img/card_personal.png" 
+                src="/img/card_personal.webp" 
                 alt="Pedido de Personal" 
                 className="w-full h-full object-cover"
               />
@@ -383,7 +383,7 @@ export default function Dashboard() {
           >
             <div className="relative w-full h-32 bg-slate-100 overflow-hidden">
               <img 
-                src="/img/card_herramientas.png" 
+                src="/img/card_herramientas.webp" 
                 alt="Pedido de Herramienta" 
                 className="w-full h-full object-cover"
               />
@@ -419,7 +419,7 @@ export default function Dashboard() {
           >
             <div className="relative w-full h-32 bg-slate-100 overflow-hidden">
               <img 
-                src="/img/card_logistica.png" 
+                src="/img/card_logistica.webp" 
                 alt="Tarjeta Logística" 
                 className="w-full h-full object-cover"
               />
@@ -455,7 +455,7 @@ export default function Dashboard() {
           >
             <div className="relative w-full h-32 bg-slate-100 overflow-hidden">
               <img 
-                src="/img/card_obras.png" 
+                src="/img/card_obras.webp" 
                 alt="Mis Obras" 
                 className="w-full h-full object-cover"
               />
@@ -568,18 +568,18 @@ export default function Dashboard() {
         </div>
 
         {/* Banner de Bienvenida */}
-        <div className="grid grid-cols-12 bg-gradient-to-r from-[#031530] via-[#041d44] to-[#0a326a] text-white rounded-[24px] overflow-hidden shadow-lg min-h-[180px] relative">
-          <div className="col-span-7 p-8 flex flex-col justify-center max-w-lg z-10">
-            <h2 className="text-2xl font-black tracking-tight leading-tight">
+        <div className="grid grid-cols-12 bg-gradient-to-r from-[#031530] via-[#041d44] to-[#0a326a] text-white rounded-[24px] overflow-hidden shadow-lg h-32 md:h-36 relative">
+          <div className="col-span-7 p-6 md:p-8 flex flex-col justify-center max-w-lg z-10">
+            <h2 className="text-xl md:text-2xl font-black tracking-tight leading-tight">
               ¡Bienvenido, {userName}!
             </h2>
-            <p className="text-xs font-medium text-slate-300 leading-relaxed mt-2.5">
+            <p className="text-[10px] md:text-xs font-medium text-slate-300 leading-relaxed mt-1 md:mt-2">
               Gestiona tus pedidos, herramientas, obras y logística de forma rápida y eficiente.
             </p>
           </div>
           <div className="col-span-5 relative overflow-hidden h-full">
             <img 
-              src="/img/card_personal.png" 
+              src="/img/card_personal.webp" 
               alt="Operarios" 
               className="w-full h-full object-cover select-none"
             />
@@ -600,7 +600,7 @@ export default function Dashboard() {
             >
               <div className="relative w-full h-32 bg-slate-100 overflow-hidden">
                 <img 
-                  src="/img/card_personal.png" 
+                  src="/img/card_personal.webp" 
                   alt="Pedido de Personal" 
                   className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-300"
                 />
@@ -630,7 +630,7 @@ export default function Dashboard() {
             >
               <div className="relative w-full h-32 bg-slate-100 overflow-hidden">
                 <img 
-                  src="/img/card_herramientas.png" 
+                  src="/img/card_herramientas.webp" 
                   alt="Pedido de Herramienta" 
                   className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-300"
                 />
@@ -660,7 +660,7 @@ export default function Dashboard() {
             >
               <div className="relative w-full h-32 bg-slate-100 overflow-hidden">
                 <img 
-                  src="/img/card_logistica.png" 
+                  src="/img/card_logistica.webp" 
                   alt="Tarjeta Logística" 
                   className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-300"
                 />
@@ -690,7 +690,7 @@ export default function Dashboard() {
             >
               <div className="relative w-full h-32 bg-slate-100 overflow-hidden">
                 <img 
-                  src="/img/card_obras.png" 
+                  src="/img/card_obras.webp" 
                   alt="Mis Obras" 
                   className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-300"
                 />
@@ -845,7 +845,7 @@ export default function Dashboard() {
             <Card className="bg-white border-0 shadow-[0_8px_30px_rgba(0,0,0,0.02)] rounded-[24px] overflow-hidden flex flex-col justify-between h-[268px]">
               <div className="relative w-full h-[120px] bg-slate-100 overflow-hidden select-none">
                 <img 
-                  src="/img/card_qr_scan.png" 
+                  src="/img/card_qr_scan.webp" 
                   alt="Escanear QR" 
                   className="w-full h-full object-cover"
                 />
