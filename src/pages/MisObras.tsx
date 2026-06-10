@@ -53,21 +53,11 @@ export default function MisObras() {
 
   const fetchObras = async () => {
     setLoading(true);
-    let query = supabase
+    const { data: obrasData, error } = await supabase
       .from('obras')
       .select('id, name, address, encargado_name, active')
       .order('name');
     
-    // Si no es admin ni logistica, pre-filtrar por sus obras
-    if (!isSpecialRole && profile?.full_name) {
-      if (profile.obra_id) {
-        query = query.or(`encargado_name.eq."${profile.full_name}",id.eq.${profile.obra_id}`);
-      } else {
-        query = query.eq('encargado_name', profile.full_name);
-      }
-    }
-
-    const { data: obrasData, error } = await query;
     if (error) {
       toast({ variant: 'destructive', title: 'Error', description: error.message });
       setLoading(false);
@@ -101,7 +91,32 @@ export default function MisObras() {
       };
     });
 
-    setObras(processedObras);
+    // Si no es admin ni logistica, pre-filtrar en cliente con tolerancia a abreviaciones y nombres parciales
+    const filteredByRole = isSpecialRole ? processedObras : processedObras.filter(o => {
+      if (!profile) return false;
+      if (profile.obra_id === o.id) return true;
+      if (!profile.full_name) return false;
+
+      const userFullName = profile.full_name.toLowerCase().trim();
+      const managerName = (o.encargado_name || '').toLowerCase().trim();
+
+      if (!managerName) return false;
+
+      // Comparación por partes de nombre (ej. "Martin" en "Martin Grande")
+      const userParts = userFullName.split(/\s+/);
+      const managerParts = managerName.split(/\s+/);
+
+      const cleanName = (n: string) => n.replace(/h/g, ''); // Normaliza "Christian" y "Cristian" removiendo la "h"
+
+      const firstNameMatch = userParts[0] === managerParts[0] || 
+                             userParts[0].startsWith(managerParts[0]) || 
+                             managerParts[0].startsWith(userParts[0]) ||
+                             cleanName(userParts[0]) === cleanName(managerParts[0]);
+
+      return firstNameMatch || userFullName.includes(managerName) || managerName.includes(userFullName);
+    });
+
+    setObras(filteredByRole);
     setLoading(false);
   };
 
