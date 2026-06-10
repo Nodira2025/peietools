@@ -15,6 +15,8 @@ interface Obra {
   address: string;
   encargado_name: string | null;
   active: boolean;
+  toolCount?: number;
+  empCount?: number;
   isDinamicaActiva?: boolean;
 }
 
@@ -87,6 +89,8 @@ export default function MisObras() {
 
       return {
         ...o,
+        toolCount,
+        empCount,
         isDinamicaActiva
       };
     });
@@ -281,24 +285,37 @@ export default function MisObras() {
               <p className="text-sm text-slate-400">Sin personal asignado a esta obra</p>
             </div>
           ) : (
-            <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
+            <div className="grid grid-cols-1 gap-2.5">
               {empleados.map(emp => (
-                <div key={emp.id} className="flex items-center justify-between px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-peie-blue/10 flex items-center justify-center shrink-0">
-                      <User className="h-4 w-4 text-peie-blue" />
+                <Card
+                  key={emp.id}
+                  className="rounded-xl border border-slate-200/80 overflow-hidden hover:shadow-md transition-all bg-white"
+                >
+                  <CardContent className="p-0 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-14 h-14 bg-peie-blue/5 shrink-0 flex items-center justify-center border-r border-slate-100">
+                        <div className="w-8 h-8 rounded-full bg-peie-blue/10 flex items-center justify-center shrink-0">
+                          <HardHat className="h-4.5 w-4.5 text-peie-blue" />
+                        </div>
+                      </div>
+                      <div className="py-2">
+                        <p className="font-bold text-sm text-slate-800">{emp.full_name}</p>
+                        <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Operario Activo</p>
+                      </div>
                     </div>
-                    <span className="text-sm font-medium text-slate-700">{emp.full_name}</span>
-                  </div>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="text-[10px] text-slate-400 hover:text-red-500 h-7"
-                    onClick={() => releaseEmpleado(emp.id)}
-                  >
-                    Liberar
-                  </Button>
-                </div>
+                    
+                    <div className="pr-4 shrink-0">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 font-bold h-9 px-3 rounded-lg border border-rose-100"
+                        onClick={() => releaseEmpleado(emp.id)}
+                      >
+                        Liberar
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           )}
@@ -357,6 +374,16 @@ export default function MisObras() {
                   {obra.encargado_name && (
                     <p className="text-[10px] text-peie-blue font-semibold mt-0.5">Encargado: {obra.encargado_name}</p>
                   )}
+                  <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] bg-slate-100 text-slate-600 font-medium border border-slate-200/80">
+                      <Wrench className="h-3 w-3 text-slate-400" />
+                      {obra.toolCount || 0} Herramientas
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] bg-slate-100 text-slate-600 font-medium border border-slate-200/80">
+                      <HardHat className="h-3 w-3 text-slate-400" />
+                      {obra.empCount || 0} Personal
+                    </span>
+                  </div>
                 </div>
                 <ChevronRight className="h-4 w-4 text-slate-300 shrink-0" />
               </CardContent>
