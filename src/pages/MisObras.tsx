@@ -165,7 +165,7 @@ export default function MisObras() {
       (o.encargado_name || '').toLowerCase().includes(search.toLowerCase());
     
     const matchEncargado = !filterEncargado || o.encargado_name === filterEncargado;
-    const matchActive = !filterActive || (filterActive === 'true' ? o.isDinamicaActiva : !o.isDinamicaActiva);
+    const matchActive = !filterActive || (filterActive === 'true' ? o.active : !o.active);
     
     return matchSearch && matchEncargado && matchActive;
   });

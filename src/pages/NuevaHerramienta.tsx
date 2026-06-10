@@ -164,12 +164,14 @@ export default function NuevaHerramienta() {
             <div className="space-y-1.5">
               <Label htmlFor="obra" className="text-xs font-semibold text-slate-700">Obra o Base Inicial *</Label>
               <Select value={currentObraId} onValueChange={setCurrentObraId} required>
-                <SelectTrigger className="h-11 rounded-xl">
+                <SelectTrigger className="h-11 rounded-xl text-slate-800">
                   <SelectValue placeholder="Selecciona dónde se ubica físicamente" />
                 </SelectTrigger>
                 <SelectContent>
                   {obras.map(o => (
-                    <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>

@@ -198,7 +198,7 @@ export default function NuevaSolicitud() {
             <div className="space-y-1.5">
               <Label htmlFor="tool" className="text-xs font-semibold text-slate-700">Herramienta Disponible *</Label>
               <Select value={selectedToolId} onValueChange={setSelectedToolId} required>
-                <SelectTrigger className="h-11 rounded-xl">
+                <SelectTrigger className="h-11 rounded-xl text-slate-800">
                   <SelectValue placeholder="Selecciona qué herramienta necesitas" />
                 </SelectTrigger>
                 <SelectContent>
@@ -219,12 +219,14 @@ export default function NuevaSolicitud() {
             <div className="space-y-1.5">
               <Label htmlFor="targetObra" className="text-xs font-semibold text-slate-700">Obra o Base de Destino *</Label>
               <Select value={targetObraId} onValueChange={setTargetObraId} required>
-                <SelectTrigger className="h-11 rounded-xl">
+                <SelectTrigger className="h-11 rounded-xl text-slate-800">
                   <SelectValue placeholder="¿Hacia dónde debe enviarse?" />
                 </SelectTrigger>
                 <SelectContent>
                   {obras.map(o => (
-                    <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -243,7 +245,7 @@ export default function NuevaSolicitud() {
               </p>
 
               <Select value={selectedLogisticaId} onValueChange={setSelectedLogisticaId} required>
-                <SelectTrigger className="h-11 rounded-xl bg-white border-slate-200">
+                <SelectTrigger className="h-11 rounded-xl bg-white border-slate-200 text-slate-800">
                   <SelectValue placeholder="Selecciona un responsable de logística" />
                 </SelectTrigger>
                 <SelectContent>
@@ -266,7 +268,7 @@ export default function NuevaSolicitud() {
               <div className="space-y-1.5">
                 <Label htmlFor="priority" className="text-xs font-semibold text-slate-700">Nivel de Prioridad</Label>
                 <Select value={priority} onValueChange={setPriority}>
-                  <SelectTrigger className="h-11 rounded-xl">
+                  <SelectTrigger className="h-11 rounded-xl text-slate-800">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
