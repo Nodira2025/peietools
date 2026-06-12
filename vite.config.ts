@@ -9,6 +9,9 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      workbox: {
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024, // 4MB
+      },
       manifest: {
         name: 'PEIE Tools',
         short_name: 'PEIETools',

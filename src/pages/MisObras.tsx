@@ -1,13 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Building2, Wrench, Users, MapPin, ChevronRight, Search, User, HardHat } from 'lucide-react';
+import { Building2, Wrench, Users, MapPin, ChevronRight, Search, HardHat, Camera, Image, Plus, Trash2 } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import FilterBar from '../components/FilterBar';
+import { compressImage } from '../lib/imageUtils';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 
 interface Obra {
   id: string;
@@ -15,6 +18,7 @@ interface Obra {
   address: string;
   encargado_name: string | null;
   active: boolean;
+  photo_url?: string | null;
   toolCount?: number;
   empCount?: number;
   isDinamicaActiva?: boolean;
@@ -49,6 +53,15 @@ export default function MisObras() {
   const [filterActive, setFilterActive] = useState('true');
   const [visibleCount, setVisibleCount] = useState(10);
 
+  // States for main photo and progress photos
+  const [avances, setAvances] = useState<any[]>([]);
+  const [uploadingAvance, setUploadingAvance] = useState(false);
+  const [avanceDescription, setAvanceDescription] = useState('');
+  const [isAvanceDialogOpen, setIsAvanceDialogOpen] = useState(false);
+  const mainPhotoInputRef = useRef<HTMLInputElement>(null);
+  const avancePhotoInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingMainPhoto, setUploadingMainPhoto] = useState(false);
+
   useEffect(() => {
     fetchObras();
   }, []);
@@ -57,7 +70,7 @@ export default function MisObras() {
     setLoading(true);
     const { data: obrasData, error } = await supabase
       .from('obras')
-      .select('id, name, address, encargado_name, active')
+      .select('id, name, address, encargado_name, active, photo_url')
       .order('name');
     
     if (error) {
@@ -124,8 +137,18 @@ export default function MisObras() {
     setLoading(false);
   };
 
+  const fetchAvances = async (obraId: string) => {
+    const { data } = await supabase
+      .from('obra_avances_fotos')
+      .select('*')
+      .eq('obra_id', obraId)
+      .order('created_at', { ascending: false });
+    setAvances(data || []);
+  };
+
   const selectObra = async (obra: Obra) => {
     setSelectedObra(obra);
+    fetchAvances(obra.id);
 
     // Herramientas en esta obra
     const { data: tools } = await supabase
@@ -204,31 +227,82 @@ export default function MisObras() {
         </button>
 
         {/* Info de la obra */}
-        <div className="bg-gradient-to-r from-peie-blue to-peie-light rounded-2xl p-5 text-white shadow-lg">
-          <div className="flex items-start gap-3">
-            <Building2 className="h-8 w-8 mt-0.5 opacity-80" />
-            <div>
-              <h1 className="text-xl font-black">{selectedObra.name}</h1>
-              <p className="text-sm text-white/80 flex items-center gap-1 mt-1">
-                <MapPin className="h-3.5 w-3.5" /> {selectedObra.address || 'Sin direccion'}
+        <div className="relative bg-white rounded-2xl overflow-hidden shadow-md border border-slate-100 flex flex-col md:flex-row">
+          {/* Foto Principal */}
+          <div className="relative w-full md:w-64 h-48 md:h-auto bg-slate-50 border-r border-slate-100 flex items-center justify-center overflow-hidden shrink-0">
+            {selectedObra.photo_url ? (
+              <img src={selectedObra.photo_url} alt={selectedObra.name} className="w-full h-full object-cover" />
+            ) : (
+              <div className="text-center text-slate-300 p-4 flex flex-col items-center">
+                <Image className="h-12 w-12 stroke-[1.2] mb-1.5" />
+                <span className="text-[10px] font-semibold uppercase tracking-wider">Sin foto de portada</span>
+              </div>
+            )}
+            {/* Botón flotante para subir foto */}
+            <button 
+              onClick={() => mainPhotoInputRef.current?.click()}
+              disabled={uploadingMainPhoto}
+              className="absolute bottom-3 right-3 bg-peie-blue text-white rounded-full p-2.5 shadow-lg hover:bg-peie-blue/90 active:scale-95 transition-all"
+            >
+              {uploadingMainPhoto ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Camera className="h-4 w-4" />
+              )}
+            </button>
+            <input 
+              type="file" 
+              ref={mainPhotoInputRef} 
+              accept="image/*" 
+              capture="environment" 
+              className="hidden" 
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file || !selectedObra) return;
+                setUploadingMainPhoto(true);
+                try {
+                  const compressed = await compressImage(file);
+                  const { error } = await supabase
+                    .from('obras')
+                    .update({ photo_url: compressed })
+                    .eq('id', selectedObra.id);
+                  if (error) {
+                    toast({ variant: 'destructive', title: 'Error', description: error.message });
+                  } else {
+                    toast({ title: '¡Foto Actualizada!', description: 'La foto principal de la obra fue cargada.' });
+                    setSelectedObra(prev => prev ? { ...prev, photo_url: compressed } : null);
+                    fetchObras();
+                  }
+                } catch {
+                  toast({ variant: 'destructive', title: 'Error', description: 'No se pudo procesar la imagen.' });
+                }
+                setUploadingMainPhoto(false);
+              }}
+            />
+          </div>
+
+          <div className="p-5 flex-1 flex flex-col justify-between">
+            <div className="space-y-2">
+              <h1 className="text-xl font-black text-slate-800">{selectedObra.name}</h1>
+              <p className="text-sm text-slate-500 flex items-center gap-1">
+                <MapPin className="h-4 w-4 text-slate-400 shrink-0" /> {selectedObra.address || 'Sin dirección'}
               </p>
               {selectedObra.encargado_name && (
-                <p className="text-sm text-white/90 flex items-center gap-1 mt-1">
-                  <HardHat className="h-3.5 w-3.5" /> Encargado: <strong>{selectedObra.encargado_name}</strong>
+                <p className="text-sm text-slate-600 flex items-center gap-1.5 pt-0.5">
+                  <HardHat className="h-4 w-4 text-slate-500 shrink-0" /> Encargado: <strong>{selectedObra.encargado_name}</strong>
                 </p>
               )}
             </div>
-          </div>
 
-          {/* Contadores */}
-          <div className="grid grid-cols-2 gap-3 mt-4">
-            <div className="bg-white/15 rounded-xl p-3 text-center backdrop-blur-sm">
-              <p className="text-2xl font-black">{herramientas.length}</p>
-              <p className="text-[10px] uppercase tracking-wider text-white/70">Herramientas</p>
-            </div>
-            <div className="bg-white/15 rounded-xl p-3 text-center backdrop-blur-sm">
-              <p className="text-2xl font-black">{empleados.length}</p>
-              <p className="text-[10px] uppercase tracking-wider text-white/70">Personal</p>
+            <div className="grid grid-cols-2 gap-3 mt-4">
+              <div className="bg-slate-50 rounded-xl p-3 text-center border border-slate-100">
+                <p className="text-2xl font-black text-peie-blue">{herramientas.length}</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Herramientas</p>
+              </div>
+              <div className="bg-slate-50 rounded-xl p-3 text-center border border-slate-100">
+                <p className="text-2xl font-black text-peie-blue">{empleados.length}</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Personal</p>
+              </div>
             </div>
           </div>
         </div>
@@ -263,10 +337,21 @@ export default function MisObras() {
                     <p className="font-bold text-sm text-slate-800 truncate">{h.name}</p>
                     <p className="text-[10px] font-mono text-slate-400">{h.code} {h.brand ? '- ' + h.brand : ''}</p>
                   </div>
-                  <div className="pr-3 shrink-0">
+                  <div className="flex items-center gap-2 pr-3 shrink-0">
                     <span className={`text-[10px] font-bold px-2 py-1 rounded-full border ${getStatusColor(h.status)}`}>
                       {h.status}
                     </span>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 font-bold h-9 px-3 rounded-lg border border-rose-100"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        releaseHerramienta(h.id);
+                      }}
+                    >
+                      Liberar
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -320,6 +405,145 @@ export default function MisObras() {
             </div>
           )}
         </div>
+
+        {/* Registro de Avances Fotográficos */}
+        <div className="space-y-3 pt-2">
+          <div className="flex justify-between items-center">
+            <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+              <Image className="h-4 w-4" /> Registro de Avances Fotográficos
+            </h2>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={() => setIsAvanceDialogOpen(true)}
+              className="text-peie-blue border-peie-blue/20 hover:bg-peie-blue/5 rounded-xl h-8 text-xs font-bold"
+            >
+              <Plus className="h-3.5 w-3.5 mr-1" /> Registrar Avance
+            </Button>
+          </div>
+
+          {avances.length === 0 ? (
+            <div className="bg-slate-50 border border-dashed border-slate-200 rounded-xl p-6 text-center">
+              <Image className="mx-auto h-8 w-8 text-slate-300 mb-2" />
+              <p className="text-sm text-slate-400">No hay fotografías de avance en esta obra</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {avances.map(a => (
+                <div key={a.id} className="relative group bg-white border border-slate-150 rounded-xl overflow-hidden shadow-sm flex flex-col justify-between">
+                  <div className="relative h-28 w-full bg-slate-50 overflow-hidden">
+                    <img src={a.photo_url} alt="Avance" className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
+                    <button 
+                      onClick={async () => {
+                        if (!window.confirm('¿Eliminar esta fotografía de avance?')) return;
+                        const { error } = await supabase.from('obra_avances_fotos').delete().eq('id', a.id);
+                        if (error) toast({ variant: 'destructive', title: 'Error', description: error.message });
+                        else {
+                          toast({ title: 'Éxito', description: 'Foto de avance eliminada.' });
+                          fetchAvances(selectedObra.id);
+                        }
+                      }}
+                      className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 shadow opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="p-2.5 space-y-1">
+                    <p className="text-xs text-slate-700 font-medium line-clamp-2">{a.description || 'Sin descripción'}</p>
+                    <p className="text-[9px] text-slate-405">{new Date(a.created_at).toLocaleDateString('es-AR')}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Dialog para Nuevo Avance Fotográfico */}
+        <Dialog open={isAvanceDialogOpen} onOpenChange={setIsAvanceDialogOpen}>
+          <DialogContent className="rounded-3xl w-[95%] max-w-md">
+            <DialogHeader>
+              <DialogTitle>Registrar Avance Fotográfico</DialogTitle>
+              <CardDescription>
+                Tomá una foto o subila de tu galería y agregá una descripción breve.
+              </CardDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2 text-center">
+                <Button 
+                  type="button"
+                  onClick={() => avancePhotoInputRef.current?.click()}
+                  className="w-full h-24 rounded-2xl border-2 border-dashed border-slate-200 hover:border-peie-blue bg-slate-50/50 hover:bg-peie-blue/5 text-slate-500 hover:text-peie-blue transition-all flex flex-col items-center justify-center gap-2"
+                >
+                  <Camera className="h-6 w-6" />
+                  <span className="text-xs font-bold">Tomar / Subir fotografía</span>
+                </Button>
+                <input 
+                  type="file" 
+                  ref={avancePhotoInputRef} 
+                  accept="image/*" 
+                  capture="environment" 
+                  className="hidden" 
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setUploadingAvance(true);
+                    try {
+                      const compressed = await compressImage(file);
+                      // Creamos un avance temporal con la foto para subirlo después
+                      (window as any)._tempAvancePhoto = compressed;
+                      toast({ title: 'Foto cargada', description: 'Escribí una descripción y hacé clic en Guardar.' });
+                    } catch {
+                      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo procesar la imagen.' });
+                    }
+                    setUploadingAvance(false);
+                  }}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="avanceDesc" className="text-xs font-bold text-slate-650">Descripción del Avance</Label>
+                <Input 
+                  id="avanceDesc"
+                  placeholder="Ej: Canalización del primer piso completada..."
+                  value={avanceDescription}
+                  onChange={e => setAvanceDescription(e.target.value)}
+                  className="rounded-xl h-11"
+                />
+              </div>
+            </div>
+            <DialogFooter className="flex-row gap-2">
+              <Button variant="ghost" className="flex-1 rounded-xl" onClick={() => { setIsAvanceDialogOpen(false); setAvanceDescription(''); (window as any)._tempAvancePhoto = null; }}>Cancelar</Button>
+              <Button 
+                disabled={uploadingAvance}
+                onClick={async () => {
+                  const photo = (window as any)._tempAvancePhoto;
+                  if (!photo) {
+                    toast({ variant: 'destructive', title: 'Error', description: 'Debes capturar una fotografía primero.' });
+                    return;
+                  }
+                  setUploadingAvance(true);
+                  const { error } = await supabase.from('obra_avances_fotos').insert([{
+                    obra_id: selectedObra.id,
+                    photo_url: photo,
+                    description: avanceDescription.trim() || null
+                  }]);
+                  setUploadingAvance(false);
+                  if (error) {
+                    toast({ variant: 'destructive', title: 'Error', description: error.message });
+                  } else {
+                    toast({ title: '¡Avance Guardado!', description: 'Se registró la foto en el avance histórico.' });
+                    setIsAvanceDialogOpen(false);
+                    setAvanceDescription('');
+                    (window as any)._tempAvancePhoto = null;
+                    fetchAvances(selectedObra.id);
+                  }
+                }}
+                className="flex-1 bg-peie-blue hover:bg-peie-blue/90 text-white font-bold rounded-xl"
+              >
+                {uploadingAvance ? 'Guardando...' : 'Registrar Avance'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }

@@ -27,6 +27,7 @@ export default function NuevaHerramienta() {
   const [model, setModel] = useState('');
   const [description, setDescription] = useState('');
   const [currentObraId, setCurrentObraId] = useState('');
+  const [category, setCategory] = useState('Otros');
   const [loading, setLoading] = useState(false);
 
   // Solo Admin y Logística pueden crear herramientas
@@ -57,6 +58,7 @@ export default function NuevaHerramienta() {
       model: model.trim() || null,
       description: description.trim() || null,
       status: 'Disponible',
+      category: category,
       current_obra_id: currentObraId
     }]).select().single();
 
@@ -161,20 +163,38 @@ export default function NuevaHerramienta() {
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="obra" className="text-xs font-semibold text-slate-700">Obra o Base Inicial *</Label>
-              <Select value={currentObraId} onValueChange={setCurrentObraId} required>
-                <SelectTrigger className="h-11 rounded-xl text-slate-800">
-                  <SelectValue placeholder="Selecciona dónde se ubica físicamente" />
-                </SelectTrigger>
-                <SelectContent>
-                  {obras.map(o => (
-                    <SelectItem key={o.id} value={o.id}>
-                      {o.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="category" className="text-xs font-semibold text-slate-700">Categoría *</Label>
+                <Select value={category} onValueChange={setCategory} required>
+                  <SelectTrigger className="h-11 rounded-xl text-slate-800">
+                    <SelectValue placeholder="Selecciona la categoría" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {['Escaleras', 'Amoladoras', 'Taladros', 'Elementos de seguridad', 'Instrumentos de medición', 'Vehículos', 'Otros'].map(cat => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="obra" className="text-xs font-semibold text-slate-700">Obra o Base Inicial *</Label>
+                <Select value={currentObraId} onValueChange={setCurrentObraId} required>
+                  <SelectTrigger className="h-11 rounded-xl text-slate-800">
+                    <SelectValue placeholder="Selecciona dónde se ubica físicamente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {obras.map(o => (
+                      <SelectItem key={o.id} value={o.id}>
+                        {o.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div className="space-y-1.5">

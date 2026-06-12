@@ -25,8 +25,8 @@ export default function AppLayout() {
   const navItems = [
     { name: 'Inicio', path: '/dashboard', icon: Sparkles, show: true },
     { name: 'Reportes', path: '/reportes', icon: BarChart3, show: false },
-    { name: 'Pedido herramientas', path: '/pedidos-herramientas', icon: FileText, show: true },
-    { name: 'Pedido personal', path: '/pedidos-personal', icon: HardHat, show: true },
+    { name: 'Movimiento de Herramientas', path: '/pedidos-herramientas', icon: FileText, show: true },
+    { name: 'Movimiento de Personal', path: '/pedidos-personal', icon: HardHat, show: true },
     { name: 'Herramientas', path: '/herramientas', icon: Wrench, show: true },
     { name: 'Mis Obras', path: '/mis-obras', icon: Building, show: true },
     { name: 'Personal', path: '/personal', icon: HardHat, show: true },
@@ -148,8 +148,8 @@ export default function AppLayout() {
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#031530] text-white shadow-[0_-8px_30px_rgba(0,0,0,0.2)] rounded-t-[32px] z-40 flex overflow-x-auto no-scrollbar justify-around pb-safe pt-3 px-2 border-t border-slate-800/20">
         {[
           { name: 'Inicio', path: '/dashboard', icon: Home },
-          { name: 'Pedido Personal', path: '/pedidos-personal', icon: HardHat },
-          { name: 'Pedido Herramienta', path: '/pedidos-herramientas', icon: Wrench },
+          { name: 'Movimiento Personal', path: '/pedidos-personal', icon: HardHat },
+          { name: 'Movimiento Herramienta', path: '/pedidos-herramientas', icon: Wrench },
           { name: 'Mis Obras', path: '/mis-obras', icon: Building },
           { name: 'Personal', path: '/personal', icon: Users },
         ].map((item) => {

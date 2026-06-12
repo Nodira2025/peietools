@@ -218,10 +218,10 @@ export default function Solicitudes() {
   });
 
   const pageTitle = isHerramientasPage 
-    ? 'Pedido de Herramientas' 
+    ? 'Movimiento de Herramientas' 
     : isPersonalPage 
-      ? 'Pedido de Personal' 
-      : 'Pedidos';
+      ? 'Movimiento de Personal' 
+      : 'Movimientos';
 
   return (
     <div className="space-y-4">

@@ -340,7 +340,7 @@ export default function Dashboard() {
         {/* Grid de Accesos Rápidos */}
         <div className="grid grid-cols-2 gap-4">
           
-          {/* Pedido de Personal */}
+          {/* Movimiento de Personal */}
           <Card 
             onClick={() => navigate('/pedidos-personal')}
             className="bg-white border-0 shadow-[0_8px_30px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all cursor-pointer rounded-[24px] overflow-hidden flex flex-col justify-between group active:scale-95 duration-200"
@@ -348,7 +348,7 @@ export default function Dashboard() {
             <div className="relative w-full h-32 bg-slate-100 overflow-hidden">
               <img 
                 src="/img/card_personal.webp" 
-                alt="Pedido de Personal" 
+                alt="Movimiento de Personal" 
                 className="w-full h-full object-cover"
               />
               {counts.pendingPersonal > 0 && (
@@ -364,11 +364,11 @@ export default function Dashboard() {
                   <HardHat size={16} className="stroke-[2.5]" />
                 </div>
                 <span className="text-[10px] font-black text-slate-800 tracking-tight leading-none uppercase">
-                  Pedido Personal
+                  Movimiento Personal
                 </span>
               </div>
               <p className="text-[9px] text-slate-400 font-semibold leading-normal mt-2 line-clamp-2">
-                Gestiona personal para tus obras.
+                Gestiona traslados de personal para tus obras.
               </p>
             </div>
             <div className="pb-3 flex justify-center text-blue-500">
@@ -376,7 +376,7 @@ export default function Dashboard() {
             </div>
           </Card>
 
-          {/* Pedido de Herramienta */}
+          {/* Movimiento de Herramientas */}
           <Card 
             onClick={() => navigate('/pedidos-herramientas')}
             className="bg-white border-0 shadow-[0_8px_30px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all cursor-pointer rounded-[24px] overflow-hidden flex flex-col justify-between group active:scale-95 duration-200"
@@ -384,7 +384,7 @@ export default function Dashboard() {
             <div className="relative w-full h-32 bg-slate-100 overflow-hidden">
               <img 
                 src="/img/card_herramientas.webp" 
-                alt="Pedido de Herramienta" 
+                alt="Movimiento de Herramientas" 
                 className="w-full h-full object-cover"
               />
               {counts.pendingTools > 0 && (
@@ -400,11 +400,11 @@ export default function Dashboard() {
                   <Wrench size={16} className="stroke-[2.5]" />
                 </div>
                 <span className="text-[10px] font-black text-slate-800 tracking-tight leading-none uppercase">
-                  Pedido Herramienta
+                  Movimiento Herramienta
                 </span>
               </div>
               <p className="text-[9px] text-slate-400 font-semibold leading-normal mt-2 line-clamp-2">
-                Solicita herramientas disponibles.
+                Monitorea traslados de herramientas y equipos.
               </p>
             </div>
             <div className="pb-3 flex justify-center text-blue-500">
@@ -420,7 +420,7 @@ export default function Dashboard() {
             <div className="relative w-full h-32 bg-slate-100 overflow-hidden">
               <img 
                 src="/img/card_logistica.webp" 
-                alt="Tarjeta Logística" 
+                alt="Logística" 
                 className="w-full h-full object-cover"
               />
               {counts.activeMovements > 0 && (
@@ -440,7 +440,7 @@ export default function Dashboard() {
                 </span>
               </div>
               <p className="text-[9px] text-slate-400 font-semibold leading-normal mt-2 line-clamp-2">
-                Entregas y traslados activos.
+                Entregas y traslados activos en mapa.
               </p>
             </div>
             <div className="pb-3 flex justify-center text-blue-500">
@@ -470,7 +470,7 @@ export default function Dashboard() {
                 </span>
               </div>
               <p className="text-[9px] text-slate-400 font-semibold leading-normal mt-2 line-clamp-2">
-                Seguimiento de obras activas.
+                Seguimiento de obras activas y personal.
               </p>
             </div>
             <div className="pb-3 flex justify-center text-blue-500">
@@ -478,6 +478,47 @@ export default function Dashboard() {
             </div>
           </Card>
 
+        </div>
+
+        {/* Nueva Gestión */}
+        <div className="flex items-center justify-center gap-2 text-[11px] font-black text-blue-600 uppercase tracking-widest my-4">
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+          Nueva Solicitud
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          {/* Solicitar Herramientas */}
+          <Card 
+            onClick={() => navigate('/solicitudes/nueva')}
+            className="bg-white border-0 shadow-[0_8px_30px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all cursor-pointer rounded-[24px] p-4 flex flex-col justify-between h-28 active:scale-95 duration-200 group"
+          >
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+              <Wrench size={16} className="stroke-[2.5]" />
+            </div>
+            <div className="mt-2">
+              <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-tight leading-tight">
+                Solicitar Herramientas
+              </h4>
+              <p className="text-[8px] text-slate-400 font-semibold mt-0.5">Nuevo envío</p>
+            </div>
+          </Card>
+
+          {/* Solicitar Personal */}
+          <Card 
+            onClick={() => navigate('/personal')}
+            className="bg-white border-0 shadow-[0_8px_30px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all cursor-pointer rounded-[24px] p-4 flex flex-col justify-between h-28 active:scale-95 duration-200 group"
+          >
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+              <HardHat size={16} className="stroke-[2.5]" />
+            </div>
+            <div className="mt-2">
+              <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-tight leading-tight">
+                Solicitar Personal
+              </h4>
+              <p className="text-[8px] text-slate-400 font-semibold mt-0.5">Traslado operario</p>
+            </div>
+          </Card>
         </div>
 
         {/* Botón QR */}
@@ -593,7 +634,7 @@ export default function Dashboard() {
           
           <div className="grid grid-cols-4 gap-6">
             
-            {/* Card 1: Pedido de Personal */}
+            {/* Card 1: Movimiento de Personal */}
             <Card 
               onClick={() => navigate('/pedidos-personal')}
               className="bg-white border-0 shadow-[0_8px_30px_rgba(0,0,0,0.02)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:ring-1 hover:ring-blue-500/10 transition-all cursor-pointer rounded-[24px] overflow-hidden flex flex-col justify-between group active:scale-98 duration-150"
@@ -601,20 +642,20 @@ export default function Dashboard() {
               <div className="relative w-full h-32 bg-slate-100 overflow-hidden">
                 <img 
                   src="/img/card_personal.webp" 
-                  alt="Pedido de Personal" 
+                  alt="Movimiento de Personal" 
                   className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-300"
                 />
                 <div className="absolute bottom-0 left-4 translate-y-1/2 w-10 h-10 rounded-full bg-blue-600 border-2 border-white flex items-center justify-center text-white shadow-md shadow-blue-600/20 z-10">
-                  <Users size={16} className="stroke-[2.5]" />
+                  <HardHat size={16} className="stroke-[2.5]" />
                 </div>
               </div>
               <div className="p-5 pt-6 flex flex-col justify-between flex-1">
                 <div>
                   <h4 className="text-xs font-black text-slate-800 tracking-tight leading-none uppercase">
-                    Pedido de Personal
+                    Movimiento de Personal
                   </h4>
                   <p className="text-[10px] text-slate-400 font-semibold leading-relaxed mt-2.5 line-clamp-2">
-                    Solicita y gestiona personal para tus obras.
+                    Visualiza y gestiona traslados de personal activos o históricos.
                   </p>
                 </div>
                 <div className="flex justify-end text-blue-600 mt-4">
@@ -623,7 +664,7 @@ export default function Dashboard() {
               </div>
             </Card>
 
-            {/* Card 2: Pedido de Herramienta */}
+            {/* Card 2: Movimiento de Herramientas */}
             <Card 
               onClick={() => navigate('/pedidos-herramientas')}
               className="bg-white border-0 shadow-[0_8px_30px_rgba(0,0,0,0.02)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:ring-1 hover:ring-blue-500/10 transition-all cursor-pointer rounded-[24px] overflow-hidden flex flex-col justify-between group active:scale-98 duration-150"
@@ -631,7 +672,7 @@ export default function Dashboard() {
               <div className="relative w-full h-32 bg-slate-100 overflow-hidden">
                 <img 
                   src="/img/card_herramientas.webp" 
-                  alt="Pedido de Herramienta" 
+                  alt="Movimiento de Herramientas" 
                   className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-300"
                 />
                 <div className="absolute bottom-0 left-4 translate-y-1/2 w-10 h-10 rounded-full bg-blue-600 border-2 border-white flex items-center justify-center text-white shadow-md shadow-blue-600/20 z-10">
@@ -641,10 +682,10 @@ export default function Dashboard() {
               <div className="p-5 pt-6 flex flex-col justify-between flex-1">
                 <div>
                   <h4 className="text-xs font-black text-slate-800 tracking-tight leading-none uppercase">
-                    Pedido de Herramienta
+                    Movimiento de Herramientas
                   </h4>
                   <p className="text-[10px] text-slate-400 font-semibold leading-relaxed mt-2.5 line-clamp-2">
-                    Solicita herramientas y equipos disponibles.
+                    Visualiza y gestiona solicitudes de traslado de herramientas.
                   </p>
                 </div>
                 <div className="flex justify-end text-blue-600 mt-4">
@@ -653,7 +694,7 @@ export default function Dashboard() {
               </div>
             </Card>
 
-            {/* Card 3: Tarjeta Logística */}
+            {/* Card 3: Logística */}
             <Card 
               onClick={() => navigate('/logistica')}
               className="bg-white border-0 shadow-[0_8px_30px_rgba(0,0,0,0.02)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:ring-1 hover:ring-blue-500/10 transition-all cursor-pointer rounded-[24px] overflow-hidden flex flex-col justify-between group active:scale-98 duration-150"
@@ -661,7 +702,7 @@ export default function Dashboard() {
               <div className="relative w-full h-32 bg-slate-100 overflow-hidden">
                 <img 
                   src="/img/card_logistica.webp" 
-                  alt="Tarjeta Logística" 
+                  alt="Logística" 
                   className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-300"
                 />
                 <div className="absolute bottom-0 left-4 translate-y-1/2 w-10 h-10 rounded-full bg-blue-600 border-2 border-white flex items-center justify-center text-white shadow-md shadow-blue-600/20 z-10">
@@ -671,10 +712,10 @@ export default function Dashboard() {
               <div className="p-5 pt-6 flex flex-col justify-between flex-1">
                 <div>
                   <h4 className="text-xs font-black text-slate-800 tracking-tight leading-none uppercase">
-                    Tarjeta Logística
+                    Logística
                   </h4>
                   <p className="text-[10px] text-slate-400 font-semibold leading-relaxed mt-2.5 line-clamp-2">
-                    Gestiona transportes y logística de entregas.
+                    Gestiona transportes y logística de entregas en mapa.
                   </p>
                 </div>
                 <div className="flex justify-end text-blue-600 mt-4">
@@ -704,13 +745,56 @@ export default function Dashboard() {
                     Mis Obras
                   </h4>
                   <p className="text-[10px] text-slate-400 font-semibold leading-relaxed mt-2.5 line-clamp-2">
-                    Supervisa y administra todas tus obras.
+                    Supervisa y administra herramientas y personal en tus obras.
                   </p>
                 </div>
                 <div className="flex justify-end text-blue-600 mt-4">
                   <ArrowRight size={16} className="stroke-[3] group-hover:translate-x-0.5 transition-transform" />
                 </div>
               </div>
+            </Card>
+
+          </div>
+        </div>
+
+        {/* Nueva Gestión */}
+        <div className="space-y-4">
+          <h3 className="text-xs font-black text-slate-800 tracking-wider uppercase">Nueva Solicitud</h3>
+          
+          <div className="grid grid-cols-2 gap-6">
+            
+            {/* Solicitar Herramientas */}
+            <Card 
+              onClick={() => navigate('/solicitudes/nueva')}
+              className="bg-white border border-slate-100 hover:border-blue-500/20 shadow-[0_8px_30px_rgba(0,0,0,0.01)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.05)] transition-all cursor-pointer rounded-[24px] p-5 flex items-center justify-between group active:scale-98 duration-150"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Wrench size={20} className="stroke-[2.5]" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-tight">Solicitar Herramientas</h4>
+                  <p className="text-[10px] text-slate-400 font-semibold mt-1">Registra un nuevo envío de equipo o herramientas a tu obra</p>
+                </div>
+              </div>
+              <ArrowRight size={18} className="text-blue-600 group-hover:translate-x-1 transition-transform" />
+            </Card>
+
+            {/* Solicitar Personal */}
+            <Card 
+              onClick={() => navigate('/personal')}
+              className="bg-white border border-slate-100 hover:border-blue-500/20 shadow-[0_8px_30px_rgba(0,0,0,0.01)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.05)] transition-all cursor-pointer rounded-[24px] p-5 flex items-center justify-between group active:scale-98 duration-150"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <HardHat size={20} className="stroke-[2.5]" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-tight">Solicitar Personal</h4>
+                  <p className="text-[10px] text-slate-400 font-semibold mt-1">Busca operarios disponibles para trasladar a tu obra</p>
+                </div>
+              </div>
+              <ArrowRight size={18} className="text-blue-600 group-hover:translate-x-1 transition-transform" />
             </Card>
 
           </div>

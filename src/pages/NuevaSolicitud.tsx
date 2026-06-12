@@ -186,7 +186,7 @@ export default function NuevaSolicitud() {
               <Truck size={20} />
             </div>
             <div>
-              <CardTitle className="text-xl font-bold text-peie-blue">Solicitar Herramienta</CardTitle>
+              <CardTitle className="text-xl font-bold text-peie-blue">Movimiento de Herramientas</CardTitle>
               <CardDescription className="text-xs">Coordina el traslado seguro seleccionando al personal de logística</CardDescription>
             </div>
           </div>

@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Building, Plus, Trash2, Edit, Search } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import FilterBar from '../components/FilterBar';
 
 interface Obra {
@@ -31,6 +31,28 @@ export default function Obras() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterManager, setFilterManager] = useState('');
   const [filterActive, setFilterActive] = useState('');
+  const [capturingGPS, setCapturingGPS] = useState(false);
+
+  const handleCaptureGPS = () => {
+    if (!navigator.geolocation) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Tu navegador no soporta geolocalización.' });
+      return;
+    }
+    setCapturingGPS(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLatitude(position.coords.latitude.toString());
+        setLongitude(position.coords.longitude.toString());
+        setCapturingGPS(false);
+        toast({ title: 'Éxito', description: 'Coordenadas capturadas con éxito.' });
+      },
+      (error) => {
+        setCapturingGPS(false);
+        toast({ variant: 'destructive', title: 'Error GPS', description: error.message });
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
 
   // Form state
   const [code, setCode] = useState('');
@@ -117,6 +139,17 @@ export default function Obras() {
     }
   };
 
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('¿Estás seguro de que deseas eliminar esta obra?')) return;
+    const { error } = await supabase.from('obras').delete().eq('id', id);
+    if (error) {
+      toast({ variant: 'destructive', title: 'Error', description: error.message });
+    } else {
+      toast({ title: 'Éxito', description: 'Obra eliminada correctamente' });
+      fetchObras();
+    }
+  };
+
   const filteredObras = obras.filter(o => {
     const matchSearch = !searchTerm || 
       o.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -169,6 +202,19 @@ export default function Obras() {
               <div className="space-y-2">
                 <Label htmlFor="phone">Teléfono</Label>
                 <Input id="phone" value={phone} onChange={e => setPhone(e.target.value)} />
+              </div>
+              <div className="flex justify-between items-center pt-2">
+                <Label className="text-xs font-semibold text-slate-700">Coordenadas Geográficas</Label>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleCaptureGPS} 
+                  disabled={capturingGPS}
+                  className="h-8 text-peie-blue border-peie-blue/20 hover:bg-peie-blue/5 rounded-xl text-xs"
+                >
+                  {capturingGPS ? 'Buscando GPS...' : 'Capturar GPS Actual'}
+                </Button>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -260,6 +306,18 @@ export default function Obras() {
                 <p><strong>📍</strong> {obra.address || 'Sin dirección'}</p>
                 <p><strong>👤</strong> {obra.encargado_name || 'Sin encargado'}</p>
                 <p><strong>📞</strong> {obra.phone || 'Sin teléfono'}</p>
+                {obra.latitude && obra.longitude && (
+                  <div className="pt-2">
+                    <a 
+                      href={`https://www.google.com/maps?q=${obra.latitude},${obra.longitude}`} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="inline-flex items-center text-xs text-blue-600 hover:underline font-semibold"
+                    >
+                      🗺️ Ver en Google Maps
+                    </a>
+                  </div>
+                )}
                 {!obra.active && <p className="text-red-500 font-semibold mt-2">Inactiva</p>}
               </CardContent>
             </Card>

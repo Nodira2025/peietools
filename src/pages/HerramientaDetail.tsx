@@ -4,9 +4,12 @@ import { supabase } from '../lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Edit, Truck, AlertTriangle, MapPin, Navigation, Building2, Download, Camera, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Edit, Truck, AlertTriangle, MapPin, Navigation, Building2, Download, Camera, CheckCircle, Save, X } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { compressImage } from '../lib/imageUtils';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Herramienta {
   id: string;
@@ -17,6 +20,7 @@ interface Herramienta {
   brand: string | null;
   model: string | null;
   status: string;
+  category: string | null;
   current_obra_id: string | null;
   notes: string | null;
   photo_url?: string | null;
@@ -39,11 +43,32 @@ export default function HerramientaDetail() {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // States for editing mode
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editBrand, setEditBrand] = useState('');
+  const [editModel, setEditModel] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+  const [editObraId, setEditObraId] = useState('');
+  const [editStatus, setEditStatus] = useState('');
+  const [obras, setObras] = useState<any[]>([]);
+
   const isAdmin = profile?.role === 'admin' || profile?.role === 'logistica' || profile?.role === 'compras';
+  const canEdit = isAdmin || profile?.role === 'solicitante' || profile?.role === 'encargado';
 
   useEffect(() => {
     if (id) fetchHerramienta();
   }, [id]);
+
+  useEffect(() => {
+    async function fetchObras() {
+      const { data } = await supabase.from('obras').select('id, name').eq('active', true).order('name');
+      if (data) setObras(data);
+    }
+    fetchObras();
+  }, []);
 
   const fetchHerramienta = async () => {
     setLoading(true);
@@ -60,6 +85,46 @@ export default function HerramientaDetail() {
       setHerramienta(data);
     }
     setLoading(false);
+  };
+
+  const startEditing = () => {
+    if (!herramienta) return;
+    setEditName(herramienta.name || '');
+    setEditBrand(herramienta.brand || '');
+    setEditModel(herramienta.model || '');
+    setEditDescription(herramienta.description || '');
+    setEditNotes(herramienta.notes || '');
+    setEditCategory(herramienta.category || 'Otros');
+    setEditObraId(herramienta.current_obra_id || '');
+    setEditStatus(herramienta.status || 'Disponible');
+    setIsEditing(true);
+  };
+
+  const saveChanges = async () => {
+    if (!herramienta) return;
+    setLoading(true);
+    const { error } = await supabase
+      .from('herramientas')
+      .update({
+        name: editName.trim(),
+        brand: editBrand.trim() || null,
+        model: editModel.trim() || null,
+        description: editDescription.trim() || null,
+        notes: editNotes.trim() || null,
+        category: editCategory,
+        current_obra_id: editObraId || null,
+        status: editStatus,
+      })
+      .eq('id', herramienta.id);
+
+    setLoading(false);
+    if (error) {
+      toast({ variant: 'destructive', title: 'Error al actualizar', description: error.message });
+    } else {
+      toast({ title: 'Éxito', description: 'Información de la herramienta actualizada.' });
+      setIsEditing(false);
+      fetchHerramienta();
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -125,10 +190,21 @@ export default function HerramientaDetail() {
         <Button variant="ghost" onClick={() => navigate('/herramientas')} className="p-0 hover:bg-transparent">
           <ArrowLeft className="mr-2 h-4 w-4" /> Volver
         </Button>
-        {isAdmin && (
-          <Button variant="outline" size="sm">
-            <Edit className="mr-2 h-4 w-4" /> Editar
-          </Button>
+        {canEdit && (
+          isEditing ? (
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setIsEditing(false)} className="rounded-xl">
+                <X className="mr-2 h-4 w-4" /> Cancelar
+              </Button>
+              <Button onClick={saveChanges} size="sm" className="bg-peie-blue hover:bg-peie-blue/90 text-white rounded-xl">
+                <Save className="mr-2 h-4 w-4" /> Guardar
+              </Button>
+            </div>
+          ) : (
+            <Button variant="outline" size="sm" onClick={startEditing} className="rounded-xl">
+              <Edit className="mr-2 h-4 w-4" /> Editar
+            </Button>
+          )
         )}
       </div>
 
@@ -151,8 +227,8 @@ export default function HerramientaDetail() {
               </div>
             )}
 
-            {/* Botón de cámara flotante - solo admin/logistica */}
-            {isAdmin && (
+            {/* Botón de cámara flotante - solo admin/logistica/encargado */}
+            {canEdit && (
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
@@ -198,66 +274,156 @@ export default function HerramientaDetail() {
             />
           </div>
           <CardHeader className="pb-4 pt-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <CardTitle className="text-2xl font-bold text-peie-blue">{herramienta.name}</CardTitle>
-                <CardDescription className="text-sm font-mono mt-1 bg-gray-100 w-max px-2 py-1 rounded">
-                  {herramienta.code}
-                </CardDescription>
+            {isEditing ? (
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="editName" className="text-xs font-semibold text-slate-700">Nombre de la Herramienta *</Label>
+                  <Input 
+                    id="editName" 
+                    value={editName} 
+                    onChange={e => setEditName(e.target.value)} 
+                    className="h-11 rounded-xl font-bold"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="editCategory" className="text-xs font-semibold text-slate-700">Categoría *</Label>
+                    <Select value={editCategory} onValueChange={setEditCategory}>
+                      <SelectTrigger className="h-11 rounded-xl text-slate-800">
+                        <SelectValue placeholder="Categoría" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {['Escaleras', 'Amoladoras', 'Taladros', 'Elementos de seguridad', 'Instrumentos de medición', 'Vehículos', 'Otros'].map(cat => (
+                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="editStatus" className="text-xs font-semibold text-slate-700">Estado *</Label>
+                    <Select value={editStatus} onValueChange={setEditStatus}>
+                      <SelectTrigger className="h-11 rounded-xl text-slate-800">
+                        <SelectValue placeholder="Estado" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {['Disponible', 'En uso', 'Reservada', 'En traslado', 'En mantenimiento', 'Fuera de servicio'].map(st => (
+                          <SelectItem key={st} value={st}>{st}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </div>
-              <span className={`px-3 py-1 rounded-full text-sm font-semibold border ${getStatusColor(herramienta.status)}`}>
-                {herramienta.status}
-              </span>
-            </div>
+            ) : (
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle className="text-2xl font-bold text-peie-blue">{herramienta.name}</CardTitle>
+                  <CardDescription className="text-sm font-mono mt-1 bg-gray-100 w-max px-2 py-1 rounded">
+                    {herramienta.code}
+                  </CardDescription>
+                </div>
+                <span className={`px-3 py-1 rounded-full text-sm font-semibold border ${getStatusColor(herramienta.status)}`}>
+                  {herramienta.status}
+                </span>
+              </div>
+            )}
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Marca</p>
-                <p className="font-medium">{herramienta.brand || '-'}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Modelo</p>
-                <p className="font-medium">{herramienta.model || '-'}</p>
-              </div>
-            </div>
-            
-            <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Obra Actual</p>
-                <div className="flex items-center text-peie-blue font-medium bg-white p-2 rounded border border-border shadow-sm">
-                  <Building2 className="w-4 h-4 mr-2" /> {herramienta.obras?.name || 'Ubicación Desconocida'}
+            {isEditing ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="editBrand" className="text-xs font-semibold text-slate-700">Marca</Label>
+                    <Input id="editBrand" value={editBrand} onChange={e => setEditBrand(e.target.value)} className="h-11 rounded-xl" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="editModel" className="text-xs font-semibold text-slate-700">Modelo</Label>
+                    <Input id="editModel" value={editModel} onChange={e => setEditModel(e.target.value)} className="h-11 rounded-xl" />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="editObra" className="text-xs font-semibold text-slate-700">Obra o Ubicación Actual *</Label>
+                  <Select value={editObraId} onValueChange={setEditObraId}>
+                    <SelectTrigger className="h-11 rounded-xl text-slate-800">
+                      <SelectValue placeholder="Selecciona obra" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {obras.map(o => (
+                        <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="editDesc" className="text-xs font-semibold text-slate-700">Descripción o Características</Label>
+                  <Input id="editDesc" value={editDescription} onChange={e => setEditDescription(e.target.value)} className="h-11 rounded-xl" />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="editNotes" className="text-xs font-semibold text-slate-700">Notas Adicionales</Label>
+                  <Input id="editNotes" value={editNotes} onChange={e => setEditNotes(e.target.value)} className="h-11 rounded-xl" />
                 </div>
               </div>
-              
-              <div className="pt-2 border-t border-gray-200">
-                <div className="flex justify-between items-center mb-2">
-                  <p className="text-sm text-muted-foreground">Coordenadas GPS</p>
-                  <Button variant="ghost" size="sm" onClick={updateGPSLocation} disabled={gettingLocation} className="text-peie-blue h-8">
-                    <Navigation className={`w-4 h-4 mr-2 ${gettingLocation ? 'animate-spin' : ''}`} /> 
-                    {gettingLocation ? 'Buscando...' : 'Capturar Actual'}
-                  </Button>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Marca</p>
+                    <p className="font-medium">{herramienta.brand || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Modelo</p>
+                    <p className="font-medium">{herramienta.model || '-'}</p>
+                  </div>
                 </div>
-                {herramienta.last_location_at ? (
-                  <div className="space-y-2">
-                    <p className="text-xs text-gray-500">Última actualización: {new Date(herramienta.last_location_at).toLocaleString()}</p>
-                    {herramienta.google_maps_url && (
-                      <a href={herramienta.google_maps_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-sm font-medium text-blue-600 hover:underline">
-                        <MapPin className="w-4 h-4 mr-1" /> Ver en Google Maps
-                      </a>
+                
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 space-y-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Obra Actual</p>
+                    <div className="flex items-center text-peie-blue font-medium bg-white p-2 rounded border border-border shadow-sm">
+                      <Building2 className="w-4 h-4 mr-2" /> {herramienta.obras?.name || 'Ubicación Desconocida'}
+                    </div>
+                  </div>
+                  
+                  <div className="pt-2 border-t border-gray-200">
+                    <div className="flex justify-between items-center mb-2">
+                      <p className="text-sm text-muted-foreground">Coordenadas GPS</p>
+                      <Button variant="ghost" size="sm" onClick={updateGPSLocation} disabled={gettingLocation} className="text-peie-blue h-8">
+                        <Navigation className={`w-4 h-4 mr-2 ${gettingLocation ? 'animate-spin' : ''}`} /> 
+                        {gettingLocation ? 'Buscando...' : 'Capturar Actual'}
+                      </Button>
+                    </div>
+                    {herramienta.last_location_at ? (
+                      <div className="space-y-2">
+                        <p className="text-xs text-gray-500">Última actualización: {new Date(herramienta.last_location_at).toLocaleString()}</p>
+                        {herramienta.google_maps_url && (
+                          <a href={herramienta.google_maps_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-sm font-medium text-blue-600 hover:underline">
+                            <MapPin className="w-4 h-4 mr-1" /> Ver en Google Maps
+                          </a>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-400 italic">No hay ubicación registrada.</p>
                     )}
                   </div>
-                ) : (
-                  <p className="text-sm text-gray-400 italic">No hay ubicación registrada.</p>
-                )}
-              </div>
-            </div>
+                </div>
 
-            {herramienta.description && (
-              <div>
-                <p className="text-sm text-muted-foreground">Descripción</p>
-                <p className="text-sm mt-1">{herramienta.description}</p>
-              </div>
+                {herramienta.description && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Descripción</p>
+                    <p className="text-sm mt-1">{herramienta.description}</p>
+                  </div>
+                )}
+
+                {herramienta.notes && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Notas Adicionales</p>
+                    <p className="text-sm mt-1">{herramienta.notes}</p>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>

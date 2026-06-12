@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Clock, CheckCircle, MapPin, HardHat, AlertCircle } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { buildWhatsAppLink, APP_URL } from '../lib/whatsapp';
-import { ExternalLink, MessageCircle, FileText, Share2, Trash2 } from 'lucide-react';
+import { FileText, Share2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -81,7 +81,10 @@ export default function TrasladoPersonalDetail() {
       // 2. Actualizar la ubicación del empleado
       const { error: empError } = await supabase
         .from('empleados')
-        .update({ obra_id: traslado.target_obra_id })
+        .update({ 
+          obra_id: traslado.target_obra_id,
+          status: 'Trabajando'
+        })
         .eq('id', traslado.empleado_id);
 
       if (empError) throw empError;
@@ -135,6 +138,12 @@ export default function TrasladoPersonalDetail() {
       setRejecting(false);
       return;
     }
+
+    // Reset the employee status back to Disponible
+    await supabase
+      .from('empleados')
+      .update({ status: 'Disponible' })
+      .eq('id', traslado.empleado_id);
 
     toast({ title: 'Traslado Rechazado', description: 'Notificando al encargado...' });
 

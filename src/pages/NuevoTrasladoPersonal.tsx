@@ -81,6 +81,14 @@ export default function NuevoTrasladoPersonal() {
 
       if (trasladoError) throw trasladoError;
 
+      // 2. Actualizar el estado del empleado a 'En traslado'
+      const { error: empUpdateError } = await supabase
+        .from('empleados')
+        .update({ status: 'En traslado' })
+        .eq('id', empleado.id);
+
+      if (empUpdateError) throw empUpdateError;
+
       const targetObra = obras.find(o => o.id === targetObraId);
       
       let targetProfileData = null;

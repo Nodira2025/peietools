@@ -10,7 +10,7 @@ export default function QRScanner() {
   const [result, setResult] = useState("");
 
   const { ref } = useZxing({
-    onDecodeResult(result) {
+    onResult(result: any) {
       setResult(result.getText());
       
       // Assuming the QR contains a URL like http://localhost:5173/herramientas/uuid
