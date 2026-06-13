@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Clock, CheckCircle, Truck, AlertCircle, Package, FileText, Download, Search, User } from 'lucide-react';
+import { ArrowLeft, Clock, CheckCircle, Truck, AlertCircle, Package, Search, User, Trash2 } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { buildWhatsAppLink, APP_URL } from '../lib/whatsapp';
 import { Input } from '@/components/ui/input';
@@ -233,10 +233,36 @@ export default function SolicitudDetail() {
     fetchSolicitud();
   };
 
+  const handleDelete = async () => {
+    if (!window.confirm('¿Estás seguro de que deseas eliminar este movimiento permanentemente? Esta acción no se puede deshacer.')) return;
+    try {
+      if (solicitud.herramienta_id) {
+        await supabase
+          .from('herramientas')
+          .update({ status: 'Disponible' })
+          .eq('id', solicitud.herramienta_id);
+      }
+
+      const { error } = await supabase
+        .from('solicitudes')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({ title: 'Movimiento Eliminado', description: 'El movimiento fue borrado de la base de datos.' });
+      navigate('/solicitudes');
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.message });
+    }
+  };
+
   if (loading) return <div className="p-8 text-center text-muted-foreground">Cargando solicitud...</div>;
   if (!solicitud) return null;
 
   const canAct = solicitud.status !== 'Confirmada' && solicitud.status !== 'Cancelada' && solicitud.status !== 'Rechazada';
+  const isAdminOrLogistica = profile?.role === 'admin' || profile?.role === 'logistica';
+  const canDelete = isAdminOrLogistica || (isRequester && solicitud?.status === 'Pendiente');
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto pb-safe">
@@ -446,7 +472,6 @@ export default function SolicitudDetail() {
                   variant="outline"
                   onClick={() => {
                     const logisticaPhone = solicitud.assigned?.whatsapp;
-                    const logisticaName = solicitud.assigned?.full_name || 'Logistica';
                     if (!logisticaPhone) {
                       toast({ variant: 'destructive', title: 'Sin contacto', description: 'El responsable no tiene WhatsApp configurado.' });
                       return;
@@ -474,6 +499,20 @@ export default function SolicitudDetail() {
                 </Button>
 
               </div>
+            </div>
+          )}
+
+          {/* BOTON GENERAL DE ELIMINACION / CANCELACION (ADMIN O SOLICITANTE DE PENDIENTES) */}
+          {canDelete && (
+            <div className="pt-4 border-t border-slate-100 mt-4">
+              <Button 
+                variant="destructive"
+                onClick={handleDelete}
+                className="w-full h-12 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm shadow-sm flex items-center justify-center gap-2 active:scale-95 duration-150"
+              >
+                <Trash2 className="h-4 w-4" />
+                {isAdminOrLogistica ? 'Eliminar Movimiento Permanentemente' : 'Cancelar y Eliminar Solicitud'}
+              </Button>
             </div>
           )}
 

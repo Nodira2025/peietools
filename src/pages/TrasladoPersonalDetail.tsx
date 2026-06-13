@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Clock, CheckCircle, MapPin, HardHat, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Clock, CheckCircle, MapPin, HardHat, AlertCircle, Trash2 } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { buildWhatsAppLink, APP_URL } from '../lib/whatsapp';
 import { FileText, Share2 } from 'lucide-react';
@@ -185,6 +185,33 @@ export default function TrasladoPersonalDetail() {
     window.open(buildWhatsAppLink(phone.replace(/\D/g, ''), msg), '_blank');
   };
 
+  const handleDelete = async () => {
+    if (!window.confirm('¿Estás seguro de que deseas eliminar este traslado permanentemente? Esta acción no se puede deshacer.')) return;
+    try {
+      if (traslado.empleado_id) {
+        await supabase
+          .from('empleados')
+          .update({ 
+            status: 'Disponible',
+            obra_id: traslado.source_obra_id || null
+          })
+          .eq('id', traslado.empleado_id);
+      }
+
+      const { error } = await supabase
+        .from('traslados_personal')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({ title: 'Traslado Eliminado', description: 'El traslado de personal fue borrado de la base de datos.' });
+      navigate('/pedidos-personal');
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.message });
+    }
+  };
+
   if (loading) return <div className="p-8 text-center text-muted-foreground">Cargando traslado...</div>;
   if (!traslado) return null;
 
@@ -192,6 +219,9 @@ export default function TrasladoPersonalDetail() {
     (profile?.obra_id === traslado.target_obra_id || profile?.role === 'admin');
   
   const isLogistica = profile?.role === 'logistica' || profile?.role === 'admin';
+  const isAdminOrLogistica = profile?.role === 'admin' || profile?.role === 'logistica';
+  const isRequester = profile?.id === traslado?.requester_id;
+  const canDelete = isAdminOrLogistica || (isRequester && traslado?.status === 'Pendiente');
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto pb-safe">
@@ -311,6 +341,20 @@ export default function TrasladoPersonalDetail() {
               <Clock className="mx-auto h-8 w-8 text-orange-400 mb-2" />
               <p className="text-sm font-semibold text-orange-700">Esperando confirmación de destino</p>
               <p className="text-xs text-orange-500 mt-1">El encargado de {traslado.target_obra?.name} debe confirmar la recepción al llegar.</p>
+            </div>
+          )}
+
+          {/* BOTON GENERAL DE ELIMINACION / CANCELACION */}
+          {canDelete && (
+            <div className="pt-4 border-t border-slate-100 mt-4">
+              <Button 
+                variant="destructive"
+                onClick={handleDelete}
+                className="w-full h-12 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm shadow-sm flex items-center justify-center gap-2 active:scale-95 duration-150"
+              >
+                <Trash2 className="h-4 w-4" />
+                {isAdminOrLogistica ? 'Eliminar Traslado Permanentemente' : 'Cancelar y Eliminar Traslado'}
+              </Button>
             </div>
           )}
 
