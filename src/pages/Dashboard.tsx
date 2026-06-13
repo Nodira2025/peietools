@@ -304,6 +304,67 @@ export default function Dashboard() {
       {/* ========================================================================= */}
       <div className="md:hidden block space-y-6 max-w-md mx-auto">
         
+        {/* Saludo y Encabezado */}
+        <div className="flex items-center justify-between px-1">
+          <div className="flex flex-col">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Panel de Control</span>
+            <h2 className="text-xl font-black text-slate-800 leading-tight">¡Hola, {userName}!</h2>
+          </div>
+        </div>
+
+        {/* Acciones Principales (Prioridad 1) */}
+        <div className="grid grid-cols-2 gap-4">
+          {/* Buscar Herramienta */}
+          <Card 
+            onClick={() => navigate('/herramientas')}
+            className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white border-0 shadow-lg shadow-indigo-600/15 hover:shadow-indigo-600/25 transition-all cursor-pointer rounded-[24px] p-5 flex flex-col justify-between h-32 active:scale-95 duration-200 group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-white/10 text-white flex items-center justify-center shrink-0">
+              <Search size={18} className="stroke-[2.5]" />
+            </div>
+            <div className="mt-2">
+              <h4 className="text-[12px] font-black uppercase tracking-wider leading-tight">
+                Buscar Herramienta
+              </h4>
+              <p className="text-[9px] text-indigo-100 font-medium mt-1">Catálogo y stock</p>
+            </div>
+          </Card>
+
+          {/* Trasladar Personal */}
+          <Card 
+            onClick={() => navigate('/personal')}
+            className="bg-gradient-to-br from-emerald-600 to-teal-700 text-white border-0 shadow-lg shadow-teal-600/15 hover:shadow-teal-600/25 transition-all cursor-pointer rounded-[24px] p-5 flex flex-col justify-between h-32 active:scale-95 duration-200 group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-white/10 text-white flex items-center justify-center shrink-0">
+              <HardHat size={18} className="stroke-[2.5]" />
+            </div>
+            <div className="mt-2">
+              <h4 className="text-[12px] font-black uppercase tracking-wider leading-tight">
+                Trasladar Personal
+              </h4>
+              <p className="text-[9px] text-teal-100 font-medium mt-1">Despachar operarios</p>
+            </div>
+          </Card>
+        </div>
+
+        {/* Botón QR */}
+        <Card 
+          onClick={() => navigate('/herramientas/scanner')} 
+          className="border-2 border-dashed border-blue-200 bg-blue-50/10 hover:border-blue-300 hover:bg-blue-50/20 shadow-none transition-all cursor-pointer active:scale-98 rounded-[24px] p-4 flex items-center justify-between group h-16 w-full"
+        >
+          <div className="flex items-center gap-4">
+            <div className="p-2.5 bg-orange-500 text-white rounded-xl">
+              <QrCode size={18} className="stroke-[2.5]" />
+            </div>
+            <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
+              Escanear Código QR
+            </span>
+          </div>
+          <div className="text-blue-500 group-hover:translate-x-0.5 transition-transform">
+            <ChevronRight size={18} className="stroke-[3]" />
+          </div>
+        </Card>
+
         {/* Barra de Notificaciones */}
         <Card 
           onClick={handleNotificationClick}
@@ -333,7 +394,7 @@ export default function Dashboard() {
         {/* Menú Principal */}
         <div className="flex items-center justify-center gap-2 text-[11px] font-black text-blue-600 uppercase tracking-widest my-4">
           <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
-          Menú Principal
+          Seguimiento e Historial
           <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
         </div>
 
@@ -480,65 +541,6 @@ export default function Dashboard() {
 
         </div>
 
-        {/* Nueva Gestión */}
-        <div className="flex items-center justify-center gap-2 text-[11px] font-black text-blue-600 uppercase tracking-widest my-4">
-          <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
-          Nueva Solicitud
-          <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          {/* Solicitar Herramientas */}
-          <Card 
-            onClick={() => navigate('/solicitudes/nueva')}
-            className="bg-white border-0 shadow-[0_8px_30px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all cursor-pointer rounded-[24px] p-4 flex flex-col justify-between h-28 active:scale-95 duration-200 group"
-          >
-            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-              <Wrench size={16} className="stroke-[2.5]" />
-            </div>
-            <div className="mt-2">
-              <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-tight leading-tight">
-                Solicitar Herramientas
-              </h4>
-              <p className="text-[8px] text-slate-400 font-semibold mt-0.5">Nuevo envío</p>
-            </div>
-          </Card>
-
-          {/* Solicitar Personal */}
-          <Card 
-            onClick={() => navigate('/personal')}
-            className="bg-white border-0 shadow-[0_8px_30px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all cursor-pointer rounded-[24px] p-4 flex flex-col justify-between h-28 active:scale-95 duration-200 group"
-          >
-            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-              <HardHat size={16} className="stroke-[2.5]" />
-            </div>
-            <div className="mt-2">
-              <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-tight leading-tight">
-                Solicitar Personal
-              </h4>
-              <p className="text-[8px] text-slate-400 font-semibold mt-0.5">Traslado operario</p>
-            </div>
-          </Card>
-        </div>
-
-        {/* Botón QR */}
-        <Card 
-          onClick={() => navigate('/herramientas/scanner')} 
-          className="border-2 border-dashed border-blue-200 bg-blue-50/10 hover:border-blue-300 hover:bg-blue-50/20 shadow-none transition-all cursor-pointer active:scale-98 rounded-[24px] p-4 flex items-center justify-between group h-16 mt-4 w-full"
-        >
-          <div className="flex items-center gap-4">
-            <div className="p-2.5 bg-orange-500 text-white rounded-xl">
-              <QrCode size={18} className="stroke-[2.5]" />
-            </div>
-            <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
-              Escanear Código QR
-            </span>
-          </div>
-          <div className="text-blue-500 group-hover:translate-x-0.5 transition-transform">
-            <ChevronRight size={18} className="stroke-[3]" />
-          </div>
-        </Card>
-
         {isEncargado && (
           <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-center mt-2 w-full">
             <p className="text-[11px] font-bold text-slate-500">¿Necesitas ayuda con un equipo o herramienta?</p>
@@ -628,9 +630,53 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Accesos Rápidos */}
+        {/* Acciones Principales (Prioridad 1) */}
         <div className="space-y-4">
-          <h3 className="text-xs font-black text-slate-800 tracking-wider uppercase">Accesos rápidos</h3>
+          <h3 className="text-xs font-black text-slate-800 tracking-wider uppercase">Acciones Principales</h3>
+          <div className="grid grid-cols-2 gap-6">
+            
+            {/* Buscar Herramienta */}
+            <Card 
+              onClick={() => navigate('/herramientas')}
+              className="bg-white border border-slate-100 hover:border-indigo-500/20 shadow-[0_8px_30px_rgba(0,0,0,0.01)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all cursor-pointer rounded-[24px] p-6 flex items-center justify-between group active:scale-[0.99] duration-150 relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full translate-x-8 -translate-y-8 group-hover:scale-110 transition-transform duration-300" />
+              <div className="flex items-center gap-5 z-10">
+                <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-inner group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
+                  <Search size={24} className="stroke-[2.5]" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider group-hover:text-indigo-600 transition-colors">Buscar Herramienta</h4>
+                  <p className="text-xs text-slate-400 font-semibold mt-1">Consultar inventario general, disponibilidad y estado de herramientas</p>
+                </div>
+              </div>
+              <ArrowRight size={20} className="text-indigo-600 group-hover:translate-x-1 transition-transform z-10" />
+            </Card>
+
+            {/* Trasladar Personal */}
+            <Card 
+              onClick={() => navigate('/personal')}
+              className="bg-white border border-slate-100 hover:border-emerald-500/20 shadow-[0_8px_30px_rgba(0,0,0,0.01)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all cursor-pointer rounded-[24px] p-6 flex items-center justify-between group active:scale-[0.99] duration-150 relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full translate-x-8 -translate-y-8 group-hover:scale-110 transition-transform duration-300" />
+              <div className="flex items-center gap-5 z-10">
+                <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-inner group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300">
+                  <HardHat size={24} className="stroke-[2.5]" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider group-hover:text-emerald-600 transition-colors">Trasladar Personal</h4>
+                  <p className="text-xs text-slate-400 font-semibold mt-1">Consultar operarios disponibles y gestionar el envío a tus obras</p>
+                </div>
+              </div>
+              <ArrowRight size={20} className="text-emerald-600 group-hover:translate-x-1 transition-transform z-10" />
+            </Card>
+
+          </div>
+        </div>
+
+        {/* Seguimiento e Historial */}
+        <div className="space-y-4">
+          <h3 className="text-xs font-black text-slate-800 tracking-wider uppercase">Seguimiento e Historial</h3>
           
           <div className="grid grid-cols-4 gap-6">
             
@@ -752,49 +798,6 @@ export default function Dashboard() {
                   <ArrowRight size={16} className="stroke-[3] group-hover:translate-x-0.5 transition-transform" />
                 </div>
               </div>
-            </Card>
-
-          </div>
-        </div>
-
-        {/* Nueva Gestión */}
-        <div className="space-y-4">
-          <h3 className="text-xs font-black text-slate-800 tracking-wider uppercase">Nueva Solicitud</h3>
-          
-          <div className="grid grid-cols-2 gap-6">
-            
-            {/* Solicitar Herramientas */}
-            <Card 
-              onClick={() => navigate('/solicitudes/nueva')}
-              className="bg-white border border-slate-100 hover:border-blue-500/20 shadow-[0_8px_30px_rgba(0,0,0,0.01)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.05)] transition-all cursor-pointer rounded-[24px] p-5 flex items-center justify-between group active:scale-98 duration-150"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <Wrench size={20} className="stroke-[2.5]" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-tight">Solicitar Herramientas</h4>
-                  <p className="text-[10px] text-slate-400 font-semibold mt-1">Registra un nuevo envío de equipo o herramientas a tu obra</p>
-                </div>
-              </div>
-              <ArrowRight size={18} className="text-blue-600 group-hover:translate-x-1 transition-transform" />
-            </Card>
-
-            {/* Solicitar Personal */}
-            <Card 
-              onClick={() => navigate('/personal')}
-              className="bg-white border border-slate-100 hover:border-blue-500/20 shadow-[0_8px_30px_rgba(0,0,0,0.01)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.05)] transition-all cursor-pointer rounded-[24px] p-5 flex items-center justify-between group active:scale-98 duration-150"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <HardHat size={20} className="stroke-[2.5]" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-tight">Solicitar Personal</h4>
-                  <p className="text-[10px] text-slate-400 font-semibold mt-1">Busca operarios disponibles para trasladar a tu obra</p>
-                </div>
-              </div>
-              <ArrowRight size={18} className="text-blue-600 group-hover:translate-x-1 transition-transform" />
             </Card>
 
           </div>

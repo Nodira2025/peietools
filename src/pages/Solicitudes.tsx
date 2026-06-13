@@ -225,11 +225,19 @@ export default function Solicitudes() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-stretch gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-peie-blue">{pageTitle}</h1>
           <p className="text-sm text-muted-foreground">{filtered.length} de {solicitudes.length} solicitudes</p>
         </div>
+        {isHerramientasPage && (
+          <Button 
+            onClick={() => navigate('/solicitudes/nueva')}
+            className="bg-peie-blue hover:bg-peie-blue/90 text-white rounded-xl shadow-md flex items-center gap-2 active:scale-95 duration-150 self-end sm:self-center font-bold text-xs"
+          >
+            Nuevo Movimiento
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
