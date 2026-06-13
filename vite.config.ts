@@ -36,6 +36,17 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "es-toolkit/compat/range": path.resolve(__dirname, "./src/lib/es-toolkit-compat-shims/range.js"),
+      "es-toolkit/compat/get": path.resolve(__dirname, "./src/lib/es-toolkit-compat-shims/get.js"),
+      "es-toolkit/compat/omit": path.resolve(__dirname, "./src/lib/es-toolkit-compat-shims/omit.js"),
+      "es-toolkit/compat/maxBy": path.resolve(__dirname, "./src/lib/es-toolkit-compat-shims/maxBy.js"),
+      "es-toolkit/compat/sumBy": path.resolve(__dirname, "./src/lib/es-toolkit-compat-shims/sumBy.js"),
+      "es-toolkit/compat/sortBy": path.resolve(__dirname, "./src/lib/es-toolkit-compat-shims/sortBy.js"),
+      "es-toolkit/compat/throttle": path.resolve(__dirname, "./src/lib/es-toolkit-compat-shims/throttle.js"),
+      "es-toolkit/compat/minBy": path.resolve(__dirname, "./src/lib/es-toolkit-compat-shims/minBy.js"),
+      "es-toolkit/compat/last": path.resolve(__dirname, "./src/lib/es-toolkit-compat-shims/last.js"),
+      "es-toolkit/compat/isPlainObject": path.resolve(__dirname, "./src/lib/es-toolkit-compat-shims/isPlainObject.js"),
+      "es-toolkit/compat/uniqBy": path.resolve(__dirname, "./src/lib/es-toolkit-compat-shims/uniqBy.js"),
     },
   },
 })

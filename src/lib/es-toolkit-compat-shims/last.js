@@ -1,0 +1,2 @@
+import { last } from 'es-toolkit/compat';
+export default last;
