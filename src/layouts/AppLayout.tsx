@@ -1,10 +1,12 @@
+import { useState } from 'react';
 import { Navigate, Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
-import { Home, Wrench, FileText, Truck, Users, Building, LogOut, ShoppingCart, Sparkles, HardHat, ClipboardList, BarChart3 } from 'lucide-react';
+import { Home, Wrench, FileText, Truck, Users, Building, LogOut, ShoppingCart, Sparkles, HardHat, ClipboardList, BarChart3, MoreHorizontal } from 'lucide-react';
 
 export default function AppLayout() {
   const { user, profile, loading, signOut } = useAuthStore();
   const location = useLocation();
+  const [showMas, setShowMas] = useState(false);
 
   if (loading) {
     return (
@@ -147,14 +149,32 @@ export default function AppLayout() {
       {/* Barra de Navegación Inferior (Exclusiva para Móviles) */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#031530] text-white shadow-[0_-8px_30px_rgba(0,0,0,0.2)] rounded-t-[32px] z-40 flex overflow-x-auto no-scrollbar justify-around pb-safe pt-3 px-2 border-t border-slate-800/20">
         {[
-          { name: 'Inicio', path: '/dashboard', icon: Home },
-          { name: 'Movimiento Personal', path: '/pedidos-personal', icon: HardHat },
-          { name: 'Movimiento Herramienta', path: '/pedidos-herramientas', icon: Wrench },
-          { name: 'Mis Obras', path: '/mis-obras', icon: Building },
-          { name: 'Personal', path: '/personal', icon: Users },
+          { name: 'Inicio', path: '/dashboard', icon: Home, isButton: false },
+          { name: 'Mis Obras', path: '/mis-obras', icon: Building, isButton: false },
+          { name: 'Herramientas', path: '/herramientas', icon: Wrench, isButton: false },
+          { name: 'Personal', path: '/personal', icon: Users, isButton: false },
+          { name: 'Más', path: '#', icon: MoreHorizontal, isButton: true },
         ].map((item) => {
           const Icon = item.icon;
-          const isActive = location.pathname === item.path || (item.path !== '/dashboard' && location.pathname.startsWith(item.path));
+          const isActive = !item.isButton && (location.pathname === item.path || (item.path !== '/dashboard' && location.pathname.startsWith(item.path)));
+          
+          if (item.isButton) {
+            return (
+              <button
+                key={item.name}
+                onClick={() => setShowMas(true)}
+                className="flex flex-col items-center justify-center py-1 px-1 flex-1 min-w-[64px] transition-all duration-200 relative text-left"
+              >
+                <div className="relative p-2.5 rounded-full transition-all duration-200 text-slate-400 hover:text-slate-200">
+                  <Icon size={20} className="stroke-2" />
+                </div>
+                <span className="text-[9px] tracking-tight mt-0.5 whitespace-nowrap font-semibold text-slate-400">
+                  {item.name}
+                </span>
+              </button>
+            );
+          }
+
           return (
             <Link
               key={item.path}
@@ -177,6 +197,94 @@ export default function AppLayout() {
           );
         })}
       </nav>
+
+      {/* Bottom Sheet para el menú "Más" */}
+      {showMas && (
+        <div className="md:hidden fixed inset-0 bg-black/60 z-50 transition-opacity duration-300" onClick={() => setShowMas(false)}>
+          <div 
+            className="fixed bottom-0 left-0 right-0 bg-[#031530] text-white rounded-t-[32px] p-6 space-y-6 shadow-[0_-10px_40px_rgba(0,0,0,0.4)] animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header del cajón */}
+            <div className="flex justify-between items-center border-b border-slate-800/80 pb-3">
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-300">Más Opciones</h3>
+              <button onClick={() => setShowMas(false)} className="text-slate-400 hover:text-white text-xs font-bold bg-slate-800/40 px-3 py-1 rounded-full">
+                Cerrar
+              </button>
+            </div>
+
+            {/* Listado de links */}
+            <div className="grid grid-cols-2 gap-4 py-2">
+              <Link 
+                to="/pedidos-herramientas" 
+                onClick={() => setShowMas(false)}
+                className="flex flex-col items-center justify-center p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:bg-slate-900 transition-all text-center gap-2"
+              >
+                <FileText size={24} className="text-blue-400" />
+                <span className="text-[11px] font-black uppercase tracking-tight">Mov. Herramientas</span>
+              </Link>
+
+              <Link 
+                to="/pedidos-personal" 
+                onClick={() => setShowMas(false)}
+                className="flex flex-col items-center justify-center p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:bg-slate-900 transition-all text-center gap-2"
+              >
+                <HardHat size={24} className="text-emerald-400" />
+                <span className="text-[11px] font-black uppercase tracking-tight">Mov. Personal</span>
+              </Link>
+
+              <Link 
+                to="/logistica" 
+                onClick={() => setShowMas(false)}
+                className="flex flex-col items-center justify-center p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:bg-slate-900 transition-all text-center gap-2"
+              >
+                <Truck size={24} className="text-purple-400" />
+                <span className="text-[11px] font-black uppercase tracking-tight">Mapa Logística</span>
+              </Link>
+
+              <Link 
+                to="/reportes" 
+                onClick={() => setShowMas(false)}
+                className="flex flex-col items-center justify-center p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:bg-slate-900 transition-all text-center gap-2"
+              >
+                <BarChart3 size={24} className="text-orange-400" />
+                <span className="text-[11px] font-black uppercase tracking-tight">Reportes KPI</span>
+              </Link>
+
+              {isAdmin && (
+                <Link 
+                  to="/usuarios" 
+                  onClick={() => setShowMas(false)}
+                  className="flex flex-col items-center justify-center p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:bg-slate-900 transition-all text-center gap-2"
+                >
+                  <Users size={24} className="text-sky-400" />
+                  <span className="text-[11px] font-black uppercase tracking-tight">Usuarios</span>
+                </Link>
+              )}
+
+              {isAdmin && (
+                <Link 
+                  to="/obras" 
+                  onClick={() => setShowMas(false)}
+                  className="flex flex-col items-center justify-center p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:bg-slate-900 transition-all text-center gap-2"
+                >
+                  <Building size={24} className="text-amber-400" />
+                  <span className="text-[11px] font-black uppercase tracking-tight">Obras (Admin)</span>
+                </Link>
+              )}
+            </div>
+
+            {/* Logout button */}
+            <button
+              onClick={() => { signOut(); setShowMas(false); }}
+              className="w-full py-3 bg-rose-950/20 border border-rose-900/50 hover:bg-rose-950/40 text-rose-400 font-black text-xs rounded-xl uppercase tracking-wider flex items-center justify-center gap-2 transition-all mt-4"
+            >
+              <LogOut size={16} />
+              Cerrar Sesión
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   );

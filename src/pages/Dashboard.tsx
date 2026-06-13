@@ -6,7 +6,6 @@ import { supabase } from '../lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Wrench, 
-  MapPin, 
   QrCode, 
   Users, 
   ChevronRight, 
@@ -17,7 +16,8 @@ import {
   Building,
   Search,
   HelpCircle,
-  ArrowRight
+  ArrowRight,
+  MessageCircle
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -41,7 +41,7 @@ export default function Dashboard() {
   const [activities, setActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const isEncargado = profile?.role === 'encargado' || profile?.role === 'solicitante';
+
   const totalNotifications = counts.pendingTools + counts.pendingPersonal;
 
   useEffect(() => {
@@ -302,256 +302,303 @@ export default function Dashboard() {
       {/* ========================================================================= */}
       {/* 1. DISPOSITIVOS MÓVILES (md:hidden block)                                 */}
       {/* ========================================================================= */}
-      <div className="md:hidden block space-y-6 max-w-md mx-auto">
+      <div className="md:hidden block space-y-5 max-w-md mx-auto px-2">
         
-        {/* Saludo y Encabezado */}
-        <div className="flex items-center justify-between px-1">
-          <div className="flex flex-col">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Panel de Control</span>
-            <h2 className="text-xl font-black text-slate-800 leading-tight">¡Hola, {userName}!</h2>
-          </div>
-        </div>
-
-        {/* Acciones Principales (Prioridad 1) */}
-        <div className="grid grid-cols-2 gap-4">
-          {/* Buscar Herramienta */}
-          <Card 
-            onClick={() => navigate('/herramientas')}
-            className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white border-0 shadow-lg shadow-indigo-600/15 hover:shadow-indigo-600/25 transition-all cursor-pointer rounded-[24px] p-5 flex flex-col justify-between h-32 active:scale-95 duration-200 group"
-          >
-            <div className="w-10 h-10 rounded-xl bg-white/10 text-white flex items-center justify-center shrink-0">
-              <Search size={18} className="stroke-[2.5]" />
-            </div>
-            <div className="mt-2">
-              <h4 className="text-[12px] font-black uppercase tracking-wider leading-tight">
-                Buscar Herramienta
-              </h4>
-              <p className="text-[9px] text-indigo-100 font-medium mt-1">Catálogo y stock</p>
-            </div>
-          </Card>
-
-          {/* Trasladar Personal */}
-          <Card 
-            onClick={() => navigate('/personal')}
-            className="bg-gradient-to-br from-emerald-600 to-teal-700 text-white border-0 shadow-lg shadow-teal-600/15 hover:shadow-teal-600/25 transition-all cursor-pointer rounded-[24px] p-5 flex flex-col justify-between h-32 active:scale-95 duration-200 group"
-          >
-            <div className="w-10 h-10 rounded-xl bg-white/10 text-white flex items-center justify-center shrink-0">
-              <HardHat size={18} className="stroke-[2.5]" />
-            </div>
-            <div className="mt-2">
-              <h4 className="text-[12px] font-black uppercase tracking-wider leading-tight">
-                Trasladar Personal
-              </h4>
-              <p className="text-[9px] text-teal-100 font-medium mt-1">Despachar operarios</p>
-            </div>
-          </Card>
-        </div>
-
-        {/* Botón QR */}
-        <Card 
-          onClick={() => navigate('/herramientas/scanner')} 
-          className="border-2 border-dashed border-blue-200 bg-blue-50/10 hover:border-blue-300 hover:bg-blue-50/20 shadow-none transition-all cursor-pointer active:scale-98 rounded-[24px] p-4 flex items-center justify-between group h-16 w-full"
-        >
-          <div className="flex items-center gap-4">
-            <div className="p-2.5 bg-orange-500 text-white rounded-xl">
-              <QrCode size={18} className="stroke-[2.5]" />
-            </div>
-            <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
-              Escanear Código QR
-            </span>
-          </div>
-          <div className="text-blue-500 group-hover:translate-x-0.5 transition-transform">
-            <ChevronRight size={18} className="stroke-[3]" />
-          </div>
-        </Card>
-
         {/* Barra de Notificaciones */}
         <Card 
           onClick={handleNotificationClick}
-          className="bg-white border-0 shadow-[0_8px_30px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all cursor-pointer rounded-[24px] p-4 flex items-center justify-between group active:scale-[0.99]"
+          className="bg-white border-0 shadow-[0_4px_20px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_20px_rgba(0,0,0,0.08)] transition-all cursor-pointer rounded-[24px] p-4 flex items-center justify-between group active:scale-[0.99] w-full"
         >
           <div className="flex items-center gap-4">
             <div className="relative w-12 h-12 bg-rose-500 rounded-full flex items-center justify-center text-white shadow-md shadow-rose-500/20">
-              <Bell size={22} className="animate-wiggle" />
+              <Bell size={22} className="stroke-[2] text-white" />
               {totalNotifications > 0 && (
-                <span className="absolute -top-1 -right-1 bg-rose-600 text-white text-[10px] font-black rounded-full w-5 h-5 flex items-center justify-center border-2 border-white">
+                <span className="absolute -top-1.5 -right-1.5 bg-rose-600 text-white text-[10px] font-black rounded-full w-5 h-5 flex items-center justify-center border-2 border-white">
                   {totalNotifications}
                 </span>
               )}
             </div>
             <div className="flex flex-col">
-              <span className="text-sm font-black text-slate-800 leading-tight">Notificación</span>
-              <span className="text-xs text-slate-400 font-semibold mt-0.5">
+              <span className="text-sm font-black text-[#031530] leading-tight">Notificación</span>
+              <span className="text-xs text-slate-400 font-bold mt-0.5">
                 {totalNotifications > 0 
                   ? `Tienes ${totalNotifications} notificaciones nuevas` 
-                  : 'No tienes notificaciones pendientes'}
+                  : 'No tienes notificaciones nuevas'}
               </span>
             </div>
           </div>
           <ChevronRight size={18} className="text-slate-400 group-hover:translate-x-0.5 transition-transform" />
         </Card>
 
-        {/* Menú Principal */}
-        <div className="flex items-center justify-center gap-2 text-[11px] font-black text-blue-600 uppercase tracking-widest my-4">
-          <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
-          Seguimiento e Historial
-          <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+        {/* Barra de Estadísticas Rápidas */}
+        <div className="grid grid-cols-4 gap-2">
+          {/* Card 1: Obras activas */}
+          <div 
+            onClick={() => navigate('/mis-obras')}
+            className="bg-white rounded-2xl p-2.5 border border-slate-100 flex flex-col items-center text-center justify-center cursor-pointer hover:shadow-sm"
+          >
+            <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+              <Building size={16} />
+            </div>
+            <span className="text-[8px] font-black text-slate-400 mt-1.5 uppercase tracking-tight leading-tight">Obras active</span>
+            <span className="text-sm font-black text-blue-600 mt-0.5">{stats.activeSites}</span>
+          </div>
+          
+          {/* Card 2: Personal pendiente */}
+          <div 
+            onClick={() => navigate('/personal')}
+            className="bg-white rounded-2xl p-2.5 border border-slate-100 flex flex-col items-center text-center justify-center cursor-pointer hover:shadow-sm"
+          >
+            <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center text-green-600">
+              <Users size={16} />
+            </div>
+            <span className="text-[8px] font-black text-slate-400 mt-1.5 uppercase tracking-tight leading-tight">Pers. pend.</span>
+            <span className="text-sm font-black text-green-600 mt-0.5">{counts.pendingPersonal}</span>
+          </div>
+
+          {/* Card 3: Herramientas pendientes */}
+          <div 
+            onClick={() => navigate('/pedidos-herramientas')}
+            className="bg-white rounded-2xl p-2.5 border border-slate-100 flex flex-col items-center text-center justify-center cursor-pointer hover:shadow-sm"
+          >
+            <div className="w-8 h-8 rounded-full bg-amber-50 flex items-center justify-center text-amber-600">
+              <Wrench size={16} />
+            </div>
+            <span className="text-[8px] font-black text-slate-400 mt-1.5 uppercase tracking-tight leading-tight">Herr. pend.</span>
+            <span className="text-sm font-black text-amber-600 mt-0.5">{counts.pendingTools}</span>
+          </div>
+
+          {/* Card 4: Logística pendiente */}
+          <div 
+            onClick={() => navigate('/logistica')}
+            className="bg-white rounded-2xl p-2.5 border border-slate-100 flex flex-col items-center text-center justify-center cursor-pointer hover:shadow-sm"
+          >
+            <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center text-purple-600">
+              <Truck size={16} />
+            </div>
+            <span className="text-[8px] font-black text-slate-400 mt-1.5 uppercase tracking-tight leading-tight">Logíst. pend.</span>
+            <span className="text-sm font-black text-purple-600 mt-0.5">{counts.activeMovements}</span>
+          </div>
         </div>
 
-        {/* Grid de Accesos Rápidos */}
+        {/* Grilla de Secciones (6 Tarjetas con imágenes) */}
         <div className="grid grid-cols-2 gap-4">
           
-          {/* Movimiento de Personal */}
-          <Card 
-            onClick={() => navigate('/pedidos-personal')}
-            className="bg-white border-0 shadow-[0_8px_30px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all cursor-pointer rounded-[24px] overflow-hidden flex flex-col justify-between group active:scale-95 duration-200"
-          >
-            <div className="relative w-full h-32 bg-slate-100 overflow-hidden">
-              <img 
-                src="/img/card_personal.webp" 
-                alt="Movimiento de Personal" 
-                className="w-full h-full object-cover"
-              />
-              {counts.pendingPersonal > 0 && (
-                <span className="absolute top-3 left-3 bg-rose-600 text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                  {counts.pendingPersonal}
-                </span>
-              )}
-            </div>
-            <div className="p-4 flex flex-col items-start gap-1">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-blue-600 text-white rounded-xl">
-                  <HardHat size={16} className="stroke-[2.5]" />
-                </div>
-                <span className="text-[10px] font-black text-slate-800 tracking-tight leading-none uppercase">
-                  Movimiento Personal
-                </span>
-              </div>
-              <p className="text-[9px] text-slate-400 font-semibold leading-normal mt-2 line-clamp-2">
-                Gestiona traslados de personal para tus obras.
-              </p>
-            </div>
-            <div className="pb-3 flex justify-center text-blue-500">
-              <ChevronRight size={16} className="stroke-[3] rotate-90" />
-            </div>
-          </Card>
-
-          {/* Movimiento de Herramientas */}
-          <Card 
-            onClick={() => navigate('/pedidos-herramientas')}
-            className="bg-white border-0 shadow-[0_8px_30px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all cursor-pointer rounded-[24px] overflow-hidden flex flex-col justify-between group active:scale-95 duration-200"
-          >
-            <div className="relative w-full h-32 bg-slate-100 overflow-hidden">
-              <img 
-                src="/img/card_herramientas.webp" 
-                alt="Movimiento de Herramientas" 
-                className="w-full h-full object-cover"
-              />
-              {counts.pendingTools > 0 && (
-                <span className="absolute top-3 left-3 bg-rose-600 text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                  {counts.pendingTools}
-                </span>
-              )}
-            </div>
-            <div className="p-4 flex flex-col items-start gap-1">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-blue-600 text-white rounded-xl">
-                  <Wrench size={16} className="stroke-[2.5]" />
-                </div>
-                <span className="text-[10px] font-black text-slate-800 tracking-tight leading-none uppercase">
-                  Movimiento Herramienta
-                </span>
-              </div>
-              <p className="text-[9px] text-slate-400 font-semibold leading-normal mt-2 line-clamp-2">
-                Monitorea traslados de herramientas y equipos.
-              </p>
-            </div>
-            <div className="pb-3 flex justify-center text-blue-500">
-              <ChevronRight size={16} className="stroke-[3] rotate-90" />
-            </div>
-          </Card>
-
-          {/* Tarjeta Logística */}
-          <Card 
-            onClick={() => navigate('/logistica')}
-            className="bg-white border-0 shadow-[0_8px_30px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all cursor-pointer rounded-[24px] overflow-hidden flex flex-col justify-between group active:scale-95 duration-200"
-          >
-            <div className="relative w-full h-32 bg-slate-100 overflow-hidden">
-              <img 
-                src="/img/card_logistica.webp" 
-                alt="Logística" 
-                className="w-full h-full object-cover"
-              />
-              {counts.activeMovements > 0 && (
-                <span className="absolute top-3 left-3 bg-blue-600 text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                  {counts.activeMovements}
-                </span>
-              )}
-            </div>
-            <div className="p-4 flex flex-col items-start gap-1">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-blue-600 text-white rounded-xl">
-                  <Truck size={16} className="stroke-[2.5]" />
-                </div>
-                <span className="text-[10px] font-black text-slate-800 tracking-tight leading-none uppercase">
-                  Logística
-                </span>
-              </div>
-              <p className="text-[9px] text-slate-400 font-semibold leading-normal mt-2 line-clamp-2">
-                Entregas y traslados activos en mapa.
-              </p>
-            </div>
-            <div className="pb-3 flex justify-center text-blue-500">
-              <ChevronRight size={16} className="stroke-[3] rotate-90" />
-            </div>
-          </Card>
-
-          {/* Mis Obras */}
-          <Card 
+          {/* Card 1: MIS OBRAS */}
+          <div 
             onClick={() => navigate('/mis-obras')}
-            className="bg-white border-0 shadow-[0_8px_30px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all cursor-pointer rounded-[24px] overflow-hidden flex flex-col justify-between group active:scale-95 duration-200"
+            className="relative h-44 rounded-3xl overflow-hidden shadow-md cursor-pointer group active:scale-95 duration-200"
           >
-            <div className="relative w-full h-32 bg-slate-100 overflow-hidden">
-              <img 
-                src="/img/card_obras.webp" 
-                alt="Mis Obras" 
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <div className="p-4 flex flex-col items-start gap-1">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-blue-600 text-white rounded-xl">
-                  <Building size={16} className="stroke-[2.5]" />
-                </div>
-                <span className="text-[10px] font-black text-slate-800 tracking-tight leading-none uppercase">
-                  Mis Obras
-                </span>
+            <img src="/img/card_obras.webp" alt="Mis Obras" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#031530] via-[#031530]/40 to-transparent" />
+            
+            {/* Badge superior derecho */}
+            <span className="absolute top-3 right-3 bg-rose-600 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center shadow">
+              {stats.activeSites}
+            </span>
+
+            {/* Bottom info bar */}
+            <div className="absolute bottom-0 left-0 right-0 p-3 bg-[#031530]/85 backdrop-blur-sm flex items-center gap-2 border-t border-slate-800/20">
+              <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0">
+                <Building size={14} className="stroke-[2.5]" />
               </div>
-              <p className="text-[9px] text-slate-400 font-semibold leading-normal mt-2 line-clamp-2">
-                Seguimiento de obras activas y personal.
-              </p>
+              <div className="flex-1 min-w-0">
+                <h4 className="text-[10px] font-black text-white uppercase tracking-wider leading-none">1. MIS OBRAS</h4>
+                <p className="text-[7.5px] text-slate-300 font-semibold truncate mt-1">Ver tus obras activas</p>
+              </div>
+              <ChevronRight size={12} className="text-white shrink-0" />
             </div>
-            <div className="pb-3 flex justify-center text-blue-500">
-              <ChevronRight size={16} className="stroke-[3] rotate-90" />
+          </div>
+
+          {/* Card 2: HERRAMIENTAS */}
+          <div 
+            onClick={() => navigate('/herramientas')}
+            className="relative h-44 rounded-3xl overflow-hidden shadow-md cursor-pointer group active:scale-95 duration-200"
+          >
+            <img src="/img/card_herramientas.webp" alt="Herramientas" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#031530] via-[#031530]/40 to-transparent" />
+            
+            {/* Badge superior derecho */}
+            <span className="absolute top-3 right-3 bg-rose-600 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center shadow">
+              {counts.pendingTools}
+            </span>
+
+            {/* Bottom info bar */}
+            <div className="absolute bottom-0 left-0 right-0 p-3 bg-[#031530]/85 backdrop-blur-sm flex items-center gap-2 border-t border-slate-800/20">
+              <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0">
+                <Wrench size={14} className="stroke-[2.5]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="text-[10px] font-black text-white uppercase tracking-wider leading-none">2. HERRAMIENTAS</h4>
+                <p className="text-[7.5px] text-slate-300 font-semibold truncate mt-1">Solicita y gestiona</p>
+              </div>
+              <ChevronRight size={12} className="text-white shrink-0" />
             </div>
-          </Card>
+          </div>
+
+          {/* Card 3: PERSONAL */}
+          <div 
+            onClick={() => navigate('/personal')}
+            className="relative h-44 rounded-3xl overflow-hidden shadow-md cursor-pointer group active:scale-95 duration-200"
+          >
+            <img src="/img/card_personal.webp" alt="Personal" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#031530] via-[#031530]/40 to-transparent" />
+            
+            {/* Badge superior derecho */}
+            <span className="absolute top-3 right-3 bg-rose-600 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center shadow">
+              {counts.pendingPersonal}
+            </span>
+
+            {/* Bottom info bar */}
+            <div className="absolute bottom-0 left-0 right-0 p-3 bg-[#031530]/85 backdrop-blur-sm flex items-center gap-2 border-t border-slate-800/20">
+              <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0">
+                <Users size={14} className="stroke-[2.5]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="text-[10px] font-black text-white uppercase tracking-wider leading-none">3. PERSONAL</h4>
+                <p className="text-[7.5px] text-slate-300 font-semibold truncate mt-1">Gestiona el personal</p>
+              </div>
+              <ChevronRight size={12} className="text-white shrink-0" />
+            </div>
+          </div>
+
+          {/* Card 4: LOGÍSTICA */}
+          <div 
+            onClick={() => navigate('/logistica')}
+            className="relative h-44 rounded-3xl overflow-hidden shadow-md cursor-pointer group active:scale-95 duration-200"
+          >
+            <img src="/img/card_logistica.webp" alt="Logística" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#031530] via-[#031530]/40 to-transparent" />
+            
+            {/* Badge superior derecho */}
+            <span className="absolute top-3 right-3 bg-rose-600 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center shadow">
+              {counts.activeMovements}
+            </span>
+
+            {/* Bottom info bar */}
+            <div className="absolute bottom-0 left-0 right-0 p-3 bg-[#031530]/85 backdrop-blur-sm flex items-center gap-2 border-t border-slate-800/20">
+              <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0">
+                <Truck size={14} className="stroke-[2.5]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="text-[10px] font-black text-white uppercase tracking-wider leading-none">6. LOGÍSTICA</h4>
+                <p className="text-[7.5px] text-slate-300 font-semibold truncate mt-1">Entregas y traslados activos</p>
+              </div>
+              <ChevronRight size={12} className="text-white shrink-0" />
+            </div>
+          </div>
+
+          {/* Card 5: PEDIDOS PERSONAL */}
+          <div 
+            onClick={() => navigate('/pedidos-personal')}
+            className="relative h-44 rounded-3xl overflow-hidden shadow-md cursor-pointer group active:scale-95 duration-200"
+          >
+            <img src="/img/card_personal.webp" alt="Pedidos Personal" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform brightness-90" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#031530] via-[#031530]/40 to-transparent" />
+            
+            {/* Badge superior derecho */}
+            <span className="absolute top-3 right-3 bg-rose-600 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center shadow">
+              {counts.pendingPersonal}
+            </span>
+
+            {/* Bottom info bar */}
+            <div className="absolute bottom-0 left-0 right-0 p-3 bg-[#031530]/85 backdrop-blur-sm flex items-center gap-2 border-t border-slate-800/20">
+              <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0">
+                <FileText size={14} className="stroke-[2.5]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="text-[10px] font-black text-white uppercase tracking-wider leading-none">4. PEDIDOS PERS.</h4>
+                <p className="text-[7.5px] text-slate-300 font-semibold truncate mt-1">Revisa pedidos realizados</p>
+              </div>
+              <ChevronRight size={12} className="text-white shrink-0" />
+            </div>
+          </div>
+
+          {/* Card 6: PEDIDOS HERRAMIENTAS */}
+          <div 
+            onClick={() => navigate('/pedidos-herramientas')}
+            className="relative h-44 rounded-3xl overflow-hidden shadow-md cursor-pointer group active:scale-95 duration-200"
+          >
+            <img src="/img/card_qr_scan.webp" alt="Pedidos Herramientas" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#031530] via-[#031530]/40 to-transparent" />
+            
+            {/* Badge superior derecho */}
+            <span className="absolute top-3 right-3 bg-rose-600 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center shadow">
+              {counts.pendingTools}
+            </span>
+
+            {/* Bottom info bar */}
+            <div className="absolute bottom-0 left-0 right-0 p-3 bg-[#031530]/85 backdrop-blur-sm flex items-center gap-2 border-t border-slate-800/20">
+              <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0">
+                <Wrench size={14} className="stroke-[2.5]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="text-[10px] font-black text-white uppercase tracking-wider leading-none">5. PEDIDOS HERR.</h4>
+                <p className="text-[7.5px] text-slate-300 font-semibold truncate mt-1">Revisa pedidos realizados</p>
+              </div>
+              <ChevronRight size={12} className="text-white shrink-0" />
+            </div>
+          </div>
 
         </div>
 
-        {isEncargado && (
-          <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-center mt-2 w-full">
-            <p className="text-[11px] font-bold text-slate-500">¿Necesitas ayuda con un equipo o herramienta?</p>
-            <button 
-              onClick={() => navigate('/herramientas')}
-              className="mt-1 text-[11px] font-black text-peie-blue underline decoration-peie-light underline-offset-2"
-            >
-              Consultar inventario general de herramientas
-            </button>
+        {/* Acciones Rápidas */}
+        <div className="space-y-3 pt-2">
+          <div className="flex items-center justify-center gap-4 my-2">
+            <div className="h-[1px] bg-slate-200 flex-1" />
+            <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest whitespace-nowrap">Acciones Rápidas</span>
+            <div className="h-[1px] bg-slate-200 flex-1" />
           </div>
-        )}
+
+          <div className="grid grid-cols-3 gap-2">
+            {/* Escanear QR */}
+            <div 
+              onClick={() => navigate('/herramientas/scanner')}
+              className="bg-white rounded-2xl p-3 border border-slate-100 flex flex-col items-center text-center justify-between cursor-pointer hover:shadow-sm min-h-[96px] active:scale-95 transition-all"
+            >
+              <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+                <QrCode size={20} className="stroke-[2.5]" />
+              </div>
+              <div className="mt-1.5 flex flex-col items-center">
+                <span className="text-[8px] font-black text-slate-800 uppercase leading-none text-center">Escanear QR</span>
+                <span className="text-[6.5px] text-slate-400 font-bold mt-0.5">Escanea códigos QR</span>
+              </div>
+            </div>
+
+            {/* Escanear Código de Barras */}
+            <div 
+              onClick={() => {
+                toast({ title: "Lector de código de barras", description: "Apunta al código de barras de la herramienta." });
+                navigate('/herramientas/scanner');
+              }}
+              className="bg-white rounded-2xl p-3 border border-slate-100 flex flex-col items-center text-center justify-between cursor-pointer hover:shadow-sm min-h-[96px] active:scale-95 transition-all"
+            >
+              <div className="w-10 h-10 rounded-full bg-green-50 text-green-600 flex items-center justify-center">
+                <FileText size={20} className="stroke-[2.5]" />
+              </div>
+              <div className="mt-1.5 flex flex-col items-center">
+                <span className="text-[8px] font-black text-slate-800 uppercase leading-none text-center">Código de Barras</span>
+                <span className="text-[6.5px] text-slate-400 font-bold mt-0.5">Escanea barras</span>
+              </div>
+            </div>
+
+            {/* Conectar por WhatsApp */}
+            <a 
+              href="https://wa.me/"
+              target="_blank"
+              rel="noreferrer"
+              className="bg-white rounded-2xl p-3 border border-slate-100 flex flex-col items-center text-center justify-between cursor-pointer hover:shadow-sm min-h-[96px] active:scale-95 transition-all"
+            >
+              <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <MessageCircle size={20} className="stroke-[2.5]" />
+              </div>
+              <div className="mt-1.5 flex flex-col items-center">
+                <span className="text-[8px] font-black text-slate-800 uppercase leading-none text-center font-bold">WhatsApp</span>
+                <span className="text-[6.5px] text-slate-400 font-bold mt-0.5">Comunícate</span>
+              </div>
+            </a>
+          </div>
+        </div>
 
       </div>
 

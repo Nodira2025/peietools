@@ -5,9 +5,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { HardHat, Search, MapPin, ArrowRightLeft, Clock, Camera } from 'lucide-react';
+import { HardHat, Search, Clock, Camera } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
-import FilterBar from '../components/FilterBar';
 import { compressImage } from '../lib/imageUtils';
 
 interface Empleado {
@@ -39,12 +38,10 @@ export default function Personal() {
   const [activeTab, setActiveTab] = useState<'staff' | 'history'>('staff');
   const [historial, setHistorial] = useState<any[]>([]);
   const [filterObra, setFilterObra] = useState('');
-  const [filterManager, setFilterManager] = useState('');
   const [filterSpecialty, setFilterSpecialty] = useState('');
   
   // Opciones para filtros
   const [obrasOpciones, setObrasOpciones] = useState<{value: string, label: string}[]>([]);
-  const [managersOpciones, setManagersOpciones] = useState<{value: string, label: string}[]>([]);
   const [specialtiesOpciones, setSpecialtiesOpciones] = useState<{value: string, label: string}[]>([]);
 
   // Camera file upload state
@@ -133,30 +130,28 @@ export default function Personal() {
     const { data: obrasData } = await supabase.from('obras').select('id, name, encargado_name').eq('active', true);
     if (obrasData) {
       setObrasOpciones(obrasData.map(o => ({ value: o.id, label: o.name })));
-      const uniqueManagers = [...new Set(obrasData.map(o => o.encargado_name).filter(Boolean))].sort();
-      setManagersOpciones(uniqueManagers.map(m => ({ value: m!, label: m! })));
     }
 
     setLoading(false);
   };
 
-  const handleRelease = async (id: string) => {
-    if (!window.confirm('¿Liberar a este empleado? Quedará sin obra asignada.')) return;
-    const { error } = await supabase
-      .from('empleados')
-      .update({ 
-        obra_id: null,
-        status: 'Disponible'
-      })
-      .eq('id', id);
-
-    if (error) {
-      toast({ variant: 'destructive', title: 'Error', description: error.message });
-    } else {
-      toast({ title: 'Empleado Liberado', description: 'Ahora se encuentra en estado Disponible.' });
-      fetchData();
-    }
-  };
+  // const handleRelease = async (id: string) => {
+  //   if (!window.confirm('¿Liberar a este empleado? Quedará sin obra asignada.')) return;
+  //   const { error } = await supabase
+  //     .from('empleados')
+  //     .update({ 
+  //       obra_id: null,
+  //       status: 'Disponible'
+  //     })
+  //     .eq('id', id);
+  // 
+  //   if (error) {
+  //     toast({ variant: 'destructive', title: 'Error', description: error.message });
+  //   } else {
+  //     toast({ title: 'Empleado Liberado', description: 'Ahora se encuentra en estado Disponible.' });
+  //     fetchData();
+  //   }
+  // };
 
   const filteredEmpleados = empleados.filter(e => {
     const matchesSearch = !search || 
@@ -168,7 +163,12 @@ export default function Personal() {
     const matchesSpecialty = !filterSpecialty || e.specialty === filterSpecialty;
     
     const computedStatus = e.status || (e.obra_id ? 'Trabajando' : 'Disponible');
-    const matchesStatus = filterType === 'all' || computedStatus === filterType;
+    let matchesStatus = true;
+    if (filterType === 'free') {
+      matchesStatus = computedStatus === 'Disponible' || computedStatus === 'Libre' || !e.obra_id;
+    } else if (filterType === 'busy') {
+      matchesStatus = computedStatus === 'Trabajando' || computedStatus === 'En traslado' || !!e.obra_id;
+    }
     
     return matchesSearch && matchesObra && matchesSpecialty && matchesStatus;
   });
@@ -233,19 +233,19 @@ export default function Personal() {
         <div className="relative group">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-peie-blue" />
           <Input
-            placeholder="Buscar empleado por nombre, obra o especialidad..."
+            placeholder="Buscar empleado o por obra..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="pl-9 h-11 rounded-xl border-slate-200 shadow-sm focus:ring-peie-blue/20"
+            className="pl-9 h-11 rounded-xl border-slate-200 shadow-sm"
           />
         </div>
+
+        {/* Control de Segmentos */}
         <div className="flex gap-2 p-1 bg-slate-100 rounded-xl overflow-x-auto no-scrollbar">
           {[
-            { value: 'all', label: 'Todos' },
-            { value: 'Disponible', label: 'Disponible' },
-            { value: 'En traslado', label: 'En traslado' },
-            { value: 'Trabajando', label: 'Trabajando' },
-            { value: 'Libre', label: 'Libre' }
+            { value: 'all', label: `Todos ${empleados.length}` },
+            { value: 'free', label: `Libres ${empleados.filter(e => e.status === 'Disponible' || e.status === 'Libre' || !e.obra_id).length}` },
+            { value: 'busy', label: `En Obra ${empleados.filter(e => e.status === 'Trabajando' || e.status === 'En traslado' || e.obra_id).length}` }
           ].map(opt => (
             <Button 
               key={opt.value}
@@ -253,7 +253,7 @@ export default function Personal() {
               onClick={() => setFilterType(opt.value)}
               className={`flex-1 min-w-[70px] rounded-lg text-xs h-9 ${
                 filterType === opt.value 
-                  ? 'bg-peie-blue shadow-sm text-white' 
+                  ? 'bg-blue-600 shadow-sm text-white hover:bg-blue-700' 
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
@@ -262,18 +262,35 @@ export default function Personal() {
           ))}
         </div>
 
-        <FilterBar
-          filters={[
-            { key: 'obra', label: 'Obra', value: filterObra, options: obrasOpciones },
-            { key: 'manager', label: 'Encargado', value: filterManager, options: managersOpciones },
-            { key: 'specialty', label: 'Especialidad', value: filterSpecialty, options: specialtiesOpciones },
-          ]}
-          onFilterChange={(key, val) => {
-            if (key === 'obra') setFilterObra(val);
-            if (key === 'manager') setFilterManager(val);
-            if (key === 'specialty') setFilterSpecialty(val);
-          }}
-        />
+        {/* Filtros Dropdowns */}
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <select 
+            value={filterObra}
+            onChange={e => setFilterObra(e.target.value)}
+            className="h-9 rounded-xl border border-slate-200 px-3 text-xs bg-white text-slate-700 font-semibold shadow-sm focus:outline-none"
+          >
+            <option value="">Obra: Todas</option>
+            {obrasOpciones.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+
+          <select 
+            value={filterSpecialty}
+            onChange={e => setFilterSpecialty(e.target.value)}
+            className="h-9 rounded-xl border border-slate-200 px-3 text-xs bg-white text-slate-700 font-semibold shadow-sm focus:outline-none"
+          >
+            <option value="">Especialidad: Todas</option>
+            {specialtiesOpciones.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
+
+          {(filterObra || filterSpecialty || search || filterType !== 'all') && (
+            <button 
+              onClick={() => { setFilterObra(''); setFilterSpecialty(''); setSearch(''); setFilterType('all'); }}
+              className="text-xs text-rose-500 font-black hover:underline px-2"
+            >
+              × Limpiar
+            </button>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -281,70 +298,81 @@ export default function Personal() {
       ) : activeTab === 'staff' ? (
         <div className="space-y-3">
           {filteredEmpleados.map(emp => {
-            const statusStyle = emp.status === 'Disponible' ? 'bg-green-100 text-green-800 border-green-200' :
-                                emp.status === 'En traslado' ? 'bg-blue-100 text-blue-800 border-blue-200' :
-                                emp.status === 'Trabajando' ? 'bg-orange-100 text-orange-800 border-orange-200' :
-                                'bg-slate-100 text-slate-800 border-slate-200';
+            const isLibre = emp.status === 'Disponible' || emp.status === 'Libre' || !emp.obra_id;
+            const badgeStyle = isLibre 
+              ? 'bg-green-50 text-green-600 border-green-150' 
+              : 'bg-blue-50 text-blue-600 border-blue-150';
+
             return (
-              <Card key={emp.id} className="overflow-hidden rounded-2xl border-slate-150 hover:shadow-md transition-shadow">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-4">
-                    {/* AVATAR DE PERSONAL con Carga de Foto para Admin */}
+              <Card key={emp.id} className="overflow-hidden rounded-2xl border-slate-100 hover:shadow-sm transition-shadow bg-white">
+                <CardContent className="p-4 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    {/* Avatar */}
                     <div className="relative shrink-0">
-                      <div className="w-12 h-12 rounded-full overflow-hidden bg-peie-blue/5 border border-slate-200 flex items-center justify-center">
+                      <div className="w-12 h-12 rounded-full overflow-hidden bg-blue-50 border border-slate-100 flex items-center justify-center">
                         {emp.photo_url ? (
                           <img src={emp.photo_url} alt={emp.full_name} className="w-full h-full object-cover" />
                         ) : (
-                          <HardHat className="h-6 w-6 text-peie-blue/40" />
+                          <HardHat className="h-6 w-6 text-blue-300" />
                         )}
                       </div>
                       {isAdmin && (
                         <button 
                           onClick={() => { setSelectedEmpId(emp.id); fileInputRef.current?.click(); }}
-                          className="absolute -bottom-1 -right-1 bg-peie-blue text-white rounded-full p-1 shadow hover:bg-peie-blue/90 border border-white"
+                          className="absolute -bottom-1 -right-1 bg-blue-600 text-white rounded-full p-1 shadow hover:bg-blue-700 border border-white"
                         >
                           <Camera className="h-3 w-3" />
                         </button>
                       )}
                     </div>
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-bold text-sm text-slate-800 truncate">{emp.full_name}</p>
-                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${statusStyle}`}>
-                          {emp.status}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
+                    {/* Detalles */}
+                    <div className="min-w-0 space-y-0.5">
+                      <p className="font-black text-sm text-[#031530] truncate">{emp.full_name}</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">
                         {emp.specialty || 'Electricista'}
                       </p>
-                      <p className="text-[10px] text-slate-400 flex items-center gap-1 mt-1 truncate">
-                        <MapPin className="h-3 w-3 text-slate-400" /> {emp.obras?.name || 'Sin obra asignada'}
-                      </p>
+                      
+                      {/* Badge y obra */}
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className={`text-[8.5px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border shrink-0 ${badgeStyle}`}>
+                          {isLibre ? 'Libre' : 'En Obra'}
+                        </span>
+                        {!isLibre && (
+                          <span className="text-[9.5px] text-slate-500 font-semibold truncate max-w-[120px]">
+                            {emp.obras?.name || 'Asignado'}
+                          </span>
+                        )}
+                      </div>
                     </div>
+                  </div>
 
-                    <div className="flex gap-1.5 shrink-0">
-                      {emp.obra_id && (
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          className="text-slate-400 hover:text-red-500 h-9 px-2 text-xs rounded-xl"
-                          onClick={() => handleRelease(emp.id)}
-                        >
-                          Liberar
-                        </Button>
-                      )}
-                      {(emp.status === 'Disponible' || emp.status === 'Libre') && (
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          className="text-peie-blue border-peie-blue/30 hover:bg-peie-blue/5 h-9 px-3 text-xs font-bold rounded-xl"
-                          onClick={() => navigate(`/personal/trasladar/${emp.id}`)}
-                        >
-                          <ArrowRightLeft className="h-3.5 w-3.5 mr-1" /> Trasladar
-                        </Button>
-                      )}
-                    </div>
+                  {/* Botón de acción */}
+                  <div className="shrink-0">
+                    {isLibre ? (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="text-blue-600 border-blue-200 hover:bg-blue-50/50 h-9 px-4 text-xs font-black rounded-xl"
+                        onClick={() => navigate(`/personal/trasladar/${emp.id}`)}
+                      >
+                        Asignar
+                      </Button>
+                    ) : (
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        className="text-slate-500 hover:text-blue-600 hover:bg-slate-50 border border-slate-100 h-9 px-4 text-xs font-bold rounded-xl"
+                        onClick={() => {
+                          if (emp.obra_id) {
+                            navigate('/mis-obras');
+                            toast({ title: `Operario en obra`, description: `${emp.full_name} está trabajando en ${emp.obras?.name}.` });
+                          }
+                        }}
+                      >
+                        Ver
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -352,7 +380,7 @@ export default function Personal() {
           })}
           {filteredEmpleados.length === 0 && (
             <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-200">
-              <HardHat className="mx-auto h-12 w-12 text-slate-300 mb-2" />
+              <HardHat className="mx-auto h-12 w-12 text-slate-350 mb-2" />
               <p className="text-sm font-bold text-slate-500">No hay operarios en esta categoría</p>
               <p className="text-xs text-slate-400 mt-1">Intente remover o cambiar los filtros de búsqueda.</p>
             </div>

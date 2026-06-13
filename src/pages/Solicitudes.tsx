@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { MessageCircle, Clock, CheckCircle, Truck, AlertCircle, FileText, Search } from 'lucide-react';
+import { MessageCircle, Clock, CheckCircle, Truck, AlertCircle, FileText, Search, ArrowRightLeft } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { buildWhatsAppLink, APP_URL } from '../lib/whatsapp';
 import { Input } from '@/components/ui/input';
@@ -24,7 +24,6 @@ interface Solicitud {
   requester_name: string;
   requester_whatsapp: string | null;
   assigned_name?: string;
-  // Raw data for backward compatibility or detail navigation
   raw_id?: string;
 }
 
@@ -45,7 +44,8 @@ export default function Solicitudes() {
     if (location.pathname.startsWith('/pedidos-personal')) return 'personal';
     return '';
   });
-  const [filterStatus, setFilterStatus] = useState('');
+  
+  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'delivered' | 'cancelled'>('all');
   const [filterPriority, setFilterPriority] = useState('');
   const [filterDate, setFilterDate] = useState('');
   const [visibleCount, setVisibleCount] = useState(6);
@@ -136,17 +136,25 @@ export default function Solicitudes() {
     fetchSolicitudes();
   }, []);
 
-
-
   const getStatusBadge = (status: string) => {
     switch(status) {
-      case 'Pendiente': return <span className="flex items-center text-orange-600 bg-orange-100 px-2 py-1 rounded text-xs font-semibold"><Clock className="w-3 h-3 mr-1" /> Pendiente</span>;
-      case 'Asignada': return <span className="flex items-center text-blue-600 bg-blue-100 px-2 py-1 rounded text-xs font-semibold"><AlertCircle className="w-3 h-3 mr-1" /> Asignada</span>;
-      case 'En retiro': return <span className="flex items-center text-purple-600 bg-purple-100 px-2 py-1 rounded text-xs font-semibold"><Truck className="w-3 h-3 mr-1" /> En Retiro</span>;
-      case 'En traslado': return <span className="flex items-center text-peie-blue bg-peie-light/20 px-2 py-1 rounded text-xs font-semibold"><Truck className="w-3 h-3 mr-1" /> En Traslado</span>;
-      case 'Entregada': return <span className="flex items-center text-green-600 bg-green-100 px-2 py-1 rounded text-xs font-semibold"><CheckCircle className="w-3 h-3 mr-1" /> Entregada</span>;
-      case 'Confirmada': return <span className="flex items-center text-gray-600 bg-gray-100 px-2 py-1 rounded text-xs font-semibold"><CheckCircle className="w-3 h-3 mr-1" /> Confirmada</span>;
-      default: return <span className="bg-gray-100 px-2 py-1 rounded text-xs">{status}</span>;
+      case 'Pendiente': 
+        return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200/60 shadow-sm"><Clock className="w-3.5 h-3.5 animate-pulse" /> Pendiente</span>;
+      case 'Asignada': 
+        return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/60 shadow-sm"><AlertCircle className="w-3.5 h-3.5" /> Asignada</span>;
+      case 'En retiro': 
+        return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/60 shadow-sm"><Truck className="w-3.5 h-3.5" /> En Retiro</span>;
+      case 'En traslado': 
+        return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200/60 shadow-sm"><Truck className="w-3.5 h-3.5" /> En Traslado</span>;
+      case 'Entregada': 
+        return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 shadow-sm"><CheckCircle className="w-3.5 h-3.5" /> Entregada</span>;
+      case 'Confirmada': 
+        return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200 shadow-sm"><CheckCircle className="w-3.5 h-3.5" /> Confirmada</span>;
+      case 'Cancelada':
+      case 'Rechazada':
+        return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200/60 shadow-sm"><AlertCircle className="w-3.5 h-3.5" /> {status}</span>;
+      default: 
+        return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200 shadow-sm">{status}</span>;
     }
   };
 
@@ -198,112 +206,240 @@ export default function Solicitudes() {
     window.open(buildWhatsAppLink(phone, message), '_blank');
   };
 
-  const statusOpciones = ['Pendiente', 'Asignada', 'En retiro', 'En traslado', 'Entregada', 'Confirmada'];
   const prioridadOpciones = ['Baja', 'Normal', 'Alta', 'Urgente'];
 
-  const filtered = solicitudes.filter(s => {
+  // Base list filtered by search, only-my-orders, type, priority, date
+  const baseFiltered = solicitudes.filter(s => {
+    const matchType = !filterType || s.type === filterType;
+    const matchUser = !filterMisPedidos || s.requester_id === profile?.id;
     const matchSearch = !searchTerm || 
       s.item_name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
       s.item_code?.toLowerCase().includes(searchTerm.toLowerCase()) || 
       s.requester_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
       s.target_name?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchType = !filterType || s.type === filterType;
-    const matchStatus = !filterStatus || s.status === filterStatus;
     const matchPriority = !filterPriority || s.priority === filterPriority;
     const matchDate = !filterDate || s.created_at.startsWith(filterDate);
-    const matchUser = !filterMisPedidos || s.requester_id === profile?.id;
     
-    return matchSearch && matchType && matchStatus && matchPriority && matchDate && matchUser;
+    return matchType && matchUser && matchSearch && matchPriority && matchDate;
+  });
+
+  // Calculate segment counts based on the base filtered list
+  const counts = {
+    all: baseFiltered.length,
+    pending: baseFiltered.filter(s => ['Pendiente', 'Asignada', 'En retiro', 'En traslado'].includes(s.status)).length,
+    delivered: baseFiltered.filter(s => ['Entregada', 'Confirmada'].includes(s.status)).length,
+    cancelled: baseFiltered.filter(s => ['Cancelada', 'Rechazada'].includes(s.status)).length
+  };
+
+  // Final filtered list to render (applies activeTab status filter)
+  const finalFiltered = baseFiltered.filter(s => {
+    if (activeTab === 'all') return true;
+    if (activeTab === 'pending') return ['Pendiente', 'Asignada', 'En retiro', 'En traslado'].includes(s.status);
+    if (activeTab === 'delivered') return ['Entregada', 'Confirmada'].includes(s.status);
+    if (activeTab === 'cancelled') return ['Cancelada', 'Rechazada'].includes(s.status);
+    return true;
   });
 
   const pageTitle = isHerramientasPage 
     ? 'Movimiento de Herramientas' 
     : isPersonalPage 
       ? 'Movimiento de Personal' 
-      : 'Movimientos';
+      : 'Mis Pedidos';
+
+  const totalPageTypeRequests = solicitudes.filter(s => !filterType || s.type === filterType).length;
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-stretch gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-peie-blue">{pageTitle}</h1>
-          <p className="text-sm text-muted-foreground">{filtered.length} de {solicitudes.length} solicitudes</p>
-        </div>
-        {isHerramientasPage && (
-          <Button 
-            onClick={() => navigate('/solicitudes/nueva')}
-            className="bg-peie-blue hover:bg-peie-blue/90 text-white rounded-xl shadow-md flex items-center gap-2 active:scale-95 duration-150 self-end sm:self-center font-bold text-xs"
-          >
-            Nuevo Movimiento
-          </Button>
-        )}
+    <div className="space-y-5 max-w-5xl mx-auto pb-10">
+      {/* Cabecera */}
+      <div className="flex flex-col gap-1.5">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-800">{pageTitle}</h1>
+        <p className="text-xs font-semibold text-slate-500 bg-slate-100 px-3 py-1 rounded-full w-fit">
+          {finalFiltered.length} de {totalPageTypeRequests} solicitudes
+        </p>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3">
+      {/* Fila de Acción & Búsqueda */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white p-4 rounded-[24px] border border-slate-200/80 shadow-sm">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar herramienta, solicitante, obra..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-9 h-10 rounded-xl" />
-        </div>
-        <div className="flex items-center space-x-2 bg-white px-4 h-10 rounded-xl border border-slate-200/80 shadow-sm w-fit active:scale-98 transition-transform cursor-pointer" onClick={() => setFilterMisPedidos(!filterMisPedidos)}>
-          <input 
-            type="checkbox" 
-            id="misPedidos" 
-            checked={filterMisPedidos} 
-            onChange={() => {}} 
-            className="h-4 w-4 rounded border-gray-300 text-peie-blue focus:ring-peie-blue cursor-pointer" 
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Input 
+            placeholder="Buscar herramienta, solicitante, obra..." 
+            value={searchTerm} 
+            onChange={e => setSearchTerm(e.target.value)} 
+            className="pl-10 h-11 rounded-xl border-slate-200 focus-visible:ring-peie-blue shadow-none text-slate-700 text-sm" 
           />
-          <label htmlFor="misPedidos" className="text-xs font-bold text-slate-700 cursor-pointer select-none">
-            Solo mis pedidos
-          </label>
+        </div>
+        
+        <div className="flex flex-wrap items-center justify-between sm:justify-start gap-3">
+          <div 
+            className="flex items-center space-x-2 bg-slate-50 hover:bg-slate-100/80 px-4 h-11 rounded-xl border border-slate-200/60 shadow-sm active:scale-98 transition-all cursor-pointer select-none" 
+            onClick={() => setFilterMisPedidos(!filterMisPedidos)}
+          >
+            <input 
+              type="checkbox" 
+              id="misPedidos" 
+              checked={filterMisPedidos} 
+              onChange={() => {}} 
+              className="h-4 w-4 rounded border-slate-300 text-peie-blue focus:ring-peie-blue cursor-pointer" 
+            />
+            <label htmlFor="misPedidos" className="text-xs font-bold text-slate-700 cursor-pointer">
+              Solo mis pedidos
+            </label>
+          </div>
+          
+          <Button 
+            onClick={() => {
+              if (isHerramientasPage) {
+                navigate('/solicitudes/nueva');
+              } else if (isPersonalPage) {
+                navigate('/personal');
+                toast({
+                  title: "Crear traslado de personal",
+                  description: "Selecciona un empleado de la lista y haz clic en 'Asignar' o 'Trasladar' para iniciar.",
+                });
+              } else {
+                navigate('/solicitudes/nueva');
+              }
+            }}
+            className="bg-peie-blue hover:bg-peie-blue/90 text-white rounded-xl h-11 px-5 shadow-sm hover:shadow-md transition-all duration-200 flex items-center gap-2 active:scale-95 font-bold text-xs"
+          >
+            + Nuevo Pedido
+          </Button>
         </div>
       </div>
 
+      {/* Control de Segmentos de Estado */}
+      <div className="flex gap-2 p-1.5 bg-slate-100 rounded-[20px] overflow-x-auto no-scrollbar scroll-smooth shadow-inner">
+        {[
+          { value: 'all', label: 'Todos', count: counts.all },
+          { value: 'pending', label: 'Pendientes', count: counts.pending },
+          { value: 'delivered', label: 'Entregados', count: counts.delivered },
+          { value: 'cancelled', label: 'Cancelados', count: counts.cancelled }
+        ].map(tab => (
+          <Button 
+            key={tab.value}
+            variant={activeTab === tab.value ? 'default' : 'ghost'} 
+            onClick={() => {
+              setActiveTab(tab.value as any);
+              setVisibleCount(6); // Reset pagination on tab change
+            }}
+            className={`flex-1 min-w-[105px] rounded-xl text-xs h-10 font-bold transition-all duration-200 ${
+              activeTab === tab.value 
+                ? 'bg-peie-blue text-white shadow-md hover:bg-peie-blue/90' 
+                : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'
+            }`}
+          >
+            {tab.label} 
+            <span className={`ml-1.5 px-2 py-0.5 text-[10px] rounded-md font-bold ${
+              activeTab === tab.value 
+                ? 'bg-white/20 text-white' 
+                : 'bg-slate-200 text-slate-600'
+            }`}>{tab.count}</span>
+          </Button>
+        ))}
+      </div>
+
+      {/* Filtros Secundarios (Prioridad, Fecha) */}
       <FilterBar
         filters={[
-          ...(!isHerramientasPage && !isPersonalPage ? [{ key: 'type', label: 'Tipo', value: filterType, options: [{ value: 'herramienta', label: 'Herramienta' }, { value: 'personal', label: 'Personal' }] }] : []),
-          { key: 'status', label: 'Estado', value: filterStatus, options: statusOpciones.map(s => ({ value: s, label: s })) },
           { key: 'priority', label: 'Prioridad', value: filterPriority, options: prioridadOpciones.map(p => ({ value: p, label: p })) },
           { key: 'date', label: 'Fecha Solicitud', value: filterDate, type: 'date' },
         ]}
         onFilterChange={(key, val) => { 
-          if (key === 'type') setFilterType(val);
-          else if (key === 'status') setFilterStatus(val); 
-          else if (key === 'priority') setFilterPriority(val);
+          if (key === 'priority') setFilterPriority(val);
           else if (key === 'date') setFilterDate(val);
+          setVisibleCount(6); // Reset pagination on filter change
         }}
       />
 
+      {/* Listado principal */}
       {loading ? (
-        <div className="text-center py-8 text-muted-foreground">Cargando solicitudes...</div>
+        <div className="flex flex-col items-center justify-center py-16 gap-3">
+          <div className="w-8 h-8 border-3 border-peie-blue/20 border-t-peie-blue rounded-full animate-spin" />
+          <p className="text-xs font-semibold text-slate-500">Cargando solicitudes...</p>
+        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {filtered.slice(0, visibleCount).map(solicitud => (
-            <Card key={solicitud.id} className="relative">
-              <CardHeader className="pb-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {finalFiltered.slice(0, visibleCount).map(solicitud => (
+            <Card key={solicitud.id} className="relative group overflow-hidden border border-slate-200 hover:border-peie-blue/30 shadow-sm hover:shadow-md transition-all duration-350 rounded-[24px] bg-white">
+              {/* Indicador superior de estado */}
+              <div className={`absolute top-0 left-0 right-0 h-[4px] transition-colors ${
+                solicitud.status === 'Pendiente' ? 'bg-amber-400' :
+                ['Asignada', 'En retiro', 'En traslado'].includes(solicitud.status) ? 'bg-peie-blue' :
+                ['Entregada', 'Confirmada'].includes(solicitud.status) ? 'bg-emerald-500' : 'bg-rose-400'
+              }`} />
+              
+              <CardHeader className="pb-2 pt-5 px-5">
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex flex-col gap-1">
-                    <span className="text-[10px] font-bold uppercase text-slate-400 tracking-widest">{solicitud.type}</span>
-                    <span className="text-xs font-mono text-muted-foreground">{new Date(solicitud.created_at).toLocaleDateString()}</span>
+                    <span className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md w-fit">
+                      {solicitud.type === 'herramienta' ? '🛠️ Herramienta' : '👷 Personal'}
+                    </span>
+                    <span className="text-[11px] font-semibold text-slate-400 mt-1">
+                      {new Date(solicitud.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </span>
                   </div>
                   {getStatusBadge(solicitud.status)}
                 </div>
-                <CardTitle className="text-lg line-clamp-1">{solicitud.item_name}</CardTitle>
-                <p className="text-sm font-medium">De: {solicitud.source_name} ➔ A: {solicitud.target_name}</p>
+                <CardTitle className="text-base font-extrabold text-slate-800 line-clamp-1 leading-snug group-hover:text-peie-blue transition-colors">
+                  {solicitud.item_name}
+                </CardTitle>
               </CardHeader>
-              <CardContent className="text-sm space-y-2 mt-2 text-muted-foreground">
-                <p><strong>Solicitante:</strong> {solicitud.requester_name}</p>
-                {solicitud.type === 'herramienta' && <p><strong>Prioridad:</strong> {solicitud.priority}</p>}
-                {solicitud.assigned_name && <p><strong>Asignado a:</strong> {solicitud.assigned_name}</p>}
-                
-                <div className="pt-4 flex justify-between gap-2">
-                  <Button variant="outline" size="sm" className="flex-1" onClick={() => handleWhatsApp(solicitud)}>
-                    <MessageCircle className="w-4 h-4 mr-2 text-green-600" /> WhatsApp
+              
+              <CardContent className="px-5 pb-5 pt-0 text-sm space-y-3.5">
+                {/* Flujo origen/destino */}
+                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-100/50">
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Origen</span>
+                    <p className="text-xs font-bold text-slate-700 truncate mt-0.5">{solicitud.source_name || 'Almacén'}</p>
+                  </div>
+                  <div className="flex flex-col items-center px-3 justify-center">
+                    <ArrowRightLeft className="w-3.5 h-3.5 text-peie-blue/60" />
+                  </div>
+                  <div className="flex-1 min-w-0 text-right">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Destino</span>
+                    <p className="text-xs font-bold text-slate-700 truncate mt-0.5">{solicitud.target_name}</p>
+                  </div>
+                </div>
+
+                {/* Detalles del pedido */}
+                <div className="space-y-1.5 text-xs text-slate-600 bg-slate-50/40 p-3 rounded-2xl border border-slate-100/30">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400 font-medium">Solicitante:</span>
+                    <span className="font-bold text-slate-700">{solicitud.requester_name}</span>
+                  </div>
+                  {solicitud.type === 'herramienta' && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400 font-medium">Prioridad:</span>
+                      <span className={`font-bold ${
+                        solicitud.priority === 'Urgente' ? 'text-rose-600' :
+                        solicitud.priority === 'Alta' ? 'text-amber-600' :
+                        solicitud.priority === 'Normal' ? 'text-peie-blue' : 'text-slate-500'
+                      }`}>{solicitud.priority}</span>
+                    </div>
+                  )}
+                  {solicitud.assigned_name && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400 font-medium">Trasportista:</span>
+                      <span className="font-bold text-slate-700">{solicitud.assigned_name}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Acciones */}
+                <div className="pt-1.5 flex justify-between gap-2.5">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="flex-1 rounded-xl h-10 border-emerald-100 text-emerald-600 hover:bg-emerald-50/50 hover:text-emerald-700 hover:border-emerald-200 font-bold text-xs shadow-sm transition-all duration-200 active:scale-95 flex items-center justify-center gap-1.5" 
+                    onClick={() => handleWhatsApp(solicitud)}
+                  >
+                    <MessageCircle className="w-4 h-4 text-emerald-500" /> WhatsApp
                   </Button>
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    className="flex-1 border-peie-blue text-peie-blue hover:bg-peie-blue/10 font-bold"
+                    className="flex-1 rounded-xl h-10 border-slate-200/80 text-slate-700 hover:bg-slate-50 font-bold text-xs shadow-sm transition-all duration-200 active:scale-95"
                     onClick={() => navigate(solicitud.type === 'herramienta' ? '/solicitudes/' + solicitud.id : '/personal/traslados/' + solicitud.id)}
                   >
                     Ver Detalles
@@ -313,22 +449,23 @@ export default function Solicitudes() {
             </Card>
           ))}
           
-          {visibleCount < filtered.length && (
-            <div className="col-span-full pt-4">
+          {visibleCount < finalFiltered.length && (
+            <div className="col-span-full pt-2">
               <Button 
                 variant="ghost" 
-                className="w-full py-6 text-peie-blue hover:bg-peie-blue/5 font-bold rounded-xl"
+                className="w-full py-6 text-peie-blue hover:bg-peie-blue/5 font-bold rounded-2xl hover:text-peie-blue/90 border border-dashed border-slate-200/80 bg-white shadow-sm"
                 onClick={() => setVisibleCount(prev => prev + 6)}
               >
-                Ver más pedidos ({filtered.length - visibleCount} restantes)
+                Ver más pedidos ({finalFiltered.length - visibleCount} restantes)
               </Button>
             </div>
           )}
-          {solicitudes.length === 0 && (
-            <div className="col-span-full text-center py-12 bg-white rounded-lg border border-dashed border-gray-300">
-              <FileText className="mx-auto h-12 w-12 text-gray-400 mb-3" />
-              <h3 className="text-lg font-medium text-gray-900">No hay solicitudes</h3>
-              <p className="mt-1 text-gray-500">Todo está al día.</p>
+          
+          {finalFiltered.length === 0 && (
+            <div className="col-span-full text-center py-16 bg-white rounded-[24px] border border-dashed border-slate-200 shadow-sm flex flex-col items-center justify-center">
+              <FileText className="h-12 w-12 text-slate-300 mb-3" />
+              <h3 className="text-base font-bold text-slate-700">No se encontraron solicitudes</h3>
+              <p className="text-xs text-slate-400 mt-1">Prueba cambiando los filtros o la búsqueda.</p>
             </div>
           )}
         </div>
