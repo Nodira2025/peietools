@@ -1,2 +1,2 @@
-import { last } from 'es-toolkit/compat';
+import { last } from '../../../node_modules/es-toolkit/dist/compat/array/last.mjs';
 export default last;
