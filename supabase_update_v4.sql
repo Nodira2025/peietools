@@ -25,3 +25,8 @@ CREATE POLICY "Anyone can insert tracking_history" ON public.tracking_history FO
 -- 4. Agregar columna received_by en la tabla public.solicitudes
 ALTER TABLE public.solicitudes ADD COLUMN IF NOT EXISTS received_by TEXT;
 
+-- 5. Actualizar políticas RLS de herramientas para permitir a logística crear/insertar
+DROP POLICY IF EXISTS "Herramientas insert by admins" ON public.herramientas;
+CREATE POLICY "Herramientas insert by admins" ON public.herramientas FOR INSERT WITH CHECK (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND (role = 'admin' OR role = 'compras' OR role = 'logistica')));
+
+
