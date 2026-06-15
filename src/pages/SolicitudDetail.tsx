@@ -68,6 +68,7 @@ export default function SolicitudDetail() {
       navigate('/solicitudes');
     } else {
       setSolicitud(data);
+      if (data.received_by) setReceivedByName(data.received_by);
     }
     setLoading(false);
   };
@@ -85,12 +86,15 @@ export default function SolicitudDetail() {
     }
   };
 
-  const updateStatus = async (newStatus: string) => {
+  const updateStatus = async (newStatus: string, recipientName?: string) => {
     if (!solicitud || !profile) return;
     
     const payload: any = { status: newStatus };
     if (newStatus === 'Asignada') {
       payload.assigned_to = profile.id;
+    }
+    if (recipientName) {
+      payload.received_by = recipientName;
     }
 
     const { error } = await supabase.from('solicitudes').update(payload).eq('id', solicitud.id);
@@ -100,9 +104,11 @@ export default function SolicitudDetail() {
       return;
     }
 
+    const finalRecipient = recipientName || selectedEmpleado || solicitud.received_by;
+
     // Registrar movimiento en bitacora
-    const movNotes = newStatus === 'Confirmada' && selectedEmpleado
-      ? 'Recibio en obra: ' + selectedEmpleado + ' | Confirmado por ' + profile.full_name
+    const movNotes = (newStatus === 'Confirmada' || newStatus === 'Entregada') && finalRecipient
+      ? 'Recibio en obra: ' + finalRecipient + ' | Gestionado por ' + profile.full_name
       : 'Gestionado por ' + profile.full_name;
     
     await supabase.from('movimientos').insert([{
@@ -154,21 +160,21 @@ export default function SolicitudDetail() {
         setTimeout(() => { window.open(buildWhatsAppLink(requesterPhone, msg), '_blank'); }, 300);
       }
     } else if (newStatus === 'Confirmada') {
-      // Encargado confirma recepcion → avisar al de logistica
+      // Recepcion confirmada → avisar al de logistica
       toast({ title: 'Recepcion Confirmada!', description: 'Generando comprobante y avisando a Logistica...' });
-      setReceivedByName(selectedEmpleado);
+      setReceivedByName(finalRecipient);
       setShowReceipt(true);
       const logisticaPhone = solicitud.assigned?.whatsapp;
       if (logisticaPhone) {
         const msg = [
           '*RECEPCION CONFIRMADA*',
           '',
-          '*' + profile.full_name + '* confirmo la recepcion de:',
+          `*${profile.full_name}* confirmo la recepcion de:`,
           '',
           '- *Equipo:* ' + solicitud.herramientas.name,
           '- *Codigo:* ' + solicitud.herramientas.code,
           '- *Destino:* ' + solicitud.target_obra.name,
-          '- *Recibio:* ' + selectedEmpleado,
+          '- *Recibio:* ' + finalRecipient,
           '',
           'El traslado fue completado exitosamente.',
           '',
@@ -400,19 +406,59 @@ export default function SolicitudDetail() {
                     <DialogContent className="rounded-3xl w-[90%] max-w-md">
                       <DialogHeader>
                         <DialogTitle>Validación de Entrega</DialogTitle>
-                        <CardDescription>
-                          Pedile al encargado solicitante el código de seguridad de 6 dígitos que figura en su aplicación.
-                        </CardDescription>
+                        <DialogDescription>
+                          Seleccioná quién recibe la herramienta y solicitá el código de seguridad de 6 dígitos que figura en la app del solicitante.
+                        </DialogDescription>
                       </DialogHeader>
-                      <div className="py-4">
-                        <Input
-                          placeholder="Código de 6 dígitos"
-                          type="text"
-                          maxLength={6}
-                          value={inputSecurityCode}
-                          onChange={(e) => setInputSecurityCode(e.target.value.replace(/\D/g, ''))}
-                          className="text-center text-2xl font-mono tracking-widest h-12 rounded-xl"
-                        />
+                      <div className="space-y-4 py-2">
+                        {/* Buscador de empleado que recibe */}
+                        <div className="space-y-1.5 text-left">
+                          <label className="text-xs font-bold text-slate-700">¿Quién recibe la herramienta en obra? *</label>
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                            <Input
+                              placeholder="Buscar empleado por nombre..."
+                              value={empleadoSearch}
+                              onChange={(e) => { setEmpleadoSearch(e.target.value); setSelectedEmpleado(''); }}
+                              className="pl-9 h-11 rounded-xl text-sm"
+                            />
+                          </div>
+                          {empleadoSearch.length > 0 && !selectedEmpleado && (
+                            <div className="max-h-40 overflow-y-auto rounded-xl border border-slate-200 bg-white divide-y divide-slate-100 mt-1 shadow-sm">
+                              {filteredEmpleados.map(emp => (
+                                <button
+                                  key={emp.id}
+                                  type="button"
+                                  onClick={() => { setSelectedEmpleado(emp.full_name); setEmpleadoSearch(emp.full_name); }}
+                                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-emerald-50 active:bg-emerald-100 transition-colors"
+                                >
+                                  {emp.full_name}
+                                </button>
+                              ))}
+                              {filteredEmpleados.length === 0 && (
+                                <p className="px-3 py-2 text-xs text-slate-400">No se encontró ese empleado</p>
+                              )}
+                            </div>
+                          )}
+                          {selectedEmpleado && (
+                            <div className="flex items-center gap-2 bg-emerald-50/50 rounded-xl px-3 py-2 border border-emerald-200 mt-1">
+                              <User className="h-4 w-4 text-emerald-600" />
+                              <span className="text-sm font-semibold text-emerald-800">{selectedEmpleado}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-1.5 text-left">
+                          <label className="text-xs font-bold text-slate-700">Código de Seguridad *</label>
+                          <Input
+                            placeholder="Código de 6 dígitos"
+                            type="text"
+                            maxLength={6}
+                            value={inputSecurityCode}
+                            onChange={(e) => setInputSecurityCode(e.target.value.replace(/\D/g, ''))}
+                            className="text-center text-2xl font-mono tracking-widest h-12 rounded-xl"
+                          />
+                        </div>
                       </div>
                       <DialogFooter className="flex-row gap-2">
                         <DialogClose asChild>
@@ -420,13 +466,17 @@ export default function SolicitudDetail() {
                         </DialogClose>
                         <Button
                           onClick={() => {
-                            if (!solicitud.security_code || inputSecurityCode === solicitud.security_code) {
-                              updateStatus('Entregada');
-                            } else {
-                              toast({ variant: 'destructive', title: 'Código Incorrecto', description: 'El código ingresado no coincide con el código de seguridad del solicitante.' });
+                            if (!selectedEmpleado) {
+                              toast({ variant: 'destructive', title: 'Falta destinatario', description: 'Por favor, selecciona quién recibe la herramienta.' });
+                              return;
                             }
+                            if (solicitud.security_code && inputSecurityCode !== solicitud.security_code) {
+                              toast({ variant: 'destructive', title: 'Código Incorrecto', description: 'El código ingresado no coincide con el código de seguridad del solicitante.' });
+                              return;
+                            }
+                            updateStatus('Confirmada', selectedEmpleado);
                           }}
-                          disabled={solicitud.security_code && inputSecurityCode.length !== 6}
+                          disabled={!selectedEmpleado || (solicitud.security_code && inputSecurityCode.length !== 6)}
                           className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl"
                         >
                           Confirmar Entrega

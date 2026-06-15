@@ -21,3 +21,7 @@ CREATE POLICY "Anyone can read tracking_history" ON public.tracking_history FOR 
 
 DROP POLICY IF EXISTS "Anyone can insert tracking_history" ON public.tracking_history;
 CREATE POLICY "Anyone can insert tracking_history" ON public.tracking_history FOR INSERT WITH CHECK (true);
+
+-- 4. Agregar columna received_by en la tabla public.solicitudes
+ALTER TABLE public.solicitudes ADD COLUMN IF NOT EXISTS received_by TEXT;
+
