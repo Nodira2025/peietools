@@ -29,6 +29,8 @@ import TrasladoPersonalDetail from './pages/TrasladoPersonalDetail';
 import Ordenes from './pages/Ordenes';
 import NuevaOrden from './pages/NuevaOrden';
 import OrdenDetail from './pages/OrdenDetail';
+import Notificaciones from './pages/Notificaciones';
+import SeguimientoTraslado from './pages/SeguimientoTraslado';
 
 
 export default function App() {
@@ -67,6 +69,8 @@ export default function App() {
           <Route path="/solicitudes" element={<Navigate to="/pedidos-herramientas" replace />} />
           <Route path="/solicitudes/nueva" element={<NuevaSolicitud />} />
           <Route path="/solicitudes/:id" element={<SolicitudDetail />} />
+          <Route path="/solicitudes/:id/seguimiento" element={<SeguimientoTraslado />} />
+          <Route path="/notificaciones" element={<Notificaciones />} />
           
           <Route path="/compras" element={<Compras />} />
           <Route path="/compras/:id" element={<CompraDetail />} />

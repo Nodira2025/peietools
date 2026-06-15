@@ -249,6 +249,34 @@ export default function Herramientas() {
             </Button>
           </div>
 
+          {/* Chips de Estado Rápidos */}
+          <div className="flex flex-wrap gap-1.5 py-1 items-center">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mr-1.5">Estado:</span>
+            {[
+              { label: 'Todas', value: '' },
+              { label: 'Disponible', value: 'Disponible', color: 'bg-green-50 text-green-700 border-green-200/50 hover:bg-green-100' },
+              { label: 'En uso', value: 'En uso', color: 'bg-orange-50 text-orange-700 border-orange-200/50 hover:bg-orange-100' },
+              { label: 'En traslado', value: 'En traslado', color: 'bg-blue-50 text-blue-700 border-blue-200/50 hover:bg-blue-100' },
+              { label: 'Reservada', value: 'Reservada', color: 'bg-yellow-50 text-yellow-700 border-yellow-200/50 hover:bg-yellow-100' },
+              { label: 'Mantenimiento', value: 'En mantenimiento', color: 'bg-red-50 text-red-700 border-red-200/50 hover:bg-red-100' }
+            ].map(chip => {
+              const isActive = filterStatus === chip.value;
+              return (
+                <button
+                  key={chip.label}
+                  onClick={() => setFilterStatus(chip.value)}
+                  className={`text-xs px-3 py-1.5 rounded-full border transition-all duration-150 font-medium ${
+                    isActive
+                      ? 'bg-peie-blue text-white border-peie-blue shadow-sm font-bold scale-105'
+                      : chip.color || 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  {chip.label}
+                </button>
+              );
+            })}
+          </div>
+
           <FilterBar
             filters={[
               { key: 'status', label: 'Estado', value: filterStatus, options: statusUnicos.map(s => ({ value: s, label: s })) },
@@ -262,8 +290,8 @@ export default function Herramientas() {
             }}
           />
 
-          {/* Grilla de Herramientas (2 columnas en celular, 3 columnas en PC) */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* Grilla de Herramientas (Estrictamente 2 columnas para mejor experiencia de uso) */}
+          <div className="grid grid-cols-2 gap-4 md:gap-6">
             {filtered.slice(0, visibleCount).map((h) => {
               const styles = getStatusStyle(h.status);
               return (

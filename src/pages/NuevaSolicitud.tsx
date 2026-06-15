@@ -14,6 +14,7 @@ import { buildWhatsAppLink, APP_URL } from '../lib/whatsapp';
 interface Obra {
   id: string;
   name: string;
+  encargado_name?: string | null;
 }
 
 interface Herramienta {
@@ -46,6 +47,7 @@ export default function NuevaSolicitud() {
   
   const [selectedToolId, setSelectedToolId] = useState(preselectedToolId);
   const [targetObraId, setTargetObraId] = useState('');
+  const [filterEncargado, setFilterEncargado] = useState('');
   const [selectedLogisticaId, setSelectedLogisticaId] = useState('');
   const [priority, setPriority] = useState('Normal');
   const [comments, setComments] = useState('');
@@ -61,20 +63,23 @@ export default function NuevaSolicitud() {
         .order('name');
       if (toolsData) setHerramientas(toolsData as unknown as Herramienta[]);
 
-      // 2. Cargar Obras destino
+      // 2. Cargar Obras destino (solo activas y con encargado asignado)
       const { data: obrasData } = await supabase
         .from('obras')
-        .select('id, name')
+        .select('id, name, encargado_name')
         .eq('active', true)
         .order('name');
-      if (obrasData) setObras(obrasData);
+      if (obrasData) {
+        const validObras = obrasData.filter(o => o.encargado_name && o.encargado_name.trim() !== '');
+        setObras(validObras);
+      }
 
-      // 3. Cargar Personal de Logística (y Admins como respaldo) para notificar por WhatsApp
+      // 3. Cargar Personal de Logística (únicamente rol logistica)
       const { data: logisticaData } = await supabase
         .from('profiles')
         .select('id, full_name, whatsapp, role')
         .eq('active', true)
-        .in('role', ['logistica', 'admin'])
+        .eq('role', 'logistica')
         .order('full_name');
       if (logisticaData) setPersonalLogistica(logisticaData as PersonalLogistica[]);
     }
@@ -112,7 +117,9 @@ export default function NuevaSolicitud() {
 
     setLoading(true);
 
-    // 1. Guardar la solicitud en base de datos
+    const securityCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // 1. Guardar la solicitud en base de datos con el código de seguridad
     const { data: newSolicitud, error } = await supabase.from('solicitudes').insert([{
       requester_id: profile.id,
       herramienta_id: selectedToolId,
@@ -121,7 +128,8 @@ export default function NuevaSolicitud() {
       assigned_to: selectedLogisticaId, // Asignamos directamente al de logística elegido
       priority,
       status: 'Pendiente',
-      comments: comments.trim() || null
+      comments: comments.trim() || null,
+      security_code: securityCode
     }]).select().single();
 
     if (newSolicitud) {
@@ -167,6 +175,15 @@ export default function NuevaSolicitud() {
         window.open(buildWhatsAppLink(logisticaUser.whatsapp!, waMessage), '_blank');
       }, 300);
     }
+  };
+
+  const encargadosUnicos = [...new Set(obras.map(o => o.encargado_name).filter((e): e is string => !!e))].sort();
+  const filteredObras = obras.filter(o => !filterEncargado || o.encargado_name === filterEncargado);
+
+  const handleEncargadoChange = (val: string) => {
+    const actualVal = val === '_all_' ? '' : val;
+    setFilterEncargado(actualVal);
+    setTargetObraId('');
   };
 
   return (
@@ -217,17 +234,37 @@ export default function NuevaSolicitud() {
             </div>
 
             <div className="space-y-1.5">
+              <Label htmlFor="filterEncargado" className="text-xs font-semibold text-slate-700">Encargado de Obra (Filtrar Destinos)</Label>
+              <Select value={filterEncargado || '_all_'} onValueChange={handleEncargadoChange}>
+                <SelectTrigger className="h-11 rounded-xl text-slate-800">
+                  <SelectValue placeholder="Todos los encargados" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_all_">Todos los encargados</SelectItem>
+                  {encargadosUnicos.map(e => (
+                    <SelectItem key={e} value={e}>
+                      {e}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
               <Label htmlFor="targetObra" className="text-xs font-semibold text-slate-700">Obra o Base de Destino *</Label>
               <Select value={targetObraId} onValueChange={setTargetObraId} required>
                 <SelectTrigger className="h-11 rounded-xl text-slate-800">
                   <SelectValue placeholder="¿Hacia dónde debe enviarse?" />
                 </SelectTrigger>
                 <SelectContent>
-                  {obras.map(o => (
+                  {filteredObras.map(o => (
                     <SelectItem key={o.id} value={o.id}>
-                      {o.name}
+                      {o.name} <span className="text-[10px] text-slate-400">({o.encargado_name})</span>
                     </SelectItem>
                   ))}
+                  {filteredObras.length === 0 && (
+                    <div className="p-2 text-center text-xs text-slate-400">No hay obras asignadas a este encargado</div>
+                  )}
                 </SelectContent>
               </Select>
             </div>

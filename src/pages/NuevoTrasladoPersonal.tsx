@@ -31,7 +31,7 @@ export default function NuevoTrasladoPersonal() {
     // Traer datos del empleado
     const { data: empData, error: empError } = await supabase
       .from('empleados')
-      .select('id, full_name, obra_id, obras:obra_id(name)')
+      .select('id, full_name, obra_id, obras:obra_id(name, encargado_name)')
       .eq('id', id)
       .single();
 
@@ -42,14 +42,25 @@ export default function NuevoTrasladoPersonal() {
     }
     setEmpleado(empData);
 
-    // Traer lista de obras (todas menos la de origen)
+    // Traer lista de obras (todas menos la de origen, solo activas)
     const { data: obrasData } = await supabase
       .from('obras')
       .select('id, name, encargado_name, status')
+      .eq('active', true)
       .neq('id', empData.obra_id || '00000000-0000-0000-0000-000000000000')
       .order('name');
     
-    setObras(obrasData || []);
+    // Si no es admin ni logistica, solo mostrar sus propias obras como destino
+    let filteredObrasData = obrasData || [];
+    const isAdminOrLogistica = profile?.role === 'admin' || profile?.role === 'logistica';
+    if (!isAdminOrLogistica && profile) {
+      filteredObrasData = (obrasData || []).filter(o => 
+        (o.encargado_name && profile.full_name && o.encargado_name.toLowerCase().trim() === profile.full_name.toLowerCase().trim()) ||
+        o.id === profile.obra_id
+      );
+    }
+    
+    setObras(filteredObrasData);
     setLoading(false);
   };
 
@@ -91,16 +102,18 @@ export default function NuevoTrasladoPersonal() {
 
       const targetObra = obras.find(o => o.id === targetObraId);
       
-      let targetProfileData = null;
-      if (targetObra?.encargado_name) {
+      // Notificar al encargado de la obra origen (quien posee actualmente al empleado)
+      const sourceObraEncargado = empleado.obras?.encargado_name;
+      let sourceProfileData = null;
+      if (sourceObraEncargado) {
         const { data: profileData } = await supabase
           .from('profiles')
           .select('full_name, whatsapp')
-          .ilike('full_name', `%${targetObra.encargado_name}%`)
+          .ilike('full_name', `%${sourceObraEncargado}%`)
           .not('whatsapp', 'is', null)
           .limit(1)
           .maybeSingle();
-        targetProfileData = profileData;
+        sourceProfileData = profileData;
       }
 
       toast({ 
@@ -109,29 +122,26 @@ export default function NuevoTrasladoPersonal() {
         className: 'bg-emerald-50 border-emerald-200'
       });
 
-      if (targetProfileData?.whatsapp) {
+      if (sourceProfileData?.whatsapp) {
         const msg = [
-          '*TRASLADO DE PERSONAL*',
+          '*SOLICITUD DE TRASLADO DE PERSONAL (APROBACIÓN REQUERIDA)*',
           '',
-          `Hola *${targetProfileData.full_name.split(' ')[0]}*!`,
-          `*${profile.full_name}* te está enviando personal a tu obra (*${targetObra?.name}*):`,
+          `Hola *${sourceProfileData.full_name.split(' ')[0]}*!`,
+          `*${profile.full_name}* solicita trasladar a *${empleado.full_name}* (que se encuentra actualmente en tu obra *${empleado.obras?.name || 'Base'}*) hacia la obra *${targetObra?.name}*.`,
           '',
-          `- *Empleado:* ${empleado.full_name}`,
-          `- *Origen:* ${empleado.obras?.name || 'Sin obra anterior'}`,
-          '',
-          'Por favor, cuando el empleado llegue a la obra, confirmá su recepción entrando a este link:',
+          'Por favor, ingresá al siguiente link para validar y aprobar el traslado:',
           `${APP_URL}/personal/traslados/${trasladoData.id}`
         ].join('\n');
         
         setTimeout(() => { 
-          window.open(buildWhatsAppLink(targetProfileData.whatsapp, msg), '_blank'); 
+          window.open(buildWhatsAppLink(sourceProfileData.whatsapp!, msg), '_blank'); 
           navigate('/personal');
         }, 800);
       } else {
         toast({ 
           variant: 'default', 
           title: 'Aviso', 
-          description: 'El encargado de destino no tiene WhatsApp registrado. El traslado queda pendiente en el sistema.' 
+          description: 'El encargado de la obra de origen no tiene WhatsApp registrado. El traslado queda pendiente de aprobación en el sistema.' 
         });
         setTimeout(() => navigate('/personal'), 1500);
       }

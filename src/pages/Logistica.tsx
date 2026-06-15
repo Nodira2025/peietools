@@ -4,11 +4,14 @@ import { supabase } from '../lib/supabase';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Truck, Clock, Package, CheckCircle, ArrowRight, Wrench } from 'lucide-react';
+import { Truck, Clock, Package, CheckCircle, ArrowRight, Wrench, Search } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import FilterBar from '../components/FilterBar';
 import { Input } from '@/components/ui/input';
-import { Search } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { jsPDF } from 'jspdf';
+import { buildWhatsAppLink } from '../lib/whatsapp';
 
 interface LogisticaItem {
   id: string;
@@ -39,10 +42,128 @@ export default function Logistica() {
   const [managers, setManagers] = useState<{value: string, label: string}[]>([]);
   const [requesters, setRequesters] = useState<{value: string, label: string}[]>([]);
 
+  // Form State para registrar gasto
+  const [activeObras, setActiveObras] = useState<{id: string, name: string}[]>([]);
+  const [isGastoOpen, setIsGastoOpen] = useState(false);
+  const [gastoObraId, setGastoObraId] = useState('');
+  const [gastoConcepto, setGastoConcepto] = useState('');
+  const [gastoMonto, setGastoMonto] = useState('');
+  const [gastoDetalle, setGastoDetalle] = useState('');
+  const [gastoPago, setGastoPago] = useState('Efectivo');
+
   useEffect(() => {
     fetchSolicitudes();
     fetchFilterOptions();
+    fetchActiveObras();
   }, []);
+
+  const fetchActiveObras = async () => {
+    const { data } = await supabase.from('obras').select('id, name').eq('active', true).order('name');
+    if (data) setActiveObras(data);
+  };
+
+  const handleRegistrarGasto = () => {
+    if (!gastoConcepto || !gastoMonto) {
+      toast({ variant: 'destructive', title: 'Campos incompletos', description: 'Por favor, ingresá el concepto y el monto.' });
+      return;
+    }
+
+    const obraSeleccionada = activeObras.find(o => o.id === gastoObraId)?.name || 'Sin obra específica';
+    const montoNum = parseFloat(gastoMonto);
+    const fecha = new Date();
+    const fechaStr = fecha.toLocaleDateString('es-AR');
+    const horaStr = fecha.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+
+    // 1. Generar PDF
+    const doc = new jsPDF();
+    
+    // Configuración visual del PDF (Comprobante Premium)
+    doc.setFillColor(3, 21, 48); // peie-blue background block at top
+    doc.rect(0, 0, 210, 40, 'F');
+    
+    doc.setFontSize(22);
+    doc.setTextColor(255, 255, 255);
+    doc.text("COMPROBANTE DE GASTO", 14, 26);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(230, 230, 230);
+    doc.text("PEIE Tools - Logística & Control", 140, 26);
+
+    // Contenedor principal de detalles
+    doc.setFillColor(248, 250, 252); // slate-50
+    doc.rect(14, 50, 182, 120, 'F');
+    
+    doc.setFontSize(12);
+    doc.setTextColor(30, 41, 59); // slate-800
+    
+    // Dibujar textos
+    let yPos = 65;
+    const addLine = (label: string, value: string) => {
+      doc.setFont("helvetica", "bold");
+      doc.text(label, 20, yPos);
+      doc.setFont("helvetica", "normal");
+      doc.text(value, 80, yPos);
+      yPos += 12;
+    };
+
+    addLine("Concepto:", gastoConcepto);
+    addLine("Monto:", `$${montoNum.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`);
+    addLine("Obra destino:", obraSeleccionada);
+    addLine("Método de pago:", gastoPago);
+    addLine("Registrado por:", profile?.full_name || 'Personal Logística');
+    addLine("Fecha y hora:", `${fechaStr} a las ${horaStr} hs`);
+    
+    if (gastoDetalle) {
+      doc.setFont("helvetica", "bold");
+      doc.text("Detalle / Observaciones:", 20, yPos);
+      doc.setFont("helvetica", "normal");
+      
+      const splitText = doc.splitTextToSize(gastoDetalle, 110);
+      doc.text(splitText, 80, yPos);
+    }
+
+    // Pie de página
+    doc.setFontSize(9);
+    doc.setTextColor(148, 163, 184); // slate-400
+    doc.text("Este es un comprobante de gasto automático generado desde la aplicación PEIE Tools.", 14, 190);
+
+    // Descargar PDF
+    const fileName = `Comprobante_Gasto_${gastoConcepto.replace(/\s+/g, '_')}_${fecha.toISOString().slice(0, 10)}.pdf`;
+    doc.save(fileName);
+
+    // 2. Construir mensaje de WhatsApp para Federico Grande (+54 9 3814 01-5738)
+    const federicoPhone = '5493814015738';
+    const waMsg = [
+      '*NUEVO REGISTRO DE GASTO (LOGÍSTICA)*',
+      '',
+      `Hola *Federico*, acabo de registrar un gasto desde la app:`,
+      '',
+      `- *Concepto:* ${gastoConcepto}`,
+      `- *Monto:* $${montoNum.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`,
+      `- *Obra:* ${obraSeleccionada}`,
+      `- *Método de pago:* ${gastoPago}`,
+      `- *Registró:* ${profile?.full_name || 'Logística'}`,
+      `- *Fecha:* ${fechaStr} ${horaStr} hs`,
+      gastoDetalle.trim() ? `- *Detalles:* ${gastoDetalle}` : '',
+      '',
+      'Se ha descargado el archivo PDF del comprobante en mi dispositivo para enviártelo.',
+    ].filter(Boolean).join('\n');
+
+    // Cerrar dialog y resetear
+    setIsGastoOpen(false);
+    setGastoConcepto('');
+    setGastoMonto('');
+    setGastoDetalle('');
+    setGastoPago('Efectivo');
+    setGastoObraId('');
+
+    toast({ title: 'Gasto Registrado', description: 'Se descargó el PDF del comprobante. Abriendo chat de Federico Grande...' });
+
+    // Enviar WhatsApp al solicitante
+    setTimeout(() => {
+      window.open(buildWhatsAppLink(federicoPhone, waMsg), '_blank');
+    }, 500);
+  };
 
   const fetchFilterOptions = async () => {
     const { data: profiles } = await supabase.from('profiles').select('full_name, role').eq('active', true);
@@ -160,9 +281,97 @@ export default function Logistica() {
   return (
     <div className="space-y-6 pb-safe">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-peie-blue">Panel de Logística</h1>
-        <p className="text-sm text-muted-foreground mt-1">Gestión unificada de pedidos y traslados</p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-peie-blue">Panel de Logística</h1>
+          <p className="text-sm text-muted-foreground mt-1">Gestión unificada de pedidos y traslados</p>
+        </div>
+        <Dialog open={isGastoOpen} onOpenChange={setIsGastoOpen}>
+          <DialogTrigger asChild>
+            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs h-10 px-3 shrink-0 flex items-center gap-1.5 shadow-md">
+              💵 Registrar Gasto
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="rounded-3xl w-[90%] max-w-md">
+            <DialogHeader>
+              <DialogTitle>Registrar Gasto de Logística</DialogTitle>
+              <DialogDescription>
+                Crea un comprobante de compra para enviárselo a Federico Grande por WhatsApp.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Concepto / ¿Qué se compró? *</label>
+                <Input 
+                  placeholder="Ej: Nafta, Clavos, Cinta aisladora" 
+                  value={gastoConcepto}
+                  onChange={e => setGastoConcepto(e.target.value)}
+                  className="rounded-xl h-10"
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Monto total *</label>
+                <Input 
+                  type="number"
+                  placeholder="Ej: 8500" 
+                  value={gastoMonto}
+                  onChange={e => setGastoMonto(e.target.value)}
+                  className="rounded-xl h-10"
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Obra asociada (Opcional)</label>
+                <select 
+                  value={gastoObraId}
+                  onChange={e => setGastoObraId(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-sm"
+                >
+                  <option value="">Ninguna o General</option>
+                  {activeObras.map(o => (
+                    <option key={o.id} value={o.id}>{o.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Método de pago</label>
+                <select 
+                  value={gastoPago}
+                  onChange={e => setGastoPago(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-sm"
+                >
+                  <option value="Efectivo">Efectivo</option>
+                  <option value="Transferencia">Transferencia</option>
+                  <option value="Tarjeta de Débito">Tarjeta de Débito</option>
+                  <option value="Tarjeta de Crédito">Tarjeta de Crédito</option>
+                  <option value="Mercado Pago">Mercado Pago</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Detalles adicionales</label>
+                <Textarea 
+                  placeholder="Ej: Compras varias de ferretería pedidas por encargado" 
+                  value={gastoDetalle}
+                  onChange={e => setGastoDetalle(e.target.value)}
+                  className="rounded-xl min-h-[70px]"
+                />
+              </div>
+            </div>
+            <DialogFooter className="flex-row gap-2">
+              <DialogClose asChild>
+                <Button variant="ghost" className="flex-1 rounded-xl">Cancelar</Button>
+              </DialogClose>
+              <Button 
+                onClick={handleRegistrarGasto}
+                disabled={!gastoConcepto || !gastoMonto}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl"
+              >
+                Generar y Enviar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Buscador y Filtros */}

@@ -34,8 +34,8 @@ export default function TrasladoPersonalDetail() {
       .select(`
         *,
         empleados!traslados_personal_empleado_id_fkey(full_name),
-        source_obra:obras!traslados_personal_source_obra_id_fkey(name),
-        target_obra:obras!traslados_personal_target_obra_id_fkey(name),
+        source_obra:obras!traslados_personal_source_obra_id_fkey(name, encargado_name),
+        target_obra:obras!traslados_personal_target_obra_id_fkey(name, encargado_name),
         requester:profiles!traslados_personal_requester_id_fkey(full_name, whatsapp),
         confirmed_profile:profiles!traslados_personal_confirmed_by_fkey(full_name)
       `)
@@ -215,11 +215,23 @@ export default function TrasladoPersonalDetail() {
   if (loading) return <div className="p-8 text-center text-muted-foreground">Cargando traslado...</div>;
   if (!traslado) return null;
 
-  const canConfirm = traslado.status === 'Pendiente' && 
-    (profile?.obra_id === traslado.target_obra_id || profile?.role === 'admin');
+  const userRole = profile?.role?.toLowerCase();
+  const isSourceEncargado = !!(traslado.source_obra?.encargado_name && profile?.full_name && 
+    profile.full_name.toLowerCase().trim() === traslado.source_obra.encargado_name.toLowerCase().trim());
   
-  const isLogistica = profile?.role === 'logistica' || profile?.role === 'admin';
-  const isAdminOrLogistica = profile?.role === 'admin' || profile?.role === 'logistica';
+  const isTargetEncargado = !!(traslado.target_obra?.encargado_name && profile?.full_name && 
+    profile.full_name.toLowerCase().trim() === traslado.target_obra.encargado_name.toLowerCase().trim());
+
+  const canConfirm = traslado.status === 'Pendiente' && (
+    profile?.obra_id === traslado.target_obra_id || 
+    profile?.obra_id === traslado.source_obra_id ||
+    userRole === 'admin' || 
+    isSourceEncargado || 
+    isTargetEncargado
+  );
+  
+  const isLogistica = userRole === 'logistica' || userRole === 'admin';
+  const isAdminOrLogistica = userRole === 'admin' || userRole === 'logistica';
   const isRequester = profile?.id === traslado?.requester_id;
   const canDelete = isAdminOrLogistica || (isRequester && traslado?.status === 'Pendiente');
 

@@ -65,23 +65,24 @@ export default function Dashboard() {
       try {
         setLoading(true);
 
-        // Fetch counts in parallel
+        // Fetch data in parallel
         const [
-          { count: toolsPending, error: toolsPendingError },
-          { count: personalPending, error: personalPendingError },
-          { count: toolsTransit, error: toolsTransitError },
-          { count: toolsAsignada, error: toolsAsignadaError },
+          { data: toolsPendingData, error: toolsPendingError },
+          { data: personalPendingData, error: personalPendingError },
+          { data: toolsActiveData, error: toolsActiveError },
           { count: availTools, error: availToolsError },
           { count: activeObras, error: activeObrasError }
         ] = await Promise.all([
           // Pending tools
-          supabase.from('solicitudes').select('id', { count: 'exact', head: true }).eq('status', 'Pendiente'),
+          supabase.from('solicitudes').select('id, requester_id, assigned_to').eq('status', 'Pendiente'),
           // Personal transfers pending
-          supabase.from('traslados_personal').select('id', { count: 'exact', head: true }).eq('status', 'Pendiente'),
-          // Tools in transit
-          supabase.from('solicitudes').select('id', { count: 'exact', head: true }).in('status', ['En retiro', 'En traslado']),
-          // Tools assigned
-          supabase.from('solicitudes').select('id', { count: 'exact', head: true }).eq('status', 'Asignada'),
+          supabase.from('traslados_personal').select(`
+            id, requester_id, source_obra_id, target_obra_id,
+            source_obra:obras!traslados_personal_source_obra_id_fkey(encargado_name),
+            target_obra:obras!traslados_personal_target_obra_id_fkey(encargado_name)
+          `).eq('status', 'Pendiente'),
+          // Tools in transit or assigned
+          supabase.from('solicitudes').select('id, requester_id, assigned_to, status').in('status', ['Asignada', 'En retiro', 'En traslado']),
           // Available tools
           supabase.from('herramientas').select('id', { count: 'exact', head: true }).eq('status', 'Disponible'),
           // Active sites
@@ -90,15 +91,43 @@ export default function Dashboard() {
 
         if (toolsPendingError) throw toolsPendingError;
         if (personalPendingError) throw personalPendingError;
-        if (toolsTransitError) throw toolsTransitError;
-        if (toolsAsignadaError) throw toolsAsignadaError;
+        if (toolsActiveError) throw toolsActiveError;
         if (availToolsError) throw availToolsError;
         if (activeObrasError) throw activeObrasError;
 
+        const isAdmin = profile?.role?.toLowerCase() === 'admin';
+        const userFullName = profile?.full_name?.toLowerCase().trim() || '';
+
+        // Filter pending tools
+        const filteredPendingTools = (toolsPendingData || []).filter((s: any) => {
+          if (isAdmin) return true;
+          return s.requester_id === profile?.id || s.assigned_to === profile?.id;
+        });
+
+        // Filter pending personal
+        const filteredPendingPersonal = (personalPendingData || []).filter((t: any) => {
+          if (isAdmin) return true;
+          const isRequester = t.requester_id === profile?.id;
+          const isSourceManager = t.source_obra?.encargado_name && 
+            t.source_obra.encargado_name.toLowerCase().trim() === userFullName;
+          const isTargetManager = t.target_obra?.encargado_name && 
+            t.target_obra.encargado_name.toLowerCase().trim() === userFullName;
+          const isSourceObra = profile?.obra_id === t.source_obra_id;
+          const isTargetObra = profile?.obra_id === t.target_obra_id;
+          return isRequester || isSourceManager || isTargetManager || isSourceObra || isTargetObra;
+        });
+
+        // Filter active tools (in transit or assigned)
+        const filteredActiveTools = (toolsActiveData || []).filter((s: any) => {
+          if (isAdmin) return true;
+          return s.requester_id === profile?.id || s.assigned_to === profile?.id;
+        });
+
         // Mobile counts
-        const pTools = toolsPending || 0;
-        const pPersonal = personalPending || 0;
-        const aTools = (toolsAsignada || 0) + (toolsTransit || 0);
+        const pTools = filteredPendingTools.length;
+        const pPersonal = filteredPendingPersonal.length;
+        const aTools = filteredActiveTools.length;
+        const transitToolsCount = filteredActiveTools.filter((s: any) => s.status !== 'Asignada').length;
 
         setCounts({
           pendingTools: pTools,
@@ -107,12 +136,12 @@ export default function Dashboard() {
         });
 
         // Desktop stats
-        const activeRequestsCount = pTools + (toolsAsignada || 0) + (toolsTransit || 0) + pPersonal;
+        const activeRequestsCount = pTools + aTools + pPersonal;
 
         setStats({
           activeRequests: activeRequestsCount,
           availableTools: availTools || 0,
-          inTransit: toolsTransit || 0,
+          inTransit: transitToolsCount || 0,
           activeSites: activeObras || 0
         });
 

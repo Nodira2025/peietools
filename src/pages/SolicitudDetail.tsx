@@ -8,7 +8,7 @@ import { ArrowLeft, Clock, CheckCircle, Truck, AlertCircle, Package, Search, Use
 import { useAuthStore } from '../store/auth';
 import { buildWhatsAppLink, APP_URL } from '../lib/whatsapp';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 
 export default function SolicitudDetail() {
@@ -26,8 +26,13 @@ export default function SolicitudDetail() {
   const [receivedByName, setReceivedByName] = useState<string>('');
   const [rejectionReason, setRejectionReason] = useState('');
   const [rejecting, setRejecting] = useState(false);
+  const [isValidationOpen, setIsValidationOpen] = useState(false);
+  const [isRejectionOpen, setIsRejectionOpen] = useState(false);
 
-  const isLogistica = profile?.role === 'logistica' || profile?.role === 'admin';
+  const [inputSecurityCode, setInputSecurityCode] = useState('');
+
+  const userRole = profile?.role?.toLowerCase();
+  const isLogistica = userRole === 'logistica' || userRole === 'admin';
   const isRequester = solicitud?.requester_id === profile?.id;
 
   useEffect(() => {
@@ -177,6 +182,7 @@ export default function SolicitudDetail() {
     }
 
     fetchSolicitud();
+    setIsValidationOpen(false);
   };
 
   const handleReject = async () => {
@@ -230,6 +236,7 @@ export default function SolicitudDetail() {
     }
 
     setRejecting(false);
+    setIsRejectionOpen(false);
     fetchSolicitud();
   };
 
@@ -318,6 +325,40 @@ export default function SolicitudDetail() {
             )}
           </div>
 
+          {/* Mostrar código de seguridad al solicitante */}
+          {isRequester && solicitud.security_code && solicitud.status !== 'Confirmada' && solicitud.status !== 'Cancelada' && solicitud.status !== 'Rechazada' && (
+            <div className="p-4 bg-amber-50/60 border border-amber-200/80 rounded-2xl flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Código de Seguridad para Entrega</p>
+                <p className="text-2xl font-black text-amber-800 tracking-widest mt-1 font-mono">{solicitud.security_code}</p>
+              </div>
+              <p className="text-[10px] text-amber-600/80 max-w-[180px] leading-tight text-right">
+                Facilitá este código al personal de logística cuando entreguen la herramienta en la obra para confirmar la entrega.
+              </p>
+            </div>
+          )}
+
+          {/* Tarjeta de seguimiento en tiempo real */}
+          {solicitud.status === 'En traslado' && (
+            <div className="p-4 bg-gradient-to-r from-peie-blue to-peie-light text-white rounded-2xl flex items-center justify-between shadow-md">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-white/20 text-white flex items-center justify-center shrink-0">
+                  <Truck className="h-5 w-5 animate-pulse" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-white/80 uppercase tracking-wider">Trazabilidad en tiempo real</p>
+                  <p className="text-sm font-bold mt-0.5">El traslado está en curso</p>
+                </div>
+              </div>
+              <Button
+                onClick={() => navigate(`/solicitudes/${solicitud.id}/seguimiento`)}
+                className="bg-white text-peie-blue hover:bg-white/95 font-black text-xs px-4 h-9 rounded-xl shadow-sm flex items-center gap-1 shrink-0"
+              >
+                🚚 Seguir Envío
+              </Button>
+            </div>
+          )}
+
           {/* ========================================================= */}
           {/* BOTONES SEGUN ROL                                         */}
           {/* ========================================================= */}
@@ -349,14 +390,54 @@ export default function SolicitudDetail() {
                   </Button>
                 )}
                 {solicitud.status === 'En traslado' && (
-                  <Button onClick={() => updateStatus('Entregada')} className="bg-green-600 hover:bg-green-700 text-white w-full h-12 rounded-xl text-sm">
-                    <CheckCircle className="mr-2 h-4 w-4" />
-                    Marcar Entregada
-                  </Button>
+                  <Dialog open={isValidationOpen} onOpenChange={(open) => { setIsValidationOpen(open); if(!open) setInputSecurityCode(''); }}>
+                    <DialogTrigger asChild>
+                      <Button className="bg-green-600 hover:bg-green-700 text-white w-full h-12 rounded-xl text-sm font-bold">
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                        Validar y Marcar Entregada
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="rounded-3xl w-[90%] max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Validación de Entrega</DialogTitle>
+                        <CardDescription>
+                          Pedile al encargado solicitante el código de seguridad de 6 dígitos que figura en su aplicación.
+                        </CardDescription>
+                      </DialogHeader>
+                      <div className="py-4">
+                        <Input
+                          placeholder="Código de 6 dígitos"
+                          type="text"
+                          maxLength={6}
+                          value={inputSecurityCode}
+                          onChange={(e) => setInputSecurityCode(e.target.value.replace(/\D/g, ''))}
+                          className="text-center text-2xl font-mono tracking-widest h-12 rounded-xl"
+                        />
+                      </div>
+                      <DialogFooter className="flex-row gap-2">
+                        <DialogClose asChild>
+                          <Button variant="ghost" className="flex-1 rounded-xl">Cancelar</Button>
+                        </DialogClose>
+                        <Button
+                          onClick={() => {
+                            if (!solicitud.security_code || inputSecurityCode === solicitud.security_code) {
+                              updateStatus('Entregada');
+                            } else {
+                              toast({ variant: 'destructive', title: 'Código Incorrecto', description: 'El código ingresado no coincide con el código de seguridad del solicitante.' });
+                            }
+                          }}
+                          disabled={solicitud.security_code && inputSecurityCode.length !== 6}
+                          className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl"
+                        >
+                          Confirmar Entrega
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 )}
 
                 {/* BOTON DE RECHAZO */}
-                <Dialog>
+                <Dialog open={isRejectionOpen} onOpenChange={(open) => { setIsRejectionOpen(open); if(!open) setRejectionReason(''); }}>
                   <DialogTrigger asChild>
                     <Button variant="outline" className="w-full h-12 rounded-xl text-red-600 border-red-200 hover:bg-red-50 font-bold mt-2">
                       <AlertCircle className="mr-2 h-4 w-4" />
@@ -379,7 +460,9 @@ export default function SolicitudDetail() {
                       />
                     </div>
                     <DialogFooter className="flex-row gap-2">
-                      <Button variant="ghost" className="flex-1 rounded-xl" disabled={rejecting}>Cancelar</Button>
+                      <DialogClose asChild>
+                        <Button variant="ghost" className="flex-1 rounded-xl" disabled={rejecting}>Cancelar</Button>
+                      </DialogClose>
                       <Button 
                         onClick={handleReject} 
                         disabled={!rejectionReason.trim() || rejecting}
@@ -630,6 +713,19 @@ export default function SolicitudDetail() {
 
         </CardContent>
       </Card>
+
+      {/* Botón flotante para el seguimiento en vivo */}
+      {solicitud.status === 'En traslado' && (
+        <div className="fixed bottom-20 right-4 z-50 md:right-8 animate-bounce">
+          <Button
+            onClick={() => navigate(`/solicitudes/${solicitud.id}/seguimiento`)}
+            className="shadow-2xl rounded-full bg-peie-blue hover:bg-peie-blue/90 text-white px-5 h-14 font-black text-xs flex items-center gap-2 border-2 border-white"
+          >
+            <Truck className="h-5 w-5" />
+            SEGUIMIENTO EN VIVO
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

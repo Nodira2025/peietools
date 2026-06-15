@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Navigate, Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
-import { Home, Wrench, FileText, Truck, Users, Building, LogOut, ShoppingCart, Sparkles, HardHat, ClipboardList, BarChart3, MoreHorizontal } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { Home, Wrench, FileText, Truck, Users, Building, LogOut, ShoppingCart, Sparkles, HardHat, ClipboardList, BarChart3, MoreHorizontal, Bell } from 'lucide-react';
 
 export default function AppLayout() {
   const { user, profile, loading, signOut } = useAuthStore();
@@ -10,6 +11,56 @@ export default function AppLayout() {
   const [deviceMode] = useState<'auto' | 'mobile' | 'desktop'>(() => {
     return (localStorage.getItem('login_device_mode') as any) || 'auto';
   });
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    if (!profile) return;
+    
+    async function fetchPendingCount() {
+      try {
+        const [
+          { data: toolsData },
+          { data: personalData }
+        ] = await Promise.all([
+          supabase.from('solicitudes').select('id, requester_id, assigned_to').eq('status', 'Pendiente'),
+          supabase.from('traslados_personal').select(`
+            id, requester_id, source_obra_id, target_obra_id,
+            source_obra:obras!traslados_personal_source_obra_id_fkey(encargado_name),
+            target_obra:obras!traslados_personal_target_obra_id_fkey(encargado_name)
+          `).eq('status', 'Pendiente')
+        ]);
+
+        const isAdmin = profile.role?.toLowerCase() === 'admin';
+        const userFullName = profile.full_name?.toLowerCase().trim() || '';
+
+        const filteredTools = (toolsData || []).filter((s: any) => {
+          if (isAdmin) return true;
+          return s.requester_id === profile.id || s.assigned_to === profile.id;
+        });
+
+        const filteredPersonal = (personalData || []).filter((t: any) => {
+          if (isAdmin) return true;
+          const isRequester = t.requester_id === profile.id;
+          const isSourceManager = t.source_obra?.encargado_name && 
+            t.source_obra.encargado_name.toLowerCase().trim() === userFullName;
+          const isTargetManager = t.target_obra?.encargado_name && 
+            t.target_obra.encargado_name.toLowerCase().trim() === userFullName;
+          const isSourceObra = profile.obra_id === t.source_obra_id;
+          const isTargetObra = profile.obra_id === t.target_obra_id;
+          return isRequester || isSourceManager || isTargetManager || isSourceObra || isTargetObra;
+        });
+
+        setPendingCount(filteredTools.length + filteredPersonal.length);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    fetchPendingCount();
+    
+    const interval = setInterval(fetchPendingCount, 30000);
+    return () => clearInterval(interval);
+  }, [profile]);
 
   if (loading) {
     return (
@@ -29,6 +80,7 @@ export default function AppLayout() {
 
   const navItems = [
     { name: 'Inicio', path: '/dashboard', icon: Sparkles, show: true },
+    { name: 'Notificaciones', path: '/notificaciones', icon: Bell, show: true, badge: pendingCount },
     { name: 'Reportes', path: '/reportes', icon: BarChart3, show: false },
     { name: 'Movimiento de Herramientas', path: '/pedidos-herramientas', icon: FileText, show: true },
     { name: 'Movimiento de Personal', path: '/pedidos-personal', icon: HardHat, show: true },
@@ -117,7 +169,13 @@ export default function AppLayout() {
               >
                 <Icon size={20} className={isActive ? 'text-peie-light' : 'text-slate-400'} />
                 <span className="text-sm">{item.name}</span>
-                {isActive && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-peie-light animate-pulse" />}
+                {item.badge && item.badge > 0 ? (
+                  <span className="ml-auto bg-rose-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    {item.badge}
+                  </span>
+                ) : isActive ? (
+                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-peie-light animate-pulse" />
+                ) : null}
               </Link>
             );
           })}
@@ -160,6 +218,20 @@ export default function AppLayout() {
             aria-label="Ir al Inicio"
           >
             <Home size={18} className="stroke-[2.5]" />
+          </Link>
+
+          {/* Botón Campana Notificaciones */}
+          <Link 
+            to="/notificaciones" 
+            className="p-2.5 text-white/80 hover:text-white border border-slate-700/40 rounded-xl bg-[#041d44]/40 active:scale-90 transition-all relative"
+            aria-label="Notificaciones"
+          >
+            <Bell size={18} className="stroke-[2.5]" />
+            {pendingCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-rose-600 text-white text-[9px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center animate-bounce">
+                {pendingCount}
+              </span>
+            )}
           </Link>
 
           {/* Logo Centrado */}

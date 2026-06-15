@@ -69,7 +69,12 @@ export default function Obras() {
       setLoading(true);
       const { data, error } = await supabase.from('obras').select('*').order('name');
       if (error) throw error;
-      setObras(data || []);
+      
+      // Mostrar únicamente las obras activas con encargado asignado
+      const activeObrasWithManager = (data || []).filter(o => 
+        o.active && o.encargado_name && o.encargado_name.trim() !== ''
+      );
+      setObras(activeObrasWithManager);
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar las obras' });
     } finally {
