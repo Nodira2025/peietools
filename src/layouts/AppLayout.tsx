@@ -12,6 +12,8 @@ export default function AppLayout() {
     return (localStorage.getItem('login_device_mode') as any) || 'auto';
   });
   const [pendingCount, setPendingCount] = useState(0);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
 
   useEffect(() => {
     if (!profile) return;
@@ -61,6 +63,41 @@ export default function AppLayout() {
     const interval = setInterval(fetchPendingCount, 30000);
     return () => clearInterval(interval);
   }, [profile]);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      const dismissed = sessionStorage.getItem('pwa_banner_dismissed');
+      if (!dismissed) {
+        setShowInstallBanner(true);
+      }
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setShowInstallBanner(false);
+    }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log(`User response to install: ${outcome}`);
+    setDeferredPrompt(null);
+    setShowInstallBanner(false);
+  };
+
+  const handleDismissBanner = () => {
+    sessionStorage.setItem('pwa_banner_dismissed', 'true');
+    setShowInstallBanner(false);
+  };
 
   if (loading) {
     return (
@@ -398,6 +435,35 @@ export default function AppLayout() {
             >
               <LogOut size={16} />
               Cerrar Sesión
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* PWA Install Floating Banner */}
+      {showInstallBanner && (
+        <div className="fixed bottom-20 left-4 right-4 z-50 md:bottom-6 md:right-6 md:left-auto md:w-96 bg-white border border-peie-blue/15 shadow-xl rounded-2xl p-4 flex items-center justify-between gap-4 animate-bounce-short">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-peie-blue/10 text-peie-blue flex items-center justify-center shrink-0">
+              <Sparkles size={20} className="text-peie-blue animate-pulse" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-slate-800">Instalá PEIE Tools</p>
+              <p className="text-[10px] text-slate-500 font-medium leading-tight">Accedé al instante y usalo sin internet como una app nativa.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={handleDismissBanner}
+              className="text-xs font-bold text-slate-400 hover:text-slate-600 px-2.5 py-1.5 rounded-lg"
+            >
+              Cerrar
+            </button>
+            <button
+              onClick={handleInstallClick}
+              className="bg-peie-blue hover:bg-peie-blue/90 text-white text-xs font-bold px-3.5 py-1.5 rounded-xl shadow-md"
+            >
+              Instalar
             </button>
           </div>
         </div>

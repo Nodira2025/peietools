@@ -34,6 +34,7 @@ export default function SeguimientoTraslado() {
   const [selectedDelay, setSelectedDelay] = useState('');
   const [updating, setUpdating] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
+  const [gpsError, setGpsError] = useState<string | null>(null);
 
   // Animation progress (for the SVG truck icon)
   const [progress, setProgress] = useState(15); // Start at 15% along the path
@@ -59,8 +60,89 @@ export default function SeguimientoTraslado() {
     }
   }, [solicitud]);
 
-  const fetchDetails = async () => {
-    setLoading(true);
+  // Mandatory automatic background GPS tracking for logistics driver during active transit
+  useEffect(() => {
+    if (!solicitud || solicitud.status !== 'En traslado') return;
+    
+    const isAssignedLogistics = profile?.id === solicitud.assigned_to || profile?.role?.toLowerCase() === 'admin';
+    if (!isAssignedLogistics) return;
+
+    if (!navigator.geolocation) {
+      setGpsError('La geolocalización no está soportada por tu navegador o dispositivo.');
+      return;
+    }
+
+    let lastUploadTime = 0;
+    const throttleMs = 30000; // Database write at most once every 30 seconds
+
+    const watchId = navigator.geolocation.watchPosition(
+      async (position) => {
+        const now = Date.now();
+        if (now - lastUploadTime < throttleMs) return;
+
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        lastUploadTime = now;
+        setGpsError(null);
+
+        try {
+          // 1. Update current position in solicitudes
+          await supabase
+            .from('solicitudes')
+            .update({
+              tracking_latitude: lat,
+              tracking_longitude: lng
+            })
+            .eq('id', solicitud.id);
+
+          // 2. Insert into tracking_history table for the audit trail
+          await supabase
+            .from('tracking_history')
+            .insert([{
+              solicitud_id: solicitud.id,
+              latitude: lat,
+              longitude: lng
+            }]);
+
+          // Silently reload details to update local map & history
+          fetchDetails(true);
+        } catch (e) {
+          console.error("Error auto-updating GPS:", e);
+        }
+      },
+      (error) => {
+        let msg = 'Error desconocido al obtener ubicación.';
+        if (error.code === error.PERMISSION_DENIED) {
+          msg = 'Permiso denegado para acceder a la ubicación. Es obligatorio activar los permisos de GPS de tu navegador/celular.';
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+          msg = 'La señal GPS no está disponible actualmente.';
+        } else if (error.code === error.TIMEOUT) {
+          msg = 'Tiempo de espera agotado al obtener señal GPS.';
+        }
+        setGpsError(msg);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [solicitud?.status, solicitud?.id, profile?.id, profile?.role]);
+
+  // Auto-refresh the map for the requester/solicitor during active transit
+  useEffect(() => {
+    if (!solicitud || solicitud.status !== 'En traslado') return;
+    
+    const isAssignedLogistics = profile?.id === solicitud.assigned_to || profile?.role?.toLowerCase() === 'admin';
+    if (isAssignedLogistics) return; // Logistics is already writing and refreshing on write
+
+    const interval = setInterval(() => {
+      fetchDetails(true);
+    }, 15000); // refresh every 15 seconds
+
+    return () => clearInterval(interval);
+  }, [solicitud?.status, solicitud?.id, profile?.id]);
+
+  const fetchDetails = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const { data, error } = await supabase
         .from('solicitudes')
@@ -75,8 +157,10 @@ export default function SeguimientoTraslado() {
         .single();
 
       if (error) {
-        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo cargar el seguimiento.' });
-        navigate('/pedidos-herramientas');
+        if (!silent) {
+          toast({ variant: 'destructive', title: 'Error', description: 'No se pudo cargar el seguimiento.' });
+          navigate('/pedidos-herramientas');
+        }
         return;
       }
       setSolicitud(data);
@@ -93,7 +177,7 @@ export default function SeguimientoTraslado() {
     } catch (err: any) {
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -318,6 +402,19 @@ export default function SeguimientoTraslado() {
           <div>
             <h4 className="text-sm font-bold text-red-700">Demora Reportada</h4>
             <p className="text-xs text-red-600 font-medium mt-0.5">{solicitud.delay_reason}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Alerta de Error de GPS Obligatorio */}
+      {gpsError && (
+        <div className="p-4 bg-rose-100 border border-rose-300 rounded-2xl flex items-start gap-3 animate-pulse">
+          <AlertCircle className="w-5 h-5 text-rose-700 shrink-0 mt-0.5" />
+          <div>
+            <h4 className="text-sm font-black text-rose-800 uppercase tracking-tight">⚠️ UBICACIÓN GPS REQUERIDA</h4>
+            <p className="text-xs text-rose-700 font-semibold mt-0.5">
+              {gpsError} Por políticas de la empresa, es obligatorio activar la ubicación satelital durante el traslado de herramientas.
+            </p>
           </div>
         </div>
       )}
