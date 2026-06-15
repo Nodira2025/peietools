@@ -25,6 +25,22 @@ export default function Dashboard() {
   const { profile } = useAuthStore();
   const { toast } = useToast();
 
+  const [deviceMode] = useState<'auto' | 'mobile' | 'desktop'>(() => {
+    return (localStorage.getItem('login_device_mode') as any) || 'auto';
+  });
+
+  const mobileDashboardClass = deviceMode === 'mobile'
+    ? 'block space-y-5 max-w-md mx-auto px-2'
+    : deviceMode === 'desktop'
+      ? 'hidden'
+      : 'md:hidden block space-y-5 max-w-md mx-auto px-2';
+
+  const pcDashboardClass = deviceMode === 'mobile'
+    ? 'hidden'
+    : deviceMode === 'desktop'
+      ? 'block space-y-8'
+      : 'hidden md:block space-y-8';
+
   const [counts, setCounts] = useState({
     pendingTools: 0,
     pendingPersonal: 0,
@@ -302,7 +318,7 @@ export default function Dashboard() {
       {/* ========================================================================= */}
       {/* 1. DISPOSITIVOS MÓVILES (md:hidden block)                                 */}
       {/* ========================================================================= */}
-      <div className="md:hidden block space-y-5 max-w-md mx-auto px-2">
+      <div className={mobileDashboardClass}>
         
         {/* Barra de Notificaciones */}
         <Card 
@@ -605,7 +621,7 @@ export default function Dashboard() {
       {/* ========================================================================= */}
       {/* 2. ESCRITORIO / PC (hidden md:block)                                      */}
       {/* ========================================================================= */}
-      <div className="hidden md:block space-y-8">
+      <div className={pcDashboardClass}>
         
         {/* Cabecera Superior (Notificaciones + Barra de búsqueda y Perfil) */}
         <div className="flex justify-between items-center gap-6">
@@ -741,6 +757,11 @@ export default function Dashboard() {
                 <div className="absolute bottom-0 left-4 translate-y-1/2 w-10 h-10 rounded-full bg-blue-600 border-2 border-white flex items-center justify-center text-white shadow-md shadow-blue-600/20 z-10">
                   <HardHat size={16} className="stroke-[2.5]" />
                 </div>
+                {counts.pendingPersonal > 0 && (
+                  <span className="absolute top-3 right-3 bg-rose-600 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center shadow z-20">
+                    {counts.pendingPersonal}
+                  </span>
+                )}
               </div>
               <div className="p-5 pt-6 flex flex-col justify-between flex-1">
                 <div>
@@ -771,6 +792,11 @@ export default function Dashboard() {
                 <div className="absolute bottom-0 left-4 translate-y-1/2 w-10 h-10 rounded-full bg-blue-600 border-2 border-white flex items-center justify-center text-white shadow-md shadow-blue-600/20 z-10">
                   <Wrench size={16} className="stroke-[2.5]" />
                 </div>
+                {counts.pendingTools > 0 && (
+                  <span className="absolute top-3 right-3 bg-rose-600 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center shadow z-20">
+                    {counts.pendingTools}
+                  </span>
+                )}
               </div>
               <div className="p-5 pt-6 flex flex-col justify-between flex-1">
                 <div>
@@ -801,6 +827,11 @@ export default function Dashboard() {
                 <div className="absolute bottom-0 left-4 translate-y-1/2 w-10 h-10 rounded-full bg-blue-600 border-2 border-white flex items-center justify-center text-white shadow-md shadow-blue-600/20 z-10">
                   <Truck size={16} className="stroke-[2.5]" />
                 </div>
+                {counts.activeMovements > 0 && (
+                  <span className="absolute top-3 right-3 bg-rose-600 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center shadow z-20">
+                    {counts.activeMovements}
+                  </span>
+                )}
               </div>
               <div className="p-5 pt-6 flex flex-col justify-between flex-1">
                 <div>
@@ -831,6 +862,11 @@ export default function Dashboard() {
                 <div className="absolute bottom-0 left-4 translate-y-1/2 w-10 h-10 rounded-full bg-blue-600 border-2 border-white flex items-center justify-center text-white shadow-md shadow-blue-600/20 z-10">
                   <Building size={16} className="stroke-[2.5]" />
                 </div>
+                {stats.activeSites > 0 && (
+                  <span className="absolute top-3 right-3 bg-rose-600 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center shadow z-20">
+                    {stats.activeSites}
+                  </span>
+                )}
               </div>
               <div className="p-5 pt-6 flex flex-col justify-between flex-1">
                 <div>
@@ -972,29 +1008,67 @@ export default function Dashboard() {
             </Card>
           </div>
 
-          {/* Columna 3: Escanear código QR */}
+          {/* Columna 3: Acciones Rápidas */}
           <div className="space-y-4">
-            <h3 className="text-xs font-black text-slate-800 tracking-wider uppercase">Escanear código QR</h3>
+            <h3 className="text-xs font-black text-slate-800 tracking-wider uppercase">Acciones rápidas</h3>
             
-            <Card className="bg-white border-0 shadow-[0_8px_30px_rgba(0,0,0,0.02)] rounded-[24px] overflow-hidden flex flex-col justify-between h-[268px]">
-              <div className="relative w-full h-[120px] bg-slate-100 overflow-hidden select-none">
-                <img 
-                  src="/img/card_qr_scan.webp" 
-                  alt="Escanear QR" 
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <div className="p-4 pt-1 flex flex-col justify-between flex-1">
-                <p className="text-[10px] text-slate-400 font-semibold text-center leading-relaxed">
-                  Escanea para registrar herramientas, entregas y más.
-                </p>
-                <button 
+            <Card className="bg-white border-0 shadow-[0_8px_30px_rgba(0,0,0,0.02)] rounded-[24px] p-5 h-[268px] flex flex-col justify-between">
+              <div className="space-y-3">
+                {/* QR Scanner */}
+                <div 
                   onClick={() => navigate('/herramientas/scanner')}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs h-10 rounded-xl flex items-center justify-center gap-2 shadow-md shadow-blue-600/10 active:scale-95 duration-150 transition-all mt-2"
+                  className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 transition-all cursor-pointer group"
                 >
-                  <QrCode size={14} className="stroke-[2.5]" />
-                  Abrir escáner
-                </button>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                      <QrCode size={18} className="stroke-[2.5]" />
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="text-xs font-bold text-slate-800 leading-tight">Escanear Código QR</h4>
+                      <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Asignar o devolver herramientas</p>
+                    </div>
+                  </div>
+                  <ChevronRight size={14} className="text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+
+                {/* Barcode Scanner */}
+                <div 
+                  onClick={() => {
+                    toast({ title: "Lector de código de barras", description: "Apunta al código de barras de la herramienta." });
+                    navigate('/herramientas/scanner');
+                  }}
+                  className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-green-50 text-green-600 flex items-center justify-center shrink-0 group-hover:bg-green-600 group-hover:text-white transition-all">
+                      <FileText size={18} className="stroke-[2.5]" />
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="text-xs font-bold text-slate-800 leading-tight">Código de Barras</h4>
+                      <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Búsqueda rápida de inventario</p>
+                    </div>
+                  </div>
+                  <ChevronRight size={14} className="text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+
+                {/* WhatsApp Support */}
+                <a 
+                  href="https://wa.me/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 group-hover:bg-emerald-600 group-hover:text-white transition-all">
+                      <MessageCircle size={18} className="stroke-[2.5]" />
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="text-xs font-bold text-slate-800 leading-tight">Conectar por WhatsApp</h4>
+                      <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Soporte y consultas de logística</p>
+                    </div>
+                  </div>
+                  <ChevronRight size={14} className="text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+                </a>
               </div>
             </Card>
           </div>

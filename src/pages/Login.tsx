@@ -15,6 +15,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [deviceMode, setDeviceMode] = useState<'auto' | 'mobile' | 'desktop'>('auto');
   const { toast } = useToast();
 
   if (user && profile) {
@@ -36,7 +37,7 @@ export default function Login() {
       });
 
       if (error) throw error;
-      
+      localStorage.setItem('login_device_mode', deviceMode);
       // Actualizar la sesión en el store de Zustand
       await useAuthStore.getState().checkUser();
       
@@ -130,6 +131,22 @@ export default function Login() {
                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
                 </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="deviceMode" className="text-xs font-semibold text-peie-blue uppercase tracking-wider">
+                  Modo de Vista (Dispositivo)
+                </Label>
+                <select 
+                  id="deviceMode" 
+                  value={deviceMode}
+                  onChange={(e) => setDeviceMode(e.target.value as any)}
+                  className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white/50 focus:outline-none focus:ring-2 focus:ring-peie-light/20 text-slate-700 text-sm shadow-sm transition-all cursor-pointer"
+                >
+                  <option value="auto">📱💻 Automático (Adaptable)</option>
+                  <option value="mobile">📱 Forzar Vista Celular / Móvil</option>
+                  <option value="desktop">💻 Forzar Vista Computadora (PC)</option>
+                </select>
               </div>
 
               <Button 

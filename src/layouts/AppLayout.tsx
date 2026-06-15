@@ -7,6 +7,9 @@ export default function AppLayout() {
   const { user, profile, loading, signOut } = useAuthStore();
   const location = useLocation();
   const [showMas, setShowMas] = useState(false);
+  const [deviceMode] = useState<'auto' | 'mobile' | 'desktop'>(() => {
+    return (localStorage.getItem('login_device_mode') as any) || 'auto';
+  });
 
   if (loading) {
     return (
@@ -39,11 +42,53 @@ export default function AppLayout() {
     { name: 'Usuarios', path: '/usuarios', icon: Users, show: isAdmin },
   ].filter(item => item.show);
 
+  const wrapperClass = deviceMode === 'mobile'
+    ? 'min-h-[100svh] bg-peie-bg text-foreground flex flex-col w-full overflow-x-hidden'
+    : deviceMode === 'desktop'
+      ? 'min-h-[100svh] bg-peie-bg text-foreground flex flex-row w-full overflow-x-hidden'
+      : 'min-h-[100svh] bg-peie-bg text-foreground flex flex-col md:flex-row w-full overflow-x-hidden';
+
+  const sidebarClass = deviceMode === 'mobile' 
+    ? 'hidden' 
+    : deviceMode === 'desktop' 
+      ? 'flex flex-col w-64 bg-white border-r border-slate-100 min-h-screen shadow-sm shrink-0' 
+      : 'hidden md:flex flex-col w-64 bg-white border-r border-slate-100 min-h-screen shadow-sm shrink-0';
+
+  const headerClass = deviceMode === 'desktop'
+    ? 'hidden'
+    : deviceMode === 'mobile'
+      ? 'bg-gradient-to-r from-[#031530] to-[#042454] text-white shadow-md rounded-b-[28px] px-4 py-4 pt-safe flex justify-between items-center z-30 sticky top-0 border-b border-slate-800/10 gap-3'
+      : 'md:hidden bg-gradient-to-r from-[#031530] to-[#042454] text-white shadow-md rounded-b-[28px] px-4 py-4 pt-safe flex justify-between items-center z-30 sticky top-0 border-b border-slate-800/10 gap-3';
+
+  const mainClass = deviceMode === 'mobile'
+    ? 'flex-1 pb-20 overflow-y-auto min-h-[100svh] flex flex-col'
+    : deviceMode === 'desktop'
+      ? 'flex-1 pb-0 overflow-y-auto min-h-[100svh] flex flex-col'
+      : 'flex-1 pb-20 md:pb-0 overflow-y-auto min-h-[100svh] flex flex-col';
+
+  const containerClass = deviceMode === 'mobile'
+    ? 'p-4 max-w-7xl w-full mx-auto flex-1'
+    : deviceMode === 'desktop'
+      ? 'p-8 max-w-7xl w-full mx-auto flex-1'
+      : 'p-4 md:p-8 max-w-7xl w-full mx-auto flex-1';
+
+  const navClass = deviceMode === 'desktop'
+    ? 'hidden'
+    : deviceMode === 'mobile'
+      ? 'fixed bottom-0 left-0 right-0 bg-[#031530] text-white shadow-[0_-8px_30px_rgba(0,0,0,0.2)] rounded-t-[32px] z-40 flex overflow-x-auto no-scrollbar justify-around pb-safe pt-3 px-2 border-t border-slate-800/20'
+      : 'md:hidden fixed bottom-0 left-0 right-0 bg-[#031530] text-white shadow-[0_-8px_30px_rgba(0,0,0,0.2)] rounded-t-[32px] z-40 flex overflow-x-auto no-scrollbar justify-around pb-safe pt-3 px-2 border-t border-slate-800/20';
+
+  const bottomSheetOverlayClass = deviceMode === 'desktop'
+    ? 'hidden'
+    : deviceMode === 'mobile'
+      ? 'fixed inset-0 bg-black/60 z-50 transition-opacity duration-300'
+      : 'md:hidden fixed inset-0 bg-black/60 z-50 transition-opacity duration-300';
+
   return (
-    <div className="min-h-[100svh] bg-peie-bg text-foreground flex flex-col md:flex-row w-full overflow-x-hidden">
+    <div className={wrapperClass}>
       
       {/* Sidebar de Escritorio */}
-      <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-100 min-h-screen shadow-sm shrink-0">
+      <aside className={sidebarClass}>
         
         {/* Cabecera Sidebar con Logo */}
         <div className="p-6 border-b border-slate-50 flex flex-col items-center">
@@ -104,10 +149,10 @@ export default function AppLayout() {
       </aside>
 
       {/* Área de Contenido Principal */}
-      <main className="flex-1 pb-20 md:pb-0 overflow-y-auto min-h-[100svh] flex flex-col">
+      <main className={mainClass}>
         
         {/* Encabezado Flotante Móvil */}
-        <header className="md:hidden bg-gradient-to-r from-[#031530] to-[#042454] text-white shadow-md rounded-b-[28px] px-4 py-4 pt-safe flex justify-between items-center z-30 sticky top-0 border-b border-slate-800/10 gap-3">
+        <header className={headerClass}>
           {/* Botón Home Izquierdo */}
           <Link 
             to="/" 
@@ -140,14 +185,14 @@ export default function AppLayout() {
         </header>
         
         {/* Contenedor fluido de páginas */}
-        <div className="p-4 md:p-8 max-w-7xl w-full mx-auto flex-1">
+        <div className={containerClass}>
           <Outlet />
         </div>
 
       </main>
 
       {/* Barra de Navegación Inferior (Exclusiva para Móviles) */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#031530] text-white shadow-[0_-8px_30px_rgba(0,0,0,0.2)] rounded-t-[32px] z-40 flex overflow-x-auto no-scrollbar justify-around pb-safe pt-3 px-2 border-t border-slate-800/20">
+      <nav className={navClass}>
         {[
           { name: 'Inicio', path: '/dashboard', icon: Home, isButton: false },
           { name: 'Mis Obras', path: '/mis-obras', icon: Building, isButton: false },
@@ -200,7 +245,7 @@ export default function AppLayout() {
 
       {/* Bottom Sheet para el menú "Más" */}
       {showMas && (
-        <div className="md:hidden fixed inset-0 bg-black/60 z-50 transition-opacity duration-300" onClick={() => setShowMas(false)}>
+        <div className={bottomSheetOverlayClass} onClick={() => setShowMas(false)}>
           <div 
             className="fixed bottom-0 left-0 right-0 bg-[#031530] text-white rounded-t-[32px] p-6 space-y-6 shadow-[0_-10px_40px_rgba(0,0,0,0.4)] animate-slide-up"
             onClick={(e) => e.stopPropagation()}
