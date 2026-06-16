@@ -235,19 +235,44 @@ export default function NuevaHerramienta() {
 
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
+              {/* Input oculto para CÁMARA (capture abre la cámara directo) */}
               <input
                 type="file"
-                id="photo-upload"
+                id="photo-camera"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={handlePhotoUpload}
+              />
+              {/* Input oculto para GALERÍA (sin capture, abre selector del SO) */}
+              <input
+                type="file"
+                id="photo-gallery"
                 accept="image/*"
                 className="hidden"
                 onChange={handlePhotoUpload}
               />
-              <Label
-                htmlFor="photo-upload"
-                className="flex items-center justify-center gap-2 h-10 px-4 rounded-xl border border-slate-200 border-dashed bg-white text-xs text-slate-500 font-bold hover:bg-slate-50 cursor-pointer active:scale-95 transition-all text-center w-full"
-              >
-                📷 {uploadedPhotoName ? `Foto: ${uploadedPhotoName.slice(0, 15)}...` : 'Subir Foto QR / Código de Barras'}
-              </Label>
+              
+              {uploadedPhotoName ? (
+                <div className="flex items-center justify-center gap-2 h-10 px-4 rounded-xl border border-emerald-300 bg-emerald-50 text-xs text-emerald-700 font-bold w-full">
+                  ✅ Foto: {uploadedPhotoName.slice(0, 20)}...
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2 w-full">
+                  <Label
+                    htmlFor="photo-camera"
+                    className="flex items-center justify-center gap-1.5 h-10 px-3 rounded-xl border border-slate-200 border-dashed bg-white text-xs text-slate-600 font-bold hover:bg-blue-50 hover:border-blue-300 cursor-pointer active:scale-95 transition-all text-center"
+                  >
+                    📷 Sacar Foto
+                  </Label>
+                  <Label
+                    htmlFor="photo-gallery"
+                    className="flex items-center justify-center gap-1.5 h-10 px-3 rounded-xl border border-slate-200 border-dashed bg-white text-xs text-slate-600 font-bold hover:bg-violet-50 hover:border-violet-300 cursor-pointer active:scale-95 transition-all text-center"
+                  >
+                    📁 Subir Imagen
+                  </Label>
+                </div>
+              )}
             </div>
 
             <Button

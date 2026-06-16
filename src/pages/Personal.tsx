@@ -419,7 +419,6 @@ export default function Personal() {
         type="file" 
         ref={fileInputRef} 
         accept="image/*" 
-        capture="environment" 
         className="hidden" 
         onChange={async (e) => {
           const file = e.target.files?.[0];
