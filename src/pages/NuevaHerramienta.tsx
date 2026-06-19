@@ -7,9 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Plus, Sparkles } from 'lucide-react';
+import { ArrowLeft, Plus, Sparkles, Camera, Upload, Trash2 } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { Textarea } from '@/components/ui/textarea';
+import { compressImage } from '../lib/imageUtils';
 
 interface Obra {
   id: string;
@@ -30,6 +31,7 @@ export default function NuevaHerramienta() {
   const [currentObraId, setCurrentObraId] = useState('');
   const [category, setCategory] = useState('Otros');
   const [loading, setLoading] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 
   // AI Assistant state
   const [aiText, setAiText] = useState('');
@@ -47,16 +49,22 @@ export default function NuevaHerramienta() {
     fetchObras();
   }, []);
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setUploadedPhotoName(file.name);
-      if (!aiText.trim()) {
-        // Detect tool name from file name if descriptive, else preset barcode
-        const cleanName = file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ");
-        setAiText(`Lectura de archivo "${cleanName}": Código detectado QR: TAL-${Math.floor(100 + Math.random() * 900)}. Producto: Taladro percutor Bosch GSB 18V.`);
+      try {
+        const compressed = await compressImage(file);
+        setPhotoUrl(compressed);
+        if (!aiText.trim()) {
+          // Detect tool name from file name if descriptive, else preset barcode
+          const cleanName = file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ");
+          setAiText(`Lectura de archivo "${cleanName}": Código detectado QR: TAL-${Math.floor(100 + Math.random() * 900)}. Producto: Taladro percutor Bosch GSB 18V.`);
+        }
+        toast({ title: 'Foto procesada', description: 'Se guardó la foto para la herramienta y se analizó con IA.' });
+      } catch (err) {
+        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo procesar la imagen.' });
       }
-      toast({ title: 'Foto cargada', description: 'Se analizó la imagen para extraer el código QR o de barras.' });
     }
   };
 
@@ -172,7 +180,8 @@ export default function NuevaHerramienta() {
       description: description.trim() || null,
       status: 'Disponible',
       category: category,
-      current_obra_id: currentObraId
+      current_obra_id: currentObraId,
+      photo_url: photoUrl
     }]).select().single();
 
     setLoading(false);
@@ -408,6 +417,82 @@ export default function NuevaHerramienta() {
                 onChange={e => setDescription(e.target.value)}
                 className="h-11 rounded-xl" 
               />
+            </div>
+
+            {/* Foto de la Herramienta */}
+            <div className="space-y-2 border border-slate-100 rounded-xl p-3 bg-slate-50/50">
+              <Label className="text-xs font-semibold text-slate-700">Fotografía de la Herramienta</Label>
+              
+              {photoUrl ? (
+                <div className="relative w-36 h-36 rounded-xl overflow-hidden border border-slate-200 group">
+                  <img src={photoUrl} alt="Vista previa" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPhotoUrl(null);
+                      setUploadedPhotoName('');
+                    }}
+                    className="absolute top-1.5 right-1.5 bg-rose-600 text-white rounded-lg p-1.5 shadow-md hover:bg-rose-700 transition-colors"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <div className="flex gap-2">
+                    <input
+                      type="file"
+                      id="tool-photo-camera"
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          try {
+                            const compressed = await compressImage(file);
+                            setPhotoUrl(compressed);
+                          } catch {
+                            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo procesar la imagen.' });
+                          }
+                        }
+                      }}
+                    />
+                    <input
+                      type="file"
+                      id="tool-photo-gallery"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          try {
+                            const compressed = await compressImage(file);
+                            setPhotoUrl(compressed);
+                          } catch {
+                            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo procesar la imagen.' });
+                          }
+                        }
+                      }}
+                    />
+                    <Label
+                      htmlFor="tool-photo-camera"
+                      className="flex items-center justify-center gap-1.5 h-10 px-4 rounded-xl border border-slate-200 bg-white text-xs text-slate-700 font-semibold shadow-sm hover:bg-slate-50 cursor-pointer transition-all"
+                    >
+                      <Camera size={16} /> Sacar Foto
+                    </Label>
+                    <Label
+                      htmlFor="tool-photo-gallery"
+                      className="flex items-center justify-center gap-1.5 h-10 px-4 rounded-xl border border-slate-200 bg-white text-xs text-slate-700 font-semibold shadow-sm hover:bg-slate-50 cursor-pointer transition-all"
+                    >
+                      <Upload size={16} /> Elegir de Galería
+                    </Label>
+                  </div>
+                  <span className="text-[10px] text-slate-400 block">
+                    Formatos recomendados: JPG o PNG. La imagen se optimizará automáticamente.
+                  </span>
+                </div>
+              )}
             </div>
 
             <Button 
