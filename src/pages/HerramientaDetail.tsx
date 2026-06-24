@@ -469,7 +469,7 @@ export default function HerramientaDetail() {
                 onClick={async () => {
                   const { error } = await supabase
                     .from('herramientas')
-                    .update({ status: 'Disponible' })
+                    .update({ status: 'Disponible', current_obra_id: null })
                     .eq('id', herramienta.id);
                   if (error) {
                     toast({ variant: 'destructive', title: 'Error', description: error.message });

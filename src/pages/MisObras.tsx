@@ -173,7 +173,7 @@ export default function MisObras() {
 
   const releaseHerramienta = async (hId: string) => {
     if (!window.confirm('¿Liberar esta herramienta de la obra? Volverá al depósito virtual.')) return;
-    const { error } = await supabase.from('herramientas').update({ current_obra_id: null }).eq('id', hId);
+    const { error } = await supabase.from('herramientas').update({ current_obra_id: null, status: 'Disponible' }).eq('id', hId);
     if (error) toast({ variant: 'destructive', title: 'Error', description: error.message });
     else {
       toast({ title: 'Liberada', description: 'La herramienta ya no pertenece a esta obra.' });
@@ -183,7 +183,7 @@ export default function MisObras() {
 
   const releaseEmpleado = async (eId: string) => {
     if (!window.confirm('¿Liberar este empleado de la obra? Quedará disponible para nuevos traslados.')) return;
-    const { error } = await supabase.from('empleados').update({ obra_id: null }).eq('id', eId);
+    const { error } = await supabase.from('empleados').update({ obra_id: null, status: 'Disponible' }).eq('id', eId);
     if (error) toast({ variant: 'destructive', title: 'Error', description: error.message });
     else {
       toast({ title: 'Liberado', description: 'El empleado ya no pertenece a esta obra.' });

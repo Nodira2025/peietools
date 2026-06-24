@@ -139,10 +139,11 @@ export default function TrasladoPersonalDetail() {
       return;
     }
 
-    // Reset the employee status back to Disponible
+    // Reset the employee status back to Trabajando (if assigned to an obra) or Disponible
+    const { data: empData } = await supabase.from('empleados').select('obra_id').eq('id', traslado.empleado_id).single();
     await supabase
       .from('empleados')
-      .update({ status: 'Disponible' })
+      .update({ status: empData?.obra_id ? 'Trabajando' : 'Disponible' })
       .eq('id', traslado.empleado_id);
 
     toast({ title: 'Traslado Rechazado', description: 'Notificando al encargado...' });
@@ -192,7 +193,7 @@ export default function TrasladoPersonalDetail() {
         await supabase
           .from('empleados')
           .update({ 
-            status: 'Disponible',
+            status: traslado.source_obra_id ? 'Trabajando' : 'Disponible',
             obra_id: traslado.source_obra_id || null
           })
           .eq('id', traslado.empleado_id);

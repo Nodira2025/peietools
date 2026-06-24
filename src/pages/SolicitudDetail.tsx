@@ -218,9 +218,10 @@ export default function SolicitudDetail() {
       notes: 'Motivo: ' + rejectionReason
     }]);
 
-    // Devolver herramienta a Disponible
+    // Devolver herramienta a En uso (si está en obra) o Disponible
+    const { data: hData } = await supabase.from('herramientas').select('current_obra_id').eq('id', solicitud.herramienta_id).single();
     await supabase.from('herramientas')
-      .update({ status: 'Disponible' })
+      .update({ status: hData?.current_obra_id ? 'En uso' : 'Disponible' })
       .eq('id', solicitud.herramienta_id);
 
     toast({ title: 'Solicitud Rechazada', description: 'Notificando al encargado...' });
@@ -250,9 +251,10 @@ export default function SolicitudDetail() {
     if (!window.confirm('¿Estás seguro de que deseas eliminar este movimiento permanentemente? Esta acción no se puede deshacer.')) return;
     try {
       if (solicitud.herramienta_id) {
+        const { data: hData } = await supabase.from('herramientas').select('current_obra_id').eq('id', solicitud.herramienta_id).single();
         await supabase
           .from('herramientas')
-          .update({ status: 'Disponible' })
+          .update({ status: hData?.current_obra_id ? 'En uso' : 'Disponible' })
           .eq('id', solicitud.herramienta_id);
       }
 
