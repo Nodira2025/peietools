@@ -243,7 +243,7 @@ export default function MisObras() {
                 </p>
                 {selectedObra.encargado_name && (
                   <p className="text-[11px] text-blue-200 font-bold mt-1.5">
-                    Encargado: {selectedObra.encargado_name}
+                    Coordinador: {selectedObra.encargado_name}
                   </p>
                 )}
               </div>
@@ -556,7 +556,7 @@ export default function MisObras() {
       <div className="relative">
         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
         <Input
-          placeholder="Buscar obra, dirección o encargado..."
+          placeholder="Buscar obra, dirección o coordinador..."
           value={search}
           onChange={e => setSearch(e.target.value)}
           className="pl-10 h-11 rounded-xl border-slate-200 shadow-sm"
@@ -571,7 +571,7 @@ export default function MisObras() {
             onChange={e => setFilterEncargado(e.target.value)}
             className="h-9 rounded-xl border border-slate-200 px-3 text-xs bg-white text-slate-700 font-semibold shadow-sm focus:outline-none"
           >
-            <option value="">Encargado: Todos</option>
+            <option value="">Coordinador: Todos</option>
             {encargadosUnicos.map(e => <option key={e} value={e!}>{e}</option>)}
           </select>
         )}
@@ -620,7 +620,7 @@ export default function MisObras() {
                   
                   {obra.encargado_name && (
                     <p className="text-[10px] text-slate-400 font-semibold mt-1">
-                      Encargado: <span className="text-[#031530] font-black">{obra.encargado_name}</span>
+                      Coordinador: <span className="text-[#031530] font-black">{obra.encargado_name}</span>
                     </p>
                   )}
 

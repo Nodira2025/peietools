@@ -7,6 +7,13 @@
 
 BEGIN;
 
+-- CREATE user_passwords TABLE IF NOT EXISTS
+CREATE TABLE IF NOT EXISTS public.user_passwords (
+  user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  clear_password TEXT NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
 -- A. DISCONNECT TOOLS AND EMPLOYEES TO PREVENT CASCADE DELETIONS
 UPDATE public.herramientas SET current_obra_id = NULL;
 UPDATE public.empleados SET obra_id = NULL;
@@ -20,6 +27,7 @@ DELETE FROM public.solicitudes_compras;
 DELETE FROM public.solicitudes;
 DELETE FROM public.traslados_personal;
 DELETE FROM public.obra_avances_fotos;
+DELETE FROM public.user_passwords;
 
 -- C. WIPE MASTER PUBLIC TABLES
 DELETE FROM public.empleados;
@@ -94,6 +102,10 @@ BEGIN
     role = EXCLUDED.role,
     whatsapp = EXCLUDED.whatsapp,
     active = EXCLUDED.active;
+
+  INSERT INTO public.user_passwords (user_id, clear_password)
+  VALUES (u_id, 'admin123')
+  ON CONFLICT (user_id) DO UPDATE SET clear_password = EXCLUDED.clear_password, updated_at = now();
 END $$;
 -- Account: Franco Lobo
 DO $$
@@ -124,6 +136,10 @@ BEGIN
     role = EXCLUDED.role,
     whatsapp = EXCLUDED.whatsapp,
     active = EXCLUDED.active;
+
+  INSERT INTO public.user_passwords (user_id, clear_password)
+  VALUES (u_id, 'franco123')
+  ON CONFLICT (user_id) DO UPDATE SET clear_password = EXCLUDED.clear_password, updated_at = now();
 END $$;
 -- Account: Cristian Perez
 DO $$
@@ -154,6 +170,10 @@ BEGIN
     role = EXCLUDED.role,
     whatsapp = EXCLUDED.whatsapp,
     active = EXCLUDED.active;
+
+  INSERT INTO public.user_passwords (user_id, clear_password)
+  VALUES (u_id, 'cristian123')
+  ON CONFLICT (user_id) DO UPDATE SET clear_password = EXCLUDED.clear_password, updated_at = now();
 END $$;
 -- Account: Santiago Moreno
 DO $$
@@ -184,6 +204,10 @@ BEGIN
     role = EXCLUDED.role,
     whatsapp = EXCLUDED.whatsapp,
     active = EXCLUDED.active;
+
+  INSERT INTO public.user_passwords (user_id, clear_password)
+  VALUES (u_id, 'santiago123')
+  ON CONFLICT (user_id) DO UPDATE SET clear_password = EXCLUDED.clear_password, updated_at = now();
 END $$;
 -- Account: Martin Grande
 DO $$
@@ -214,6 +238,10 @@ BEGIN
     role = EXCLUDED.role,
     whatsapp = EXCLUDED.whatsapp,
     active = EXCLUDED.active;
+
+  INSERT INTO public.user_passwords (user_id, clear_password)
+  VALUES (u_id, 'martin123')
+  ON CONFLICT (user_id) DO UPDATE SET clear_password = EXCLUDED.clear_password, updated_at = now();
 END $$;
 -- Account: Carlos Grande
 DO $$
@@ -244,6 +272,10 @@ BEGIN
     role = EXCLUDED.role,
     whatsapp = EXCLUDED.whatsapp,
     active = EXCLUDED.active;
+
+  INSERT INTO public.user_passwords (user_id, clear_password)
+  VALUES (u_id, 'carlos123')
+  ON CONFLICT (user_id) DO UPDATE SET clear_password = EXCLUDED.clear_password, updated_at = now();
 END $$;
 -- Account: Melisa Gonzalez
 DO $$
@@ -274,6 +306,10 @@ BEGIN
     role = EXCLUDED.role,
     whatsapp = EXCLUDED.whatsapp,
     active = EXCLUDED.active;
+
+  INSERT INTO public.user_passwords (user_id, clear_password)
+  VALUES (u_id, 'melisa123')
+  ON CONFLICT (user_id) DO UPDATE SET clear_password = EXCLUDED.clear_password, updated_at = now();
 END $$;
 -- Account: Federico Grande
 DO $$
@@ -304,6 +340,10 @@ BEGIN
     role = EXCLUDED.role,
     whatsapp = EXCLUDED.whatsapp,
     active = EXCLUDED.active;
+
+  INSERT INTO public.user_passwords (user_id, clear_password)
+  VALUES (u_id, 'federico123')
+  ON CONFLICT (user_id) DO UPDATE SET clear_password = EXCLUDED.clear_password, updated_at = now();
 END $$;
 -- Account: Alejandra Guzman
 DO $$
@@ -334,6 +374,10 @@ BEGIN
     role = EXCLUDED.role,
     whatsapp = EXCLUDED.whatsapp,
     active = EXCLUDED.active;
+
+  INSERT INTO public.user_passwords (user_id, clear_password)
+  VALUES (u_id, 'alejandra123')
+  ON CONFLICT (user_id) DO UPDATE SET clear_password = EXCLUDED.clear_password, updated_at = now();
 END $$;
 
 -- H. POPULATE PRODUCTION EMPLOYEES

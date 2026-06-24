@@ -281,7 +281,7 @@ export default function Herramientas() {
             filters={[
               { key: 'status', label: 'Estado', value: filterStatus, options: statusUnicos.map(s => ({ value: s, label: s })) },
               { key: 'obra', label: 'Obra actual', value: filterObra, options: obrasUnicas.map(o => ({ value: o, label: o })) },
-              { key: 'encargado', label: 'Encargado', value: filterEncargado, options: encargadosUnicos.map(e => ({ value: e, label: e })) },
+              { key: 'encargado', label: 'Coordinador', value: filterEncargado, options: encargadosUnicos.map(e => ({ value: e, label: e })) },
             ]}
             onFilterChange={(key, val) => {
               if (key === 'status') setFilterStatus(val);

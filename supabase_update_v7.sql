@@ -45,12 +45,13 @@ CREATE POLICY "Users can update own password" ON public.user_passwords
 CREATE OR REPLACE FUNCTION public.handle_new_user() 
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.profiles (id, full_name, role, whatsapp)
+  INSERT INTO public.profiles (id, full_name, role, whatsapp, photo_url)
   VALUES (
     new.id, 
     new.raw_user_meta_data->>'full_name', 
     COALESCE(new.raw_user_meta_data->>'role', 'solicitante'),
-    new.raw_user_meta_data->>'whatsapp'
+    new.raw_user_meta_data->>'whatsapp',
+    new.raw_user_meta_data->>'photo_url'
   );
 
   -- Si se pasa una contraseña en texto claro al crearse en auth.users, la guardamos
