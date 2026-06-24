@@ -41,6 +41,7 @@ export default function HerramientaDetail() {
   const [loading, setLoading] = useState(true);
   const [gettingLocation, setGettingLocation] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // States for editing mode
@@ -212,12 +213,13 @@ export default function HerramientaDetail() {
         {/* Info Card */}
         <Card className="md:col-span-2 shadow-sm border-t-4 overflow-hidden" style={{ borderTopColor: 'var(--peie-blue)' }}>
           {/* ZONA DE FOTO - con botón de cámara para admin */}
-          <div className="relative h-64 w-full bg-slate-50 border-b border-slate-100">
+          <div className="relative h-64 w-full bg-slate-50 border-b border-slate-100 overflow-hidden">
             {herramienta.photo_url ? (
               <img 
                 src={herramienta.photo_url} 
                 alt={herramienta.name} 
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover cursor-zoom-in hover:opacity-90 transition-opacity"
+                onClick={() => setIsImageModalOpen(true)}
                 onError={(e) => { e.currentTarget.style.display = 'none'; }}
               />
             ) : (
@@ -564,6 +566,33 @@ export default function HerramientaDetail() {
           </div>
         </div>
       </div>
+
+      {/* Fullscreen Image Preview Modal */}
+      {isImageModalOpen && herramienta?.photo_url && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+          onClick={() => setIsImageModalOpen(false)}
+        >
+          <button 
+            className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 active:scale-95 transition-all text-white rounded-full p-2.5 shadow-lg border border-white/10"
+            onClick={() => setIsImageModalOpen(false)}
+          >
+            <X size={24} />
+          </button>
+          
+          <div className="max-w-4xl max-h-[85vh] overflow-hidden rounded-2xl border border-white/10 shadow-2xl relative" onClick={(e) => e.stopPropagation()}>
+            <img 
+              src={herramienta.photo_url} 
+              alt={herramienta.name} 
+              className="max-h-[80vh] w-auto max-w-full object-contain mx-auto"
+            />
+            <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent p-4 text-white text-center">
+              <p className="text-sm font-bold">{herramienta.name}</p>
+              {herramienta.code && <p className="text-xs text-slate-300 font-mono mt-0.5">{herramienta.code}</p>}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

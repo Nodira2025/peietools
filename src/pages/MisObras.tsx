@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Building2, Wrench, MapPin, ChevronRight, Search, HardHat, Camera, Image, Plus, Trash2 } from 'lucide-react';
+import { Building2, Wrench, MapPin, ChevronRight, Search, HardHat, Camera, Image, Plus, Trash2, X } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { compressImage } from '../lib/imageUtils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -61,6 +61,7 @@ export default function MisObras() {
   const [avanceDescription, setAvanceDescription] = useState('');
   const [isAvanceDialogOpen, setIsAvanceDialogOpen] = useState(false);
   // const mainPhotoInputRef = useRef<HTMLInputElement>(null);
+  const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
   const avancePhotoInputRef = useRef<HTMLInputElement>(null);
   // const [uploadingMainPhoto, setUploadingMainPhoto] = useState(false);
 
@@ -401,7 +402,12 @@ export default function MisObras() {
               {avances.map(a => (
                 <div key={a.id} className="relative group bg-white border border-slate-100 rounded-xl overflow-hidden shadow-sm flex flex-col justify-between">
                   <div className="relative h-28 w-full bg-slate-50 overflow-hidden">
-                    <img src={a.photo_url} alt="Avance" className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
+                    <img 
+                      src={a.photo_url} 
+                      alt="Avance" 
+                      className="w-full h-full object-cover hover:scale-105 cursor-zoom-in transition-transform duration-300" 
+                      onClick={() => setPreviewPhotoUrl(a.photo_url)}
+                    />
                     {isSpecialRole && (
                       <button 
                         onClick={async () => {
@@ -669,6 +675,29 @@ export default function MisObras() {
         >
           <Plus size={24} className="stroke-[3]" />
         </button>
+      )}
+
+      {/* Fullscreen Progress Photo Preview Modal */}
+      {previewPhotoUrl && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+          onClick={() => setPreviewPhotoUrl(null)}
+        >
+          <button 
+            className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 active:scale-95 transition-all text-white rounded-full p-2.5 shadow-lg border border-white/10"
+            onClick={() => setPreviewPhotoUrl(null)}
+          >
+            <X size={24} />
+          </button>
+          
+          <div className="max-w-4xl max-h-[85vh] overflow-hidden rounded-2xl border border-white/10 shadow-2xl relative" onClick={(e) => e.stopPropagation()}>
+            <img 
+              src={previewPhotoUrl} 
+              alt="Avance de obra" 
+              className="max-h-[80vh] w-auto max-w-full object-contain mx-auto"
+            />
+          </div>
+        </div>
       )}
     </div>
   );
