@@ -383,7 +383,8 @@ ON CONFLICT (code) DO UPDATE SET
   brand = EXCLUDED.brand,
   model = EXCLUDED.model,
   current_obra_id = EXCLUDED.current_obra_id,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  status = EXCLUDED.status;
 -- Tool: A-41/2-O2
 INSERT INTO public.herramientas (code, qr_code, name, brand, model, status, current_obra_id, category)
 SELECT 'A-41/2-O2', 'A-41/2-O2', 'Amoladora (4 1/2")', 'Skil', 'Skil', 'En uso', id, 'Amoladoras'
@@ -393,7 +394,8 @@ ON CONFLICT (code) DO UPDATE SET
   brand = EXCLUDED.brand,
   model = EXCLUDED.model,
   current_obra_id = EXCLUDED.current_obra_id,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  status = EXCLUDED.status;
 -- Tool: A-41/2-O3
 INSERT INTO public.herramientas (code, qr_code, name, brand, model, status, current_obra_id, category)
 SELECT 'A-41/2-O3', 'A-41/2-O3', 'Amoladora (4 1/2")', 'Hamilton', 'Hamilton', 'En uso', id, 'Amoladoras'
@@ -403,7 +405,8 @@ ON CONFLICT (code) DO UPDATE SET
   brand = EXCLUDED.brand,
   model = EXCLUDED.model,
   current_obra_id = EXCLUDED.current_obra_id,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  status = EXCLUDED.status;
 -- Tool: A-41/2-O4
 INSERT INTO public.herramientas (code, qr_code, name, brand, model, status, current_obra_id, category)
 SELECT 'A-41/2-O4', 'A-41/2-O4', 'Amoladora (4 1/2")', 'Black&Decker', 'Black&Decker', 'En uso', id, 'Amoladoras'
@@ -413,7 +416,8 @@ ON CONFLICT (code) DO UPDATE SET
   brand = EXCLUDED.brand,
   model = EXCLUDED.model,
   current_obra_id = EXCLUDED.current_obra_id,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  status = EXCLUDED.status;
 -- Tool: A-7-01
 INSERT INTO public.herramientas (code, qr_code, name, brand, model, status, current_obra_id, category)
 SELECT 'A-7-01', 'A-7-01', 'Amoladora (7")', 'Total', 'Total', 'En uso', id, 'Amoladoras'
@@ -423,7 +427,8 @@ ON CONFLICT (code) DO UPDATE SET
   brand = EXCLUDED.brand,
   model = EXCLUDED.model,
   current_obra_id = EXCLUDED.current_obra_id,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  status = EXCLUDED.status;
 -- Tool: A-7-02
 INSERT INTO public.herramientas (code, qr_code, name, brand, model, status, current_obra_id, category)
 SELECT 'A-7-02', 'A-7-02', 'Amoladora (7")', 'Total', 'Total', 'En uso', id, 'Amoladoras'
@@ -433,7 +438,8 @@ ON CONFLICT (code) DO UPDATE SET
   brand = EXCLUDED.brand,
   model = EXCLUDED.model,
   current_obra_id = EXCLUDED.current_obra_id,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  status = EXCLUDED.status;
 -- Tool: ANC-01
 INSERT INTO public.herramientas (code, qr_code, name, brand, model, status, current_obra_id, category)
 SELECT 'ANC-01', 'ANC-01', 'Cuerpo Andamio 1', '', '', 'En uso', id, 'Otros'
@@ -443,7 +449,8 @@ ON CONFLICT (code) DO UPDATE SET
   brand = EXCLUDED.brand,
   model = EXCLUDED.model,
   current_obra_id = EXCLUDED.current_obra_id,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  status = EXCLUDED.status;
 -- Tool: ANC-02
 INSERT INTO public.herramientas (code, qr_code, name, brand, model, status, current_obra_id, category)
 SELECT 'ANC-02', 'ANC-02', 'Cuerpo Andamio 2', '', '', 'En uso', id, 'Otros'
@@ -453,7 +460,8 @@ ON CONFLICT (code) DO UPDATE SET
   brand = EXCLUDED.brand,
   model = EXCLUDED.model,
   current_obra_id = EXCLUDED.current_obra_id,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  status = EXCLUDED.status;
 -- Tool: ANC-03
 INSERT INTO public.herramientas (code, qr_code, name, brand, model, status, current_obra_id, category)
 SELECT 'ANC-03', 'ANC-03', 'Cuerpo Andamio 3', '', '', 'En uso', id, 'Otros'
@@ -463,7 +471,8 @@ ON CONFLICT (code) DO UPDATE SET
   brand = EXCLUDED.brand,
   model = EXCLUDED.model,
   current_obra_id = EXCLUDED.current_obra_id,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  status = EXCLUDED.status;
 -- Tool: ARN-01
 INSERT INTO public.herramientas (code, qr_code, name, brand, model, status, current_obra_id, category)
 SELECT 'ARN-01', 'ARN-01', 'Arnés', 'Amarillo', 'Amarillo', 'En uso', id, 'Elementos de seguridad'
@@ -473,7 +482,8 @@ ON CONFLICT (code) DO UPDATE SET
   brand = EXCLUDED.brand,
   model = EXCLUDED.model,
   current_obra_id = EXCLUDED.current_obra_id,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  status = EXCLUDED.status;
 -- Tool: ESC-03
 INSERT INTO public.herramientas (code, qr_code, name, brand, model, status, current_obra_id, category)
 SELECT 'ESC-03', 'ESC-03', 'Escalera 3', 'Cant peldaños', 'Cant peldaños', 'En uso', id, 'Escaleras'
@@ -483,7 +493,8 @@ ON CONFLICT (code) DO UPDATE SET
   brand = EXCLUDED.brand,
   model = EXCLUDED.model,
   current_obra_id = EXCLUDED.current_obra_id,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  status = EXCLUDED.status;
 -- Tool: ESC-04
 INSERT INTO public.herramientas (code, qr_code, name, brand, model, status, current_obra_id, category)
 SELECT 'ESC-04', 'ESC-04', 'Escalera 4', 'Cant peldaños', 'Cant peldaños', 'En uso', id, 'Escaleras'
@@ -493,7 +504,8 @@ ON CONFLICT (code) DO UPDATE SET
   brand = EXCLUDED.brand,
   model = EXCLUDED.model,
   current_obra_id = EXCLUDED.current_obra_id,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  status = EXCLUDED.status;
 -- Tool: ESC-05
 INSERT INTO public.herramientas (code, qr_code, name, brand, model, status, current_obra_id, category)
 SELECT 'ESC-05', 'ESC-05', 'Escalera 5', 'Cant peldaños', 'Cant peldaños', 'En uso', id, 'Escaleras'
@@ -503,7 +515,8 @@ ON CONFLICT (code) DO UPDATE SET
   brand = EXCLUDED.brand,
   model = EXCLUDED.model,
   current_obra_id = EXCLUDED.current_obra_id,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  status = EXCLUDED.status;
 -- Tool: ESC01
 INSERT INTO public.herramientas (code, qr_code, name, brand, model, status, current_obra_id, category)
 SELECT 'ESC01', 'ESC01', 'Escalera 1', 'Cant peldaños', 'Cant peldaños', 'En uso', id, 'Escaleras'
@@ -513,7 +526,8 @@ ON CONFLICT (code) DO UPDATE SET
   brand = EXCLUDED.brand,
   model = EXCLUDED.model,
   current_obra_id = EXCLUDED.current_obra_id,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  status = EXCLUDED.status;
 -- Tool: ESC02
 INSERT INTO public.herramientas (code, qr_code, name, brand, model, status, current_obra_id, category)
 SELECT 'ESC02', 'ESC02', 'Escalera 2', 'Cant peldaños', 'Cant peldaños', 'En uso', id, 'Escaleras'
@@ -523,7 +537,8 @@ ON CONFLICT (code) DO UPDATE SET
   brand = EXCLUDED.brand,
   model = EXCLUDED.model,
   current_obra_id = EXCLUDED.current_obra_id,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  status = EXCLUDED.status;
 -- Tool: GA-01
 INSERT INTO public.herramientas (code, qr_code, name, brand, model, status, current_obra_id, category)
 SELECT 'GA-01', 'GA-01', 'Garrafa', 'Negra', 'Negra', 'En uso', id, 'Otros'
@@ -533,7 +548,8 @@ ON CONFLICT (code) DO UPDATE SET
   brand = EXCLUDED.brand,
   model = EXCLUDED.model,
   current_obra_id = EXCLUDED.current_obra_id,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  status = EXCLUDED.status;
 -- Tool: GA-02
 INSERT INTO public.herramientas (code, qr_code, name, brand, model, status, current_obra_id, category)
 SELECT 'GA-02', 'GA-02', 'Garrafa', 'Roja', 'Roja', 'En uso', id, 'Otros'
@@ -543,7 +559,8 @@ ON CONFLICT (code) DO UPDATE SET
   brand = EXCLUDED.brand,
   model = EXCLUDED.model,
   current_obra_id = EXCLUDED.current_obra_id,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  status = EXCLUDED.status;
 -- Tool: PI-01
 INSERT INTO public.herramientas (code, qr_code, name, brand, model, status, current_obra_id, category)
 SELECT 'PI-01', 'PI-01', 'Pinza de identar', '', '', 'En uso', id, 'Otros'
@@ -553,7 +570,8 @@ ON CONFLICT (code) DO UPDATE SET
   brand = EXCLUDED.brand,
   model = EXCLUDED.model,
   current_obra_id = EXCLUDED.current_obra_id,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  status = EXCLUDED.status;
 -- Tool: PI-02
 INSERT INTO public.herramientas (code, qr_code, name, brand, model, status, current_obra_id, category)
 SELECT 'PI-02', 'PI-02', 'Pinza de identar', '', '', 'En uso', id, 'Otros'
@@ -563,7 +581,8 @@ ON CONFLICT (code) DO UPDATE SET
   brand = EXCLUDED.brand,
   model = EXCLUDED.model,
   current_obra_id = EXCLUDED.current_obra_id,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  status = EXCLUDED.status;
 -- Tool: RES-20-01
 INSERT INTO public.herramientas (code, qr_code, name, brand, model, status, current_obra_id, category)
 SELECT 'RES-20-01', 'RES-20-01', 'Resorte', '20mm (3/4")', '20mm (3/4")', 'En uso', id, 'Otros'
@@ -573,7 +592,8 @@ ON CONFLICT (code) DO UPDATE SET
   brand = EXCLUDED.brand,
   model = EXCLUDED.model,
   current_obra_id = EXCLUDED.current_obra_id,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  status = EXCLUDED.status;
 -- Tool: RES-22-01
 INSERT INTO public.herramientas (code, qr_code, name, brand, model, status, current_obra_id, category)
 SELECT 'RES-22-01', 'RES-22-01', 'Resorte', '22mm (7/8")', '22mm (7/8")', 'En uso', id, 'Otros'
@@ -583,7 +603,8 @@ ON CONFLICT (code) DO UPDATE SET
   brand = EXCLUDED.brand,
   model = EXCLUDED.model,
   current_obra_id = EXCLUDED.current_obra_id,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  status = EXCLUDED.status;
 -- Tool: RES-25-01
 INSERT INTO public.herramientas (code, qr_code, name, brand, model, status, current_obra_id, category)
 SELECT 'RES-25-01', 'RES-25-01', 'Resorte', '25mm (1")', '25mm (1")', 'En uso', id, 'Otros'
@@ -593,7 +614,8 @@ ON CONFLICT (code) DO UPDATE SET
   brand = EXCLUDED.brand,
   model = EXCLUDED.model,
   current_obra_id = EXCLUDED.current_obra_id,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  status = EXCLUDED.status;
 -- Tool: RTD01
 INSERT INTO public.herramientas (code, qr_code, name, brand, model, status, current_obra_id, category)
 SELECT 'RTD01', 'RTD01', 'Rotomartillo demoledor', 'Barovo', 'Barovo', 'En uso', id, 'Taladros'
@@ -603,7 +625,8 @@ ON CONFLICT (code) DO UPDATE SET
   brand = EXCLUDED.brand,
   model = EXCLUDED.model,
   current_obra_id = EXCLUDED.current_obra_id,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  status = EXCLUDED.status;
 -- Tool: RTP-01
 INSERT INTO public.herramientas (code, qr_code, name, brand, model, status, current_obra_id, category)
 SELECT 'RTP-01', 'RTP-01', 'Rotomartillo percutor', 'Barovo', 'Barovo', 'En uso', id, 'Taladros'
@@ -613,7 +636,8 @@ ON CONFLICT (code) DO UPDATE SET
   brand = EXCLUDED.brand,
   model = EXCLUDED.model,
   current_obra_id = EXCLUDED.current_obra_id,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  status = EXCLUDED.status;
 -- Tool: TCC-01
 INSERT INTO public.herramientas (code, qr_code, name, brand, model, status, current_obra_id, category)
 SELECT 'TCC-01', 'TCC-01', 'Tijera corta cable', '', '', 'En uso', id, 'Otros'
@@ -623,7 +647,8 @@ ON CONFLICT (code) DO UPDATE SET
   brand = EXCLUDED.brand,
   model = EXCLUDED.model,
   current_obra_id = EXCLUDED.current_obra_id,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  status = EXCLUDED.status;
 -- Tool: TCC-02
 INSERT INTO public.herramientas (code, qr_code, name, brand, model, status, current_obra_id, category)
 SELECT 'TCC-02', 'TCC-02', 'Tijera corta cable', '', '', 'En uso', id, 'Otros'
@@ -633,7 +658,8 @@ ON CONFLICT (code) DO UPDATE SET
   brand = EXCLUDED.brand,
   model = EXCLUDED.model,
   current_obra_id = EXCLUDED.current_obra_id,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  status = EXCLUDED.status;
 -- Tool: TP-01
 INSERT INTO public.herramientas (code, qr_code, name, brand, model, status, current_obra_id, category)
 SELECT 'TP-01', 'TP-01', 'Taladro percutor', 'Total', 'Total', 'En uso', id, 'Taladros'
@@ -643,7 +669,8 @@ ON CONFLICT (code) DO UPDATE SET
   brand = EXCLUDED.brand,
   model = EXCLUDED.model,
   current_obra_id = EXCLUDED.current_obra_id,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  status = EXCLUDED.status;
 -- Tool: TP-02
 INSERT INTO public.herramientas (code, qr_code, name, brand, model, status, current_obra_id, category)
 SELECT 'TP-02', 'TP-02', 'Taladro chico', 'Barovo', 'Barovo', 'En uso', id, 'Taladros'
@@ -653,7 +680,8 @@ ON CONFLICT (code) DO UPDATE SET
   brand = EXCLUDED.brand,
   model = EXCLUDED.model,
   current_obra_id = EXCLUDED.current_obra_id,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  status = EXCLUDED.status;
 -- Tool: TRP-01
 INSERT INTO public.herramientas (code, qr_code, name, brand, model, status, current_obra_id, category)
 SELECT 'TRP-01', 'TRP-01', 'Taladro rotopercutor', 'Dewalt', 'Dewalt', 'En uso', id, 'Taladros'
@@ -663,7 +691,8 @@ ON CONFLICT (code) DO UPDATE SET
   brand = EXCLUDED.brand,
   model = EXCLUDED.model,
   current_obra_id = EXCLUDED.current_obra_id,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  status = EXCLUDED.status;
 -- Tool: TRP-02
 INSERT INTO public.herramientas (code, qr_code, name, brand, model, status, current_obra_id, category)
 SELECT 'TRP-02', 'TRP-02', 'Taladro rotopercutor', 'Barovo', 'Barovo', 'En uso', id, 'Taladros'
@@ -673,7 +702,8 @@ ON CONFLICT (code) DO UPDATE SET
   brand = EXCLUDED.brand,
   model = EXCLUDED.model,
   current_obra_id = EXCLUDED.current_obra_id,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  status = EXCLUDED.status;
 -- Tool: ESC-06
 INSERT INTO public.herramientas (code, qr_code, name, brand, model, status, current_obra_id, category)
 SELECT 'ESC-06', 'ESC-06', 'Escalera', 'Cant peldaños', 'Cant peldaños', 'En uso', id, 'Escaleras'
@@ -683,7 +713,8 @@ ON CONFLICT (code) DO UPDATE SET
   brand = EXCLUDED.brand,
   model = EXCLUDED.model,
   current_obra_id = EXCLUDED.current_obra_id,
-  category = EXCLUDED.category;
+  category = EXCLUDED.category,
+  status = EXCLUDED.status;
 
 -- Delete any tool in DB that is not in the official excel sheet
 DELETE FROM public.herramientas WHERE code NOT IN ('A-41/2-01', 'A-41/2-O2', 'A-41/2-O3', 'A-41/2-O4', 'A-7-01', 'A-7-02', 'ANC-01', 'ANC-02', 'ANC-03', 'ARN-01', 'ESC-03', 'ESC-04', 'ESC-05', 'ESC01', 'ESC02', 'GA-01', 'GA-02', 'PI-01', 'PI-02', 'RES-20-01', 'RES-22-01', 'RES-25-01', 'RTD01', 'RTP-01', 'TCC-01', 'TCC-02', 'TP-01', 'TP-02', 'TRP-01', 'TRP-02', 'ESC-06');

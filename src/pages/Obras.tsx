@@ -201,7 +201,7 @@ export default function Obras() {
                 <Input id="address" value={address} onChange={e => setAddress(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="manager">Encargado</Label>
+                <Label htmlFor="manager">Coordinador</Label>
                 <Input id="manager" value={manager} onChange={e => setManager(e.target.value)} />
               </div>
               <div className="space-y-2">
@@ -262,7 +262,7 @@ export default function Obras() {
         
         <FilterBar
           filters={[
-            { key: 'manager', label: 'Encargado', value: filterManager, options: encargadosUnicos },
+            { key: 'manager', label: 'Coordinador', value: filterManager, options: encargadosUnicos },
             { key: 'active', label: 'Estado', value: filterActive, options: [{ value: 'true', label: 'En proceso' }, { value: 'false', label: 'Finalizado' }] },
           ]}
           onFilterChange={(key, val) => {
@@ -309,7 +309,7 @@ export default function Obras() {
               </CardHeader>
               <CardContent className="text-sm space-y-1 mt-2 text-muted-foreground">
                 <p><strong>📍</strong> {obra.address || 'Sin dirección'}</p>
-                <p><strong>👤</strong> {obra.encargado_name || 'Sin encargado'}</p>
+                <p><strong>👤</strong> {obra.encargado_name || 'Sin coordinador'}</p>
                 <p><strong>📞</strong> {obra.phone || 'Sin teléfono'}</p>
                 {obra.latitude && obra.longitude && (
                   <div className="pt-2">

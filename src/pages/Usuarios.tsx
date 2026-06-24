@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Users as UsersIcon, ShieldAlert, Edit } from 'lucide-react';
+import { Users as UsersIcon, ShieldAlert, Edit, Eye, EyeOff } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
@@ -19,6 +19,7 @@ interface Profile {
   whatsapp: string | null;
   photo_url?: string | null;
   active: boolean;
+  user_passwords?: { clear_password: string } | { clear_password: string }[] | null;
 }
 
 export default function Usuarios() {
@@ -39,9 +40,27 @@ export default function Usuarios() {
   
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
+  const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
+
+  const togglePasswordVisibility = (userId: string) => {
+    setVisiblePasswords(prev => ({
+      ...prev,
+      [userId]: !prev[userId]
+    }));
+  };
+
+  const getRoleLabel = (roleName: string) => {
+    switch (roleName?.toLowerCase()) {
+      case 'admin': return 'Administrador';
+      case 'solicitante': return 'Coordinador';
+      case 'logistica': return 'Logística';
+      default: return roleName;
+    }
+  };
+
   const fetchUsuarios = async () => {
     setLoading(true);
-    const { data, error } = await supabase.from('profiles').select('*').order('full_name');
+    const { data, error } = await supabase.from('profiles').select('*, user_passwords(clear_password)').order('full_name');
     if (error) {
       toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar los usuarios' });
     } else {
@@ -187,7 +206,7 @@ export default function Usuarios() {
                     <SelectTrigger><SelectValue placeholder="Seleccionar rol" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="admin">Administrador</SelectItem>
-                      <SelectItem value="solicitante">Solicitante (Encargado)</SelectItem>
+                      <SelectItem value="solicitante">Coordinador</SelectItem>
                       <SelectItem value="logistica">Logística</SelectItem>
                     </SelectContent>
                   </Select>
@@ -234,7 +253,7 @@ export default function Usuarios() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin">Administrador</SelectItem>
-                  <SelectItem value="solicitante">Solicitante</SelectItem>
+                  <SelectItem value="solicitante">Coordinador</SelectItem>
                   <SelectItem value="logistica">Logística</SelectItem>
                 </SelectContent>
               </Select>
@@ -318,7 +337,7 @@ export default function Usuarios() {
                   )}
                   <div>
                     <CardTitle className="text-base font-bold text-slate-800">{user.full_name || 'Sin nombre'}</CardTitle>
-                    <span className="text-[10px] font-mono text-slate-400 capitalize">{user.role}</span>
+                    <span className="text-[10px] font-mono text-slate-400 capitalize">{getRoleLabel(user.role)}</span>
                   </div>
                 </div>
                 <Button 
@@ -331,9 +350,34 @@ export default function Usuarios() {
                 </Button>
               </CardHeader>
               <CardContent className="text-sm space-y-1 mt-2 text-muted-foreground">
-                <p className="capitalize"><strong>Rol:</strong> <span className="font-medium text-foreground">{user.role}</span></p>
+                <p className="capitalize"><strong>Rol:</strong> <span className="font-medium text-foreground">{getRoleLabel(user.role)}</span></p>
                 <p><strong>WhatsApp:</strong> {user.whatsapp || 'No configurado'}</p>
                 <p><strong>Estado:</strong> {user.active ? <span className="text-green-600 font-medium">Activo</span> : <span className="text-red-500 font-medium">Inactivo</span>}</p>
+                
+                {(() => {
+                  const clearPassword = Array.isArray(user.user_passwords)
+                    ? user.user_passwords[0]?.clear_password
+                    : (user.user_passwords as any)?.clear_password;
+                  
+                  return (
+                    <p className="flex items-center gap-1.5">
+                      <strong>Contraseña:</strong> 
+                      <span className="font-mono text-foreground font-medium">
+                        {clearPassword ? (visiblePasswords[user.id] ? clearPassword : '••••••••') : 'Desconocida'}
+                      </span>
+                      {clearPassword && (
+                        <button
+                          onClick={() => togglePasswordVisibility(user.id)}
+                          className="text-slate-400 hover:text-peie-blue p-0.5 ml-1 transition-colors flex items-center justify-center"
+                          type="button"
+                          title={visiblePasswords[user.id] ? "Ocultar Contraseña" : "Mostrar Contraseña"}
+                        >
+                          {visiblePasswords[user.id] ? <EyeOff size={14} /> : <Eye size={14} />}
+                        </button>
+                      )}
+                    </p>
+                  );
+                })()}
               </CardContent>
             </Card>
           ))}

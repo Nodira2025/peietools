@@ -2,7 +2,12 @@ import { useState, useEffect } from 'react';
 import { Navigate, Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { supabase } from '../lib/supabase';
-import { Home, Wrench, FileText, Truck, Users, Building, LogOut, ShoppingCart, Sparkles, HardHat, ClipboardList, BarChart3, MoreHorizontal, Bell } from 'lucide-react';
+import { Home, Wrench, FileText, Truck, Users, Building, LogOut, ShoppingCart, Sparkles, HardHat, ClipboardList, BarChart3, MoreHorizontal, Bell, Key } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 
 export default function AppLayout() {
   const { user, profile, loading, signOut } = useAuthStore();
@@ -14,6 +19,42 @@ export default function AppLayout() {
   const [pendingCount, setPendingCount] = useState(0);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
+
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [updatingPassword, setUpdatingPassword] = useState(false);
+  const { toast } = useToast();
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword.length < 6) {
+      toast({ variant: 'destructive', title: 'Error', description: 'La contraseña debe tener al menos 6 caracteres.' });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Las contraseñas no coinciden.' });
+      return;
+    }
+
+    setUpdatingPassword(true);
+    try {
+      const { error } = await supabase.rpc('change_own_password', {
+        p_new_password: newPassword
+      });
+
+      if (error) throw error;
+
+      toast({ title: 'Éxito', description: 'Contraseña actualizada correctamente.' });
+      setIsPasswordDialogOpen(false);
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Error', description: err.message || 'No se pudo cambiar la contraseña' });
+    } finally {
+      setUpdatingPassword(false);
+    }
+  };
 
   useEffect(() => {
     if (!profile) return;
@@ -227,18 +268,28 @@ export default function AppLayout() {
             <div className="min-w-0 flex-1">
               <p className="text-xs font-bold text-slate-800 truncate">{profile.full_name}</p>
               <span className="inline-block px-2 py-0.5 mt-0.5 text-[10px] bg-peie-light/10 text-peie-blue font-semibold rounded capitalize">
-                {profile.role}
+                {profile.role === 'solicitante' ? 'Coordinador' : (profile.role === 'logistica' ? 'Logística' : 'Administrador')}
               </span>
             </div>
           </div>
 
-          <button
-            onClick={signOut}
-            className="flex items-center justify-center space-x-2 px-3 py-2.5 w-full text-xs font-semibold text-rose-600 hover:bg-rose-50 hover:text-rose-700 border border-rose-100/50 rounded-xl transition-colors"
-          >
-            <LogOut size={16} />
-            <span>Cerrar Sesión</span>
-          </button>
+          <div className="flex flex-col gap-1.5">
+            <button
+              onClick={() => setIsPasswordDialogOpen(true)}
+              className="flex items-center justify-center space-x-2 px-3 py-2 w-full text-xs font-semibold text-peie-blue hover:bg-peie-blue/5 border border-peie-blue/15 rounded-xl transition-colors"
+            >
+              <Key size={14} />
+              <span>Cambiar Contraseña</span>
+            </button>
+
+            <button
+              onClick={signOut}
+              className="flex items-center justify-center space-x-2 px-3 py-2 w-full text-xs font-semibold text-rose-600 hover:bg-rose-50 hover:text-rose-700 border border-rose-100/50 rounded-xl transition-colors"
+            >
+              <LogOut size={16} />
+              <span>Cerrar Sesión</span>
+            </button>
+          </div>
         </div>
 
       </aside>
@@ -280,8 +331,18 @@ export default function AppLayout() {
           <div className="flex items-center gap-2.5">
             <div className="flex flex-col text-right">
               <span className="text-xs font-black text-white leading-tight">{profile.full_name?.split(' ')[0]}</span>
-              <span className="text-[9px] text-sky-400 font-black capitalize leading-none mt-0.5">{profile.role}</span>
+              <span className="text-[9px] text-sky-400 font-black capitalize leading-none mt-0.5">
+                {profile.role === 'solicitante' ? 'Coordinador' : (profile.role === 'logistica' ? 'Logística' : 'Admin')}
+              </span>
             </div>
+            
+            <button 
+              onClick={() => setIsPasswordDialogOpen(true)} 
+              className="p-2.5 text-white/80 hover:text-white border border-slate-700/40 rounded-xl bg-[#041d44]/40 active:scale-90 transition-all"
+              aria-label="Cambiar contraseña"
+            >
+              <Key size={16} className="stroke-[2.5]" />
+            </button>
             
             <button 
               onClick={signOut} 
@@ -428,10 +489,19 @@ export default function AppLayout() {
               )}
             </div>
 
+            {/* Cambiar Contraseña button */}
+            <button
+              onClick={() => { setShowMas(false); setIsPasswordDialogOpen(true); }}
+              className="w-full py-3 bg-slate-900/40 border border-slate-800/80 hover:bg-slate-900 text-white font-black text-xs rounded-xl uppercase tracking-wider flex items-center justify-center gap-2 transition-all mt-2"
+            >
+              <Key size={16} />
+              Cambiar Contraseña
+            </button>
+
             {/* Logout button */}
             <button
               onClick={() => { signOut(); setShowMas(false); }}
-              className="w-full py-3 bg-rose-950/20 border border-rose-900/50 hover:bg-rose-950/40 text-rose-400 font-black text-xs rounded-xl uppercase tracking-wider flex items-center justify-center gap-2 transition-all mt-4"
+              className="w-full py-3 bg-rose-950/20 border border-rose-900/50 hover:bg-rose-950/40 text-rose-400 font-black text-xs rounded-xl uppercase tracking-wider flex items-center justify-center gap-2 transition-all mt-2"
             >
               <LogOut size={16} />
               Cerrar Sesión
@@ -468,6 +538,62 @@ export default function AppLayout() {
           </div>
         </div>
       )}
+
+      {/* Dialog para Cambiar Contraseña */}
+      <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+        <DialogContent className="sm:max-w-[425px] rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-peie-blue">
+              <Key className="h-5 w-5" />
+              <span>Cambiar Contraseña</span>
+            </DialogTitle>
+            <DialogDescription>
+              Ingresá tu nueva contraseña de acceso. Recordá que el administrador podrá visualizarla si es necesario.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handlePasswordChange} className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="newPassword">Nueva Contraseña</Label>
+              <Input
+                id="newPassword"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Mínimo 6 caracteres"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirmar Nueva Contraseña</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Repetir contraseña"
+                required
+              />
+            </div>
+            <DialogFooter className="pt-2 flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsPasswordDialogOpen(false)}
+                disabled={updatingPassword}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={updatingPassword}
+                className="bg-peie-blue hover:bg-peie-blue/90 text-white"
+              >
+                {updatingPassword ? 'Guardando...' : 'Cambiar Contraseña'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
     </div>
   );

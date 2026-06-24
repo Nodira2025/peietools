@@ -10,6 +10,7 @@ interface Profile {
   whatsapp: string | null;
   obra_id: string | null;
   active: boolean;
+  clear_password?: string | null;
 }
 
 interface AuthState {
