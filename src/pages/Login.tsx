@@ -164,6 +164,17 @@ export default function Login() {
                 )}
               </Button>
 
+              <div className="text-center pt-2">
+                <a 
+                  href="https://wa.me/5493814015738?text=Hola,%20olvid%C3%A9%20mi%20contrase%C3%B1a%20de%20PEIE%20Tools"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-slate-500 hover:text-peie-blue hover:underline font-semibold transition-all"
+                >
+                  ¿Olvidaste tu contraseña?
+                </a>
+              </div>
+
             </form>
           </CardContent>
 

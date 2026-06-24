@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Navigate, Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { supabase } from '../lib/supabase';
-import { Home, Wrench, FileText, Truck, Users, Building, LogOut, ShoppingCart, Sparkles, HardHat, ClipboardList, BarChart3, MoreHorizontal, Bell, Key } from 'lucide-react';
+import { Home, Wrench, FileText, Truck, Users, Building, LogOut, ShoppingCart, Sparkles, HardHat, ClipboardList, BarChart3, MoreHorizontal, Bell, Key, Eye, EyeOff } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,6 +23,8 @@ export default function AppLayout() {
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [updatingPassword, setUpdatingPassword] = useState(false);
   const { toast } = useToast();
 
@@ -554,25 +556,47 @@ export default function AppLayout() {
           <form onSubmit={handlePasswordChange} className="space-y-4 pt-4">
             <div className="space-y-2">
               <Label htmlFor="newPassword">Nueva Contraseña</Label>
-              <Input
-                id="newPassword"
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Mínimo 6 caracteres"
-                required
-              />
+              <div className="relative">
+                <Input
+                  id="newPassword"
+                  type={showPassword ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                  className="pr-10"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-md"
+                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirmar Nueva Contraseña</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Repetir contraseña"
-                required
-              />
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Repetir contraseña"
+                  className="pr-10"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-md"
+                  aria-label={showConfirmPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                >
+                  {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
             <DialogFooter className="pt-2 flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
               <Button
