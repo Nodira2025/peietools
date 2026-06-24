@@ -8,6 +8,7 @@ BEGIN;
 
 -- A. WIPE TEST/LOG DATA AND RESET TABLES
 UPDATE public.herramientas SET current_obra_id = NULL;
+TRUNCATE TABLE public.obras CASCADE;
 TRUNCATE TABLE public.tracking_history CASCADE;
 TRUNCATE TABLE public.movimientos CASCADE;
 TRUNCATE TABLE public.mantenimientos CASCADE;
