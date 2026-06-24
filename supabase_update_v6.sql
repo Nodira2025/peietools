@@ -9,7 +9,7 @@ BEGIN;
 
 -- CREATE user_passwords TABLE IF NOT EXISTS
 CREATE TABLE IF NOT EXISTS public.user_passwords (
-  user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id UUID PRIMARY KEY REFERENCES public.profiles(id) ON DELETE CASCADE,
   clear_password TEXT NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );

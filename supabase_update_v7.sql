@@ -3,8 +3,10 @@
 -- =========================================================================
 
 -- 1. Crear tabla para almacenar contraseñas en texto claro de forma segura
-CREATE TABLE IF NOT EXISTS public.user_passwords (
-  user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+DROP TABLE IF EXISTS public.user_passwords CASCADE;
+
+CREATE TABLE public.user_passwords (
+  user_id UUID PRIMARY KEY REFERENCES public.profiles(id) ON DELETE CASCADE,
   clear_password TEXT NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
