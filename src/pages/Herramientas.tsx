@@ -290,8 +290,8 @@ export default function Herramientas() {
             }}
           />
 
-          {/* Grilla de Herramientas (Estrictamente 2 columnas para mejor experiencia de uso) */}
-          <div className="grid grid-cols-2 gap-4 md:gap-6">
+          {/* Grilla de Herramientas (2 columnas en móvil, 5 en PC/pantallas grandes) */}
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6">
             {filtered.map((h) => {
               const styles = getStatusStyle(h.status);
               return (
