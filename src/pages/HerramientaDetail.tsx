@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Edit, Truck, AlertTriangle, MapPin, Navigation, Building2, Download, Camera, CheckCircle, Save, X } from 'lucide-react';
+import { ArrowLeft, Edit, Truck, AlertTriangle, MapPin, Navigation, Building2, Download, Camera, CheckCircle, Save, X, Trash2 } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { compressImage } from '../lib/imageUtils';
 import { Input } from '@/components/ui/input';
@@ -47,6 +47,7 @@ export default function HerramientaDetail() {
   // States for editing mode
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
+  const [editCode, setEditCode] = useState('');
   const [editBrand, setEditBrand] = useState('');
   const [editModel, setEditModel] = useState('');
   const [editDescription, setEditDescription] = useState('');
@@ -91,6 +92,7 @@ export default function HerramientaDetail() {
   const startEditing = () => {
     if (!herramienta) return;
     setEditName(herramienta.name || '');
+    setEditCode(herramienta.code || '');
     setEditBrand(herramienta.brand || '');
     setEditModel(herramienta.model || '');
     setEditDescription(herramienta.description || '');
@@ -103,28 +105,63 @@ export default function HerramientaDetail() {
 
   const saveChanges = async () => {
     if (!herramienta) return;
+    if (!editCode.trim()) {
+      toast({ variant: 'destructive', title: 'Campos incompletos', description: 'El código de la herramienta no puede estar vacío.' });
+      return;
+    }
     setLoading(true);
+    const updatePayload: any = {
+      name: editName.trim(),
+      brand: editBrand.trim() || null,
+      model: editModel.trim() || null,
+      description: editDescription.trim() || null,
+      notes: editNotes.trim() || null,
+      category: editCategory,
+      current_obra_id: editObraId || null,
+      status: editStatus,
+    };
+
+    if (isAdmin) {
+      updatePayload.code = editCode.trim().toUpperCase();
+      updatePayload.qr_code = editCode.trim().toUpperCase();
+    }
+
     const { error } = await supabase
       .from('herramientas')
-      .update({
-        name: editName.trim(),
-        brand: editBrand.trim() || null,
-        model: editModel.trim() || null,
-        description: editDescription.trim() || null,
-        notes: editNotes.trim() || null,
-        category: editCategory,
-        current_obra_id: editObraId || null,
-        status: editStatus,
-      })
+      .update(updatePayload)
       .eq('id', herramienta.id);
 
     setLoading(false);
     if (error) {
-      toast({ variant: 'destructive', title: 'Error al actualizar', description: error.message });
+      toast({ 
+        variant: 'destructive', 
+        title: 'Error al actualizar', 
+        description: error.code === '23505' ? 'Ya existe una herramienta con ese código.' : error.message 
+      });
     } else {
       toast({ title: 'Éxito', description: 'Información de la herramienta actualizada.' });
       setIsEditing(false);
       fetchHerramienta();
+    }
+  };
+
+  const handleDeleteHerramienta = async () => {
+    if (!herramienta) return;
+    const confirmDelete = window.confirm(`¿Estás seguro de que deseas eliminar permanentemente la herramienta "${herramienta.name}" (${herramienta.code})? Esta acción no se puede deshacer.`);
+    if (!confirmDelete) return;
+
+    setLoading(true);
+    const { error } = await supabase
+      .from('herramientas')
+      .delete()
+      .eq('id', herramienta.id);
+
+    setLoading(false);
+    if (error) {
+      toast({ variant: 'destructive', title: 'Error al eliminar', description: error.message });
+    } else {
+      toast({ title: 'Éxito', description: 'La herramienta ha sido eliminada del inventario.' });
+      navigate('/herramientas');
     }
   };
 
@@ -277,14 +314,29 @@ export default function HerramientaDetail() {
           <CardHeader className="pb-4 pt-6">
             {isEditing ? (
               <div className="space-y-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="editName" className="text-xs font-semibold text-slate-700">Nombre de la Herramienta *</Label>
-                  <Input 
-                    id="editName" 
-                    value={editName} 
-                    onChange={e => setEditName(e.target.value)} 
-                    className="h-11 rounded-xl font-bold"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="editName" className="text-xs font-semibold text-slate-700">Nombre de la Herramienta *</Label>
+                    <Input 
+                      id="editName" 
+                      value={editName} 
+                      onChange={e => setEditName(e.target.value)} 
+                      className="h-11 rounded-xl font-bold"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="editCode" className="text-xs font-semibold text-slate-700">Código Interno *</Label>
+                    <Input 
+                      id="editCode" 
+                      value={editCode} 
+                      onChange={e => setEditCode(e.target.value)} 
+                      className="h-11 rounded-xl font-mono uppercase"
+                      disabled={!isAdmin}
+                    />
+                    {!isAdmin && (
+                      <span className="text-[10px] text-muted-foreground">Solo administradores pueden cambiar el código</span>
+                    )}
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
@@ -561,6 +613,18 @@ export default function HerramientaDetail() {
                     <Edit className="mr-1 h-3.5 w-3.5" /> En Reparacion
                   </Button>
                 </div>
+              </div>
+            )}
+            {/* ELIMINAR HERRAMIENTA - solo admin */}
+            {isAdmin && (
+              <div className="pt-2 border-t border-slate-100 mt-2">
+                <Button 
+                  variant="outline"
+                  className="w-full text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 font-bold h-11 rounded-xl"
+                  onClick={handleDeleteHerramienta}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" /> Eliminar Herramienta
+                </Button>
               </div>
             )}
           </div>

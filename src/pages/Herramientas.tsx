@@ -42,7 +42,7 @@ export default function Herramientas() {
   const [filterObra, setFilterObra] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterEncargado, setFilterEncargado] = useState('');
-  const [visibleCount, setVisibleCount] = useState(12);
+
   const { toast } = useToast();
   const navigate = useNavigate();
   const { profile } = useAuthStore();
@@ -292,7 +292,7 @@ export default function Herramientas() {
 
           {/* Grilla de Herramientas (Estrictamente 2 columnas para mejor experiencia de uso) */}
           <div className="grid grid-cols-2 gap-4 md:gap-6">
-            {filtered.slice(0, visibleCount).map((h) => {
+            {filtered.map((h) => {
               const styles = getStatusStyle(h.status);
               return (
                 <Card 
@@ -348,17 +348,7 @@ export default function Herramientas() {
               );
             })}
 
-            {visibleCount < filtered.length && (
-              <div className="col-span-full pt-4">
-                <Button 
-                  variant="ghost" 
-                  className="w-full py-6 text-peie-blue hover:bg-peie-blue/5 font-bold rounded-2xl border border-dashed border-slate-200"
-                  onClick={() => setVisibleCount(prev => prev + 12)}
-                >
-                  Ver más herramientas ({filtered.length - visibleCount} restantes)
-                </Button>
-              </div>
-            )}
+
 
             {filtered.length === 0 && (
               <div className="col-span-full text-center py-16 bg-white rounded-2xl border border-dashed border-slate-200">
