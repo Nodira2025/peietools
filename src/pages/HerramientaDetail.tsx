@@ -147,21 +147,46 @@ export default function HerramientaDetail() {
 
   const handleDeleteHerramienta = async () => {
     if (!herramienta) return;
-    const confirmDelete = window.confirm(`¿Estás seguro de que deseas eliminar permanentemente la herramienta "${herramienta.name}" (${herramienta.code})? Esta acción no se puede deshacer.`);
+    const confirmDelete = window.confirm(`¿Estás seguro de que deseas eliminar permanentemente la herramienta "${herramienta.name}" (${herramienta.code}) y todo su historial relacionado (movimientos, solicitudes, mantenimientos)? Esta acción no se puede deshacer.`);
     if (!confirmDelete) return;
 
     setLoading(true);
-    const { error } = await supabase
-      .from('herramientas')
-      .delete()
-      .eq('id', herramienta.id);
 
-    setLoading(false);
-    if (error) {
-      toast({ variant: 'destructive', title: 'Error al eliminar', description: error.message });
-    } else {
-      toast({ title: 'Éxito', description: 'La herramienta ha sido eliminada del inventario.' });
+    try {
+      // 1. Eliminar movimientos asociados
+      const { error: errorMov } = await supabase
+        .from('movimientos')
+        .delete()
+        .eq('herramienta_id', herramienta.id);
+      if (errorMov) throw new Error(`Historial de movimientos: ${errorMov.message}`);
+
+      // 2. Eliminar solicitudes asociadas
+      const { error: errorSol } = await supabase
+        .from('solicitudes')
+        .delete()
+        .eq('herramienta_id', herramienta.id);
+      if (errorSol) throw new Error(`Solicitudes de traslado: ${errorSol.message}`);
+
+      // 3. Eliminar mantenimientos asociados
+      const { error: errorMant } = await supabase
+        .from('mantenimientos')
+        .delete()
+        .eq('herramienta_id', herramienta.id);
+      if (errorMant) throw new Error(`Historial de mantenimiento: ${errorMant.message}`);
+
+      // 4. Eliminar herramienta
+      const { error: errorHerr } = await supabase
+        .from('herramientas')
+        .delete()
+        .eq('id', herramienta.id);
+      if (errorHerr) throw new Error(`Ficha de herramienta: ${errorHerr.message}`);
+
+      toast({ title: 'Éxito', description: 'La herramienta y todo su historial han sido eliminados.' });
       navigate('/herramientas');
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Error al eliminar', description: err.message });
+    } finally {
+      setLoading(false);
     }
   };
 
