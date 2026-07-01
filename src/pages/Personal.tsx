@@ -16,7 +16,7 @@ interface Empleado {
   status: 'Disponible' | 'En traslado' | 'Trabajando' | 'Libre';
   specialty: string | null;
   photo_url: string | null;
-  obras: { name: string } | null;
+  obras: { name: string; encargado_name: string | null } | null;
 }
 
 interface TrasladoPendiente {
@@ -61,7 +61,7 @@ export default function Personal() {
     // Fetch Empleados
     const { data: empData, error: empError } = await supabase
       .from('empleados')
-      .select('id, full_name, obra_id, status, specialty, photo_url, obras:obra_id(name)')
+      .select('id, full_name, obra_id, status, specialty, photo_url, obras:obra_id(name, encargado_name)')
       .order('full_name');
       
     if (empError) {
@@ -171,6 +171,118 @@ export default function Personal() {
     }
     
     return matchesSearch && matchesObra && matchesSpecialty && matchesStatus;
+  });
+
+  // Tema de colores para las distintas obras (basado en la planilla del cliente)
+  const getObraTheme = (name: string) => {
+    const cleanName = name.toLowerCase();
+    if (cleanName.includes('libre') || cleanName.includes('disponible') || cleanName.includes('sin asignar')) {
+      return {
+        border: 'border-l-green-500 border-l-4',
+        bg: 'bg-green-50/50 border-green-100',
+        badge: 'bg-green-100 text-green-800 border-green-200'
+      };
+    }
+    if (cleanName.includes('#300') || cleanName.includes('link')) {
+      return {
+        border: 'border-l-amber-500 border-l-4',
+        bg: 'bg-amber-50/30 border-amber-100',
+        badge: 'bg-amber-100 text-amber-800 border-amber-200'
+      };
+    }
+    if (cleanName.includes('aeropuerto')) {
+      return {
+        border: 'border-l-fuchsia-500 border-l-4',
+        bg: 'bg-fuchsia-50/30 border-fuchsia-100',
+        badge: 'bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200'
+      };
+    }
+    if (cleanName.includes('bamboo') || cleanName.includes('anzorena')) {
+      return {
+        border: 'border-l-emerald-500 border-l-4',
+        bg: 'bg-emerald-50/30 border-emerald-100',
+        badge: 'bg-emerald-100 text-emerald-800 border-emerald-200'
+      };
+    }
+    if (cleanName.includes('ausente') || cleanName.includes('lic. medica') || cleanName.includes('médica')) {
+      return {
+        border: 'border-l-orange-500 border-l-4',
+        bg: 'bg-orange-50/30 border-orange-100',
+        badge: 'bg-orange-100 text-orange-800 border-orange-200'
+      };
+    }
+    if (cleanName.includes('cantares')) {
+      return {
+        border: 'border-l-pink-500 border-l-4',
+        bg: 'bg-pink-50/30 border-pink-100',
+        badge: 'bg-pink-100 text-pink-800 border-pink-200'
+      };
+    }
+    if (cleanName.includes('clínica') || cleanName.includes('clinica') || cleanName.includes('mayo')) {
+      return {
+        border: 'border-l-yellow-500 border-l-4',
+        bg: 'bg-yellow-50/30 border-yellow-100',
+        badge: 'bg-yellow-100 text-yellow-800 border-yellow-200'
+      };
+    }
+    if (cleanName.includes('domus')) {
+      return {
+        border: 'border-l-sky-500 border-l-4',
+        bg: 'bg-sky-50/30 border-sky-100',
+        badge: 'bg-sky-100 text-sky-800 border-sky-200'
+      };
+    }
+    if (cleanName.includes('duo') || cleanName.includes('dúo')) {
+      return {
+        border: 'border-l-indigo-500 border-l-4',
+        bg: 'bg-indigo-50/30 border-indigo-100',
+        badge: 'bg-indigo-100 text-indigo-800 border-indigo-200'
+      };
+    }
+    if (cleanName.includes('losa')) {
+      return {
+        border: 'border-l-rose-500 border-l-4',
+        bg: 'bg-rose-50/30 border-rose-100',
+        badge: 'bg-rose-100 text-rose-800 border-rose-200'
+      };
+    }
+    if (cleanName.includes('oasis')) {
+      return {
+        border: 'border-l-teal-500 border-l-4',
+        bg: 'bg-teal-50/30 border-teal-100',
+        badge: 'bg-teal-100 text-teal-800 border-teal-200'
+      };
+    }
+    // Default fallback
+    return {
+      border: 'border-l-slate-400 border-l-4',
+      bg: 'bg-slate-50/30 border-slate-100',
+      badge: 'bg-slate-100 text-slate-800 border-slate-200'
+    };
+  };
+
+  // Agrupamiento por Obra
+  const groupedByObra: Record<string, { name: string; encargado_name?: string | null; id?: string; list: Empleado[] }> = {};
+
+  filteredEmpleados.forEach((emp) => {
+    const isLibre = emp.status === 'Disponible' || emp.status === 'Libre' || !emp.obra_id;
+    const obraKey = isLibre ? 'Sin Asignar' : (emp.obra_id || 'Sin Asignar');
+
+    if (!groupedByObra[obraKey]) {
+      groupedByObra[obraKey] = {
+        id: isLibre ? undefined : emp.obra_id || undefined,
+        name: isLibre ? 'Operarios Libres / Disponibles' : (emp.obras?.name || 'Obra Desconocida'),
+        encargado_name: isLibre ? null : (emp.obras?.encargado_name || null),
+        list: []
+      };
+    }
+    groupedByObra[obraKey].list.push(emp);
+  });
+
+  const sortedObraKeys = Object.keys(groupedByObra).sort((a, b) => {
+    if (a === 'Sin Asignar') return -1;
+    if (b === 'Sin Asignar') return 1;
+    return groupedByObra[a].name.localeCompare(groupedByObra[b].name);
   });
 
   return (
@@ -296,88 +408,113 @@ export default function Personal() {
       {loading ? (
         <div className="text-center py-12 text-muted-foreground">Cargando personal...</div>
       ) : activeTab === 'staff' ? (
-        <div className="space-y-3">
-          {filteredEmpleados.map(emp => {
-            const isLibre = emp.status === 'Disponible' || emp.status === 'Libre' || !emp.obra_id;
-            const badgeStyle = isLibre 
-              ? 'bg-green-50 text-green-600 border-green-150' 
-              : 'bg-blue-50 text-blue-600 border-blue-150';
-
+        <div className="space-y-6">
+          {sortedObraKeys.map(obraKey => {
+            const group = groupedByObra[obraKey];
+            const theme = getObraTheme(group.name);
+            
             return (
-              <Card key={emp.id} className="overflow-hidden rounded-2xl border-slate-100 hover:shadow-sm transition-shadow bg-white">
-                <CardContent className="p-4 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    {/* Avatar */}
-                    <div className="relative shrink-0">
-                      <div className="w-12 h-12 rounded-full overflow-hidden bg-blue-50 border border-slate-100 flex items-center justify-center">
-                        {emp.photo_url ? (
-                          <img src={emp.photo_url} alt={emp.full_name} className="w-full h-full object-cover" />
-                        ) : (
-                          <HardHat className="h-6 w-6 text-blue-300" />
-                        )}
-                      </div>
-                      {isAdmin && (
-                        <button 
-                          onClick={() => { setSelectedEmpId(emp.id); fileInputRef.current?.click(); }}
-                          className="absolute -bottom-1 -right-1 bg-blue-600 text-white rounded-full p-1 shadow hover:bg-blue-700 border border-white"
-                        >
-                          <Camera className="h-3 w-3" />
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Detalles */}
-                    <div className="min-w-0 space-y-0.5">
-                      <p className="font-black text-sm text-[#031530] truncate">{emp.full_name}</p>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">
-                        {emp.specialty || 'Electricista'}
+              <div 
+                key={obraKey} 
+                className={`p-4 rounded-2xl border shadow-sm space-y-3 ${theme.border} ${theme.bg}`}
+              >
+                {/* Cabecera del Grupo (Obra) */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-2 border-b border-slate-200/50">
+                  <div>
+                    <h3 className="font-extrabold text-peie-blue text-sm md:text-base tracking-tight">{group.name}</h3>
+                    {group.encargado_name && (
+                      <p className="text-[10px] md:text-xs text-slate-500 font-semibold mt-0.5">
+                        Coordinador: <span className="text-peie-blue font-bold">{group.encargado_name}</span>
                       </p>
-                      
-                      {/* Badge y obra */}
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className={`text-[8.5px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border shrink-0 ${badgeStyle}`}>
-                          {isLibre ? 'Libre' : 'En Obra'}
-                        </span>
-                        {!isLibre && (
-                          <span className="text-[9.5px] text-slate-500 font-semibold truncate max-w-[120px]">
-                            {emp.obras?.name || 'Asignado'}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Botón de acción */}
-                  <div className="shrink-0">
-                    {isLibre ? (
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        className="text-blue-600 border-blue-200 hover:bg-blue-50/50 h-9 px-4 text-xs font-black rounded-xl"
-                        onClick={() => navigate(`/personal/trasladar/${emp.id}`)}
-                      >
-                        Asignar
-                      </Button>
-                    ) : (
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        className="text-slate-500 hover:text-blue-600 hover:bg-slate-50 border border-slate-100 h-9 px-4 text-xs font-bold rounded-xl"
-                        onClick={() => {
-                          if (emp.obra_id) {
-                            navigate('/mis-obras');
-                            toast({ title: `Operario en obra`, description: `${emp.full_name} está trabajando en ${emp.obras?.name}.` });
-                          }
-                        }}
-                      >
-                        Ver
-                      </Button>
                     )}
                   </div>
-                </CardContent>
-              </Card>
+                  <span className={`text-[10px] md:text-xs font-bold px-3 py-1 rounded-full border shadow-sm ${theme.badge}`}>
+                    {group.list.length} {group.list.length === 1 ? 'operario' : 'operarios'}
+                  </span>
+                </div>
+
+                {/* Grilla de Operarios en la Obra */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {group.list.map(emp => {
+                    const isLibre = emp.status === 'Disponible' || emp.status === 'Libre' || !emp.obra_id;
+                    const badgeStyle = isLibre 
+                      ? 'bg-green-50 text-green-600 border-green-150' 
+                      : 'bg-blue-50 text-blue-600 border-blue-150';
+
+                    return (
+                      <Card key={emp.id} className="overflow-hidden rounded-xl border-slate-100 hover:shadow-md transition-all duration-200 bg-white">
+                        <CardContent className="p-3 flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            {/* Avatar */}
+                            <div className="relative shrink-0">
+                              <div className="w-10 h-10 rounded-full overflow-hidden bg-blue-50 border border-slate-100 flex items-center justify-center">
+                                {emp.photo_url ? (
+                                  <img src={emp.photo_url} alt={emp.full_name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <HardHat className="h-5 w-5 text-blue-300" />
+                                )}
+                              </div>
+                              {isAdmin && (
+                                <button 
+                                  onClick={() => { setSelectedEmpId(emp.id); fileInputRef.current?.click(); }}
+                                  className="absolute -bottom-1 -right-1 bg-blue-600 text-white rounded-full p-1 shadow hover:bg-blue-700 border border-white"
+                                >
+                                  <Camera className="h-2.5 w-2.5" />
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Detalles */}
+                            <div className="min-w-0 space-y-0.5">
+                              <p className="font-extrabold text-xs text-[#031530] truncate">{emp.full_name}</p>
+                              <p className="text-[9px] text-slate-450 font-bold uppercase tracking-wide">
+                                {emp.specialty || 'Electricista'}
+                              </p>
+                              
+                              <div className="flex items-center gap-1.5 mt-1">
+                                <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full border shrink-0 ${badgeStyle}`}>
+                                  {isLibre ? 'Libre' : 'En Obra'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Botón de acción */}
+                          <div className="shrink-0">
+                            {isLibre ? (
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                className="text-blue-600 border-blue-200 hover:bg-blue-50/50 h-8 px-3 text-[11px] font-black rounded-lg"
+                                onClick={() => navigate(`/personal/trasladar/${emp.id}`)}
+                              >
+                                Asignar
+                              </Button>
+                            ) : (
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                className="text-slate-500 hover:text-blue-600 hover:bg-slate-50 border border-slate-100 h-8 px-3 text-[11px] font-bold rounded-lg"
+                                onClick={() => {
+                                  if (emp.obra_id) {
+                                    navigate('/mis-obras');
+                                    toast({ title: `Operario en obra`, description: `${emp.full_name} está trabajando en ${emp.obras?.name}.` });
+                                  }
+                                }}
+                              >
+                                Ver
+                              </Button>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
             );
           })}
+          
           {filteredEmpleados.length === 0 && (
             <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-200">
               <HardHat className="mx-auto h-12 w-12 text-slate-350 mb-2" />
