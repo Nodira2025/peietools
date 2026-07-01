@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Building, Plus, Trash2, Edit, Search } from 'lucide-react';
+import { Building, Plus, Trash2, Edit, Search, Power } from 'lucide-react';
+import { useAuthStore } from '../store/auth';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import FilterBar from '../components/FilterBar';
 
@@ -22,6 +23,8 @@ interface Obra {
 }
 
 export default function Obras() {
+  const { profile } = useAuthStore();
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'logistica';
   const [obras, setObras] = useState<Obra[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -94,15 +97,18 @@ export default function Obras() {
         return acc;
       }, {});
 
-      // Mostrar únicamente las obras activas con encargado asignado, herramientas y personal
-      const activeObrasWithAssets = (obrasData || []).filter(o => {
+      // Si es admin, mostrar todas. Si no es admin, mostrar solo las dinámicamente activas (con herramientas y personal)
+      const filteredData = (obrasData || []).filter(o => {
+        if (isAdmin) {
+          return true; // Los administradores ven todas las obras
+        }
         const hasManager = o.encargado_name && o.encargado_name.trim() !== '';
         const hasTools = (toolsMap[o.id] || 0) > 0;
         const hasPersonnel = (empsMap[o.id] || 0) > 0;
         return o.active && hasManager && hasTools && hasPersonnel;
       });
 
-      setObras(activeObrasWithAssets);
+      setObras(filteredData);
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar las obras' });
     } finally {
@@ -112,7 +118,7 @@ export default function Obras() {
 
   useEffect(() => {
     fetchObras();
-  }, []);
+  }, [profile]);
 
   const resetForm = () => {
     setCode(''); setName(''); setAddress(''); setManager(''); setPhone(''); 
@@ -179,6 +185,30 @@ export default function Obras() {
       toast({ variant: 'destructive', title: 'Error', description: error.message });
     } else {
       toast({ title: 'Éxito', description: 'Obra eliminada correctamente' });
+      fetchObras();
+    }
+  };
+
+  const handleToggleActive = async (obra: Obra) => {
+    const newActiveState = !obra.active;
+    const confirmMessage = newActiveState 
+      ? `¿Estás seguro de que deseas ACTIVAR la obra "${obra.name}"?`
+      : `¿Estás seguro de que deseas DESACTIVAR la obra "${obra.name}"?`;
+      
+    if (!window.confirm(confirmMessage)) return;
+
+    const { error } = await supabase
+      .from('obras')
+      .update({ active: newActiveState })
+      .eq('id', obra.id);
+
+    if (error) {
+      toast({ variant: 'destructive', title: 'Error', description: error.message });
+    } else {
+      toast({ 
+        title: 'Éxito', 
+        description: `Obra ${newActiveState ? 'activada' : 'desactivada'} correctamente.` 
+      });
       fetchObras();
     }
   };
@@ -317,6 +347,17 @@ export default function Obras() {
                   </div>
                 </div>
                 <div className="flex gap-1 -mr-2 -mt-2">
+                  {isAdmin && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className={`${obra.active ? 'text-green-600 hover:bg-green-50' : 'text-slate-400 hover:bg-slate-100 hover:text-green-600'}`}
+                      onClick={() => handleToggleActive(obra)}
+                      title={obra.active ? 'Desactivar Obra' : 'Activar Obra'}
+                    >
+                      <Power className="h-4 w-4" />
+                    </Button>
+                  )}
                   <Button 
                     variant="ghost" 
                     size="icon" 
