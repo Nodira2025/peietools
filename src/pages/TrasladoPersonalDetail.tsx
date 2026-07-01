@@ -22,6 +22,7 @@ export default function TrasladoPersonalDetail() {
   const receiptRef = useRef<HTMLDivElement>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [rejecting, setRejecting] = useState(false);
+  const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
 
   useEffect(() => {
     if (id) fetchTraslado();
@@ -62,7 +63,7 @@ export default function TrasladoPersonalDetail() {
     }
   };
 
-  const confirmarRecepcion = async () => {
+  const confirmarRecepcion = async (notifyWhatsApp: boolean) => {
     if (!traslado || !profile) return;
 
     try {
@@ -95,8 +96,10 @@ export default function TrasladoPersonalDetail() {
         className: 'bg-emerald-50 border-emerald-200'
       });
 
-      // 3. Generar WhatsApp al Encargado Origen (requester)
-      if (traslado.requester?.whatsapp) {
+      setIsConfirmDialogOpen(false);
+
+      // 3. Generar WhatsApp al Encargado Origen (requester) si se seleccionó
+      if (notifyWhatsApp && traslado.requester?.whatsapp) {
         const msg = [
           '*RECEPCIÓN DE PERSONAL CONFIRMADA*',
           '',
@@ -207,7 +210,7 @@ export default function TrasladoPersonalDetail() {
       if (error) throw error;
 
       toast({ title: 'Traslado Eliminado', description: 'El traslado de personal fue borrado de la base de datos.' });
-      navigate('/pedidos-personal');
+      navigate('/personal?tab=history');
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: error.message });
     }
@@ -239,7 +242,7 @@ export default function TrasladoPersonalDetail() {
   return (
     <div className="space-y-6 max-w-2xl mx-auto pb-safe">
       <div className="flex items-center mb-4">
-        <Button variant="ghost" onClick={() => navigate('/personal')} className="p-0 hover:bg-transparent">
+        <Button variant="ghost" onClick={() => navigate('/personal?tab=history')} className="p-0 hover:bg-transparent">
           <ArrowLeft className="mr-2 h-4 w-4" /> Volver
         </Button>
       </div>
@@ -301,12 +304,53 @@ export default function TrasladoPersonalDetail() {
                 <p className="text-xs text-emerald-600/80 mt-1">Presioná confirmar cuando el empleado llegue al lugar.</p>
               </div>
               <Button 
-                onClick={confirmarRecepcion}
+                onClick={() => setIsConfirmDialogOpen(true)}
                 className="bg-gradient-to-r from-emerald-600 to-green-500 hover:from-emerald-700 hover:to-green-600 text-white font-bold w-full h-14 rounded-xl shadow-lg text-base"
               >
                 <CheckCircle className="mr-2 h-5 w-5" />
                 Confirmar Recepción
               </Button>
+
+              <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
+                <DialogContent className="rounded-3xl w-[90%] max-w-md bg-white">
+                  <DialogHeader>
+                    <DialogTitle className="text-peie-blue font-bold text-lg flex items-center gap-2">
+                      <CheckCircle className="text-emerald-500 h-5 w-5" />
+                      Confirmar Recepción
+                    </DialogTitle>
+                    <CardDescription className="text-slate-500 mt-1">
+                      ¿Deseás notificar por WhatsApp al encargado que solicitó el traslado o solo querés registrar los cambios en el sistema?
+                    </CardDescription>
+                  </DialogHeader>
+                  <div className="py-2 space-y-2">
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs text-slate-600 space-y-1">
+                      <p><strong>Operario:</strong> {traslado.empleados.full_name}</p>
+                      <p><strong>Obra Destino:</strong> {traslado.target_obra?.name}</p>
+                    </div>
+                  </div>
+                  <DialogFooter className="flex flex-col sm:flex-row gap-2 mt-2">
+                    <Button 
+                      variant="outline" 
+                      className="rounded-xl flex-1 border-slate-200 text-slate-600 font-bold"
+                      onClick={() => setIsConfirmDialogOpen(false)}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button 
+                      className="rounded-xl flex-1 bg-slate-700 hover:bg-slate-800 text-white font-bold"
+                      onClick={() => confirmarRecepcion(false)}
+                    >
+                      Solo Sistema
+                    </Button>
+                    <Button 
+                      className="rounded-xl flex-1 bg-green-600 hover:bg-green-700 text-white font-bold flex items-center justify-center gap-1.5"
+                      onClick={() => confirmarRecepcion(true)}
+                    >
+                      <Share2 size={14} /> WhatsApp
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
           )}
 

@@ -35,7 +35,13 @@ export default function Personal() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
-  const [activeTab, setActiveTab] = useState<'staff' | 'history'>('staff');
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState<'staff' | 'history'>(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'history') return 'history';
+    return 'staff';
+  });
   const [historial, setHistorial] = useState<any[]>([]);
   const [filterObra, setFilterObra] = useState('');
   const [filterSpecialty, setFilterSpecialty] = useState('');
