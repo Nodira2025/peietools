@@ -56,7 +56,12 @@ export default function Herramientas() {
         .select('*, obras(name, encargado_name)')
         .order('name');
       if (error) throw error;
-      setHerramientas(data || []);
+
+      const normalizedData = (data || []).map((h: any) => ({
+        ...h,
+        obras: Array.isArray(h.obras) ? h.obras[0] : h.obras
+      }));
+      setHerramientas(normalizedData);
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar las herramientas' });
       console.error(error);

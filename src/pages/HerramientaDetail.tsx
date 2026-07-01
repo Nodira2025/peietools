@@ -84,7 +84,11 @@ export default function HerramientaDetail() {
       toast({ variant: 'destructive', title: 'Error', description: 'No se encontró la herramienta.' });
       navigate('/herramientas');
     } else {
-      setHerramienta(data);
+      const normalizedData = {
+        ...data,
+        obras: Array.isArray(data?.obras) ? data.obras[0] : data?.obras
+      };
+      setHerramienta(normalizedData);
     }
     setLoading(false);
   };
