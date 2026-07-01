@@ -46,6 +46,10 @@ export default function Personal() {
   const [filterObra, setFilterObra] = useState('');
   const [filterSpecialty, setFilterSpecialty] = useState('');
   
+  // Filtros de fecha para el historial
+  const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'month' | 'custom' | 'all'>('today');
+  const [specificDate, setSpecificDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  
   // Opciones para filtros
   const [obrasOpciones, setObrasOpciones] = useState<{id: string, name: string}[]>([]);
   const [specialtiesOpciones, setSpecialtiesOpciones] = useState<{value: string, label: string}[]>([]);
@@ -298,6 +302,44 @@ export default function Personal() {
     return { obrasConPersonal: con, obrasSinPersonal: sin };
   }, [obrasOpciones, empleados]);
 
+  // Filtrado de historial por rangos de fecha
+  const filteredHistorial = useMemo(() => {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    // Inicio de la semana (Lunes)
+    const dayOfWeek = now.getDay();
+    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday);
+    
+    // Inicio del mes
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    return historial.filter(h => {
+      const createdDate = new Date(h.created_at);
+      
+      switch (dateFilter) {
+        case 'today':
+          return createdDate >= startOfToday;
+        case 'week':
+          return createdDate >= startOfWeek;
+        case 'month':
+          return createdDate >= startOfMonth;
+        case 'custom':
+          if (!specificDate) return true;
+          const targetDate = new Date(specificDate + 'T00:00:00'); // Evita desfases de huso horario
+          return (
+            createdDate.getFullYear() === targetDate.getFullYear() &&
+            createdDate.getMonth() === targetDate.getMonth() &&
+            createdDate.getDate() === targetDate.getDate()
+          );
+        case 'all':
+        default:
+          return true;
+      }
+    });
+  }, [historial, dateFilter, specificDate]);
+
   return (
     <div className="space-y-5 pb-safe">
       <div className="flex items-center justify-between">
@@ -546,30 +588,81 @@ export default function Personal() {
           )}
         </div>
       ) : (
-        <div className="space-y-3">
-          {historial.map(h => (
-            <Card key={h.id} className="rounded-xl border-slate-100 shadow-sm" onClick={() => navigate(`/personal/traslados/${h.id}`)}>
-              <CardContent className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors">
-                <div className="space-y-1">
-                  <p className="text-sm font-bold text-slate-800">{h.empleados?.full_name}</p>
-                  <p className="text-[10px] text-slate-400 flex items-center gap-1">
-                    {h.source_obra?.name || 'Origen'} → {h.target_obra?.name || 'Destino'}
-                  </p>
-                  <p className="text-[9px] text-slate-300">Solicitado: {new Date(h.created_at).toLocaleDateString()}</p>
-                </div>
-                <div className={`px-2 py-1 rounded-full text-[10px] font-bold ${
-                  h.status === 'Pendiente' ? 'bg-orange-100 text-orange-700' : 
-                  h.status === 'Completado' ? 'bg-green-100 text-green-700' : 
-                  'bg-slate-100 text-slate-600'
-                }`}>
-                  {h.status}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-          {historial.length === 0 && (
-            <div className="text-center py-12 text-slate-400">No hay movimientos registrados.</div>
-          )}
+        <div className="space-y-4">
+          {/* Selector de Rango de Fecha */}
+          <div className="flex flex-col gap-2.5 p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Filtrar Historial por Fecha</p>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { value: 'today', label: 'Hoy' },
+                { value: 'week', label: 'Semana' },
+                { value: 'month', label: 'Mes' },
+                { value: 'custom', label: 'Fecha específica' },
+                { value: 'all', label: 'Todos' }
+              ].map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => setDateFilter(opt.value as any)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    dateFilter === opt.value
+                      ? 'bg-blue-600 text-white shadow-sm hover:bg-blue-700'
+                      : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-150'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            
+            {/* Input de Fecha Especifica */}
+            {dateFilter === 'custom' && (
+              <div className="pt-1.5 flex items-center gap-2">
+                <input
+                  type="date"
+                  value={specificDate}
+                  onChange={e => setSpecificDate(e.target.value)}
+                  className="h-9 rounded-xl border border-slate-200 px-3 text-xs bg-white text-slate-700 font-semibold shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-600"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Listado de Movimientos Filtrados */}
+          <div className="space-y-3">
+            {filteredHistorial.map(h => (
+              <Card key={h.id} className="rounded-xl border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200" onClick={() => navigate(`/personal/traslados/${h.id}`)}>
+                <CardContent className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50/50 transition-colors">
+                  <div className="space-y-1">
+                    <p className="text-sm font-extrabold text-slate-800">{h.empleados?.full_name}</p>
+                    <p className="text-[10px] text-slate-400 flex items-center gap-1 font-semibold">
+                      {h.source_obra?.name || 'Origen'} → {h.target_obra?.name || 'Destino'}
+                    </p>
+                    <p className="text-[9px] text-slate-300 font-medium">Solicitado: {new Date(h.created_at).toLocaleDateString()}</p>
+                  </div>
+                  <div className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border ${
+                    h.status === 'Pendiente' ? 'bg-orange-50 text-orange-600 border-orange-150' : 
+                    h.status === 'Confirmado' ? 'bg-green-50 text-green-600 border-green-150' : 
+                    'bg-slate-50 text-slate-600 border-slate-150'
+                  }`}>
+                    {h.status}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+            {filteredHistorial.length === 0 && (
+              <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-200">
+                <Clock className="mx-auto h-12 w-12 text-slate-350 mb-2 animate-pulse" />
+                <p className="text-sm font-bold text-slate-500">No hay movimientos registrados</p>
+                <p className="text-xs text-slate-400 mt-1">
+                  {dateFilter === 'today' ? 'No se registraron traslados hoy.' :
+                   dateFilter === 'week' ? 'No hay traslados esta semana.' :
+                   dateFilter === 'month' ? 'No hay traslados este mes.' :
+                   dateFilter === 'custom' ? `No hay traslados para la fecha ${new Date(specificDate + 'T00:00:00').toLocaleDateString()}.` :
+                   'No hay movimientos en el sistema.'}
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
