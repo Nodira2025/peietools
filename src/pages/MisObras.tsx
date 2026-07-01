@@ -100,7 +100,7 @@ export default function MisObras() {
       const toolCount = toolsMap[o.id] || 0;
       const empCount = empsMap[o.id] || 0;
       const hasManager = !!o.encargado_name && o.encargado_name.trim() !== '';
-      const hasAssets = toolCount > 0 || empCount > 0;
+      const hasAssets = toolCount > 0 && empCount > 0;
       const isDinamicaActiva = hasManager && hasAssets;
 
       return {

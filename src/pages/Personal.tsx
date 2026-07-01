@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Card, CardContent } from '@/components/ui/card';
@@ -41,7 +41,7 @@ export default function Personal() {
   const [filterSpecialty, setFilterSpecialty] = useState('');
   
   // Opciones para filtros
-  const [obrasOpciones, setObrasOpciones] = useState<{value: string, label: string}[]>([]);
+  const [obrasOpciones, setObrasOpciones] = useState<{id: string, name: string}[]>([]);
   const [specialtiesOpciones, setSpecialtiesOpciones] = useState<{value: string, label: string}[]>([]);
 
   // Camera file upload state
@@ -129,7 +129,7 @@ export default function Personal() {
     // Fetch Filter Options
     const { data: obrasData } = await supabase.from('obras').select('id, name, encargado_name').eq('active', true);
     if (obrasData) {
-      setObrasOpciones(obrasData.map(o => ({ value: o.id, label: o.name })));
+      setObrasOpciones(obrasData.map(o => ({ id: o.id, name: o.name })));
     }
 
     setLoading(false);
@@ -285,6 +285,13 @@ export default function Personal() {
     return groupedByObra[a].name.localeCompare(groupedByObra[b].name);
   });
 
+  // Dividir obras con y sin personal
+  const { obrasConPersonal, obrasSinPersonal } = useMemo(() => {
+    const con = obrasOpciones.filter(o => empleados.some(e => e.obra_id === o.id));
+    const sin = obrasOpciones.filter(o => !empleados.some(e => e.obra_id === o.id));
+    return { obrasConPersonal: con, obrasSinPersonal: sin };
+  }, [obrasOpciones, empleados]);
+
   return (
     <div className="space-y-5 pb-safe">
       <div className="flex items-center justify-between">
@@ -382,7 +389,16 @@ export default function Personal() {
             className="h-9 rounded-xl border border-slate-200 px-3 text-xs bg-white text-slate-700 font-semibold shadow-sm focus:outline-none"
           >
             <option value="">Obra: Todas</option>
-            {obrasOpciones.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            {obrasConPersonal.length > 0 && (
+              <optgroup label="Con Personal">
+                {obrasConPersonal.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+              </optgroup>
+            )}
+            {obrasSinPersonal.length > 0 && (
+              <optgroup label="Sin Personal (Futuras)">
+                {obrasSinPersonal.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+              </optgroup>
+            )}
           </select>
 
           <select 

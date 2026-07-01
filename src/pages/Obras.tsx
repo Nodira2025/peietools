@@ -67,14 +67,42 @@ export default function Obras() {
   const fetchObras = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.from('obras').select('*').order('name');
-      if (error) throw error;
       
-      // Mostrar únicamente las obras activas con encargado asignado
-      const activeObrasWithManager = (data || []).filter(o => 
-        o.active && o.encargado_name && o.encargado_name.trim() !== ''
-      );
-      setObras(activeObrasWithManager);
+      const [
+        { data: obrasData, error: obrasError },
+        { data: toolsData, error: toolsError },
+        { data: empsData, error: empsError }
+      ] = await Promise.all([
+        supabase.from('obras').select('*').order('name'),
+        supabase.from('herramientas').select('current_obra_id'),
+        supabase.from('empleados').select('obra_id')
+      ]);
+
+      if (obrasError) throw obrasError;
+      if (toolsError) throw toolsError;
+      if (empsError) throw empsError;
+
+      // Mapear cuántas herramientas tiene cada obra
+      const toolsMap = (toolsData || []).reduce((acc: any, t: any) => {
+        if (t.current_obra_id) acc[t.current_obra_id] = (acc[t.current_obra_id] || 0) + 1;
+        return acc;
+      }, {});
+
+      // Mapear cuántos empleados tiene cada obra
+      const empsMap = (empsData || []).reduce((acc: any, e: any) => {
+        if (e.obra_id) acc[e.obra_id] = (acc[e.obra_id] || 0) + 1;
+        return acc;
+      }, {});
+
+      // Mostrar únicamente las obras activas con encargado asignado, herramientas y personal
+      const activeObrasWithAssets = (obrasData || []).filter(o => {
+        const hasManager = o.encargado_name && o.encargado_name.trim() !== '';
+        const hasTools = (toolsMap[o.id] || 0) > 0;
+        const hasPersonnel = (empsMap[o.id] || 0) > 0;
+        return o.active && hasManager && hasTools && hasPersonnel;
+      });
+
+      setObras(activeObrasWithAssets);
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar las obras' });
     } finally {

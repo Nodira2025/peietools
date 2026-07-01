@@ -71,7 +71,9 @@ export default function Dashboard() {
           { data: personalPendingData, error: personalPendingError },
           { data: toolsActiveData, error: toolsActiveError },
           { count: availTools, error: availToolsError },
-          { count: activeObras, error: activeObrasError }
+          { data: activeObrasData, error: activeObrasError },
+          { data: allToolsData, error: allToolsError },
+          { data: allEmpsData, error: allEmpsError }
         ] = await Promise.all([
           // Pending tools
           supabase.from('solicitudes').select('id, requester_id, assigned_to').eq('status', 'Pendiente'),
@@ -85,8 +87,12 @@ export default function Dashboard() {
           supabase.from('solicitudes').select('id, requester_id, assigned_to, status').in('status', ['Asignada', 'En retiro', 'En traslado']),
           // Available tools
           supabase.from('herramientas').select('id', { count: 'exact', head: true }).eq('status', 'Disponible'),
-          // Active sites
-          supabase.from('obras').select('id', { count: 'exact', head: true }).eq('active', true),
+          // Active sites in DB
+          supabase.from('obras').select('id, encargado_name').eq('active', true),
+          // All tools locations
+          supabase.from('herramientas').select('current_obra_id'),
+          // All employees locations
+          supabase.from('empleados').select('obra_id')
         ]);
 
         if (toolsPendingError) throw toolsPendingError;
@@ -94,6 +100,8 @@ export default function Dashboard() {
         if (toolsActiveError) throw toolsActiveError;
         if (availToolsError) throw availToolsError;
         if (activeObrasError) throw activeObrasError;
+        if (allToolsError) throw allToolsError;
+        if (allEmpsError) throw allEmpsError;
 
         const isAdmin = profile?.role?.toLowerCase() === 'admin';
         const userFullName = profile?.full_name?.toLowerCase().trim() || '';
@@ -135,6 +143,26 @@ export default function Dashboard() {
           activeMovements: aTools + pPersonal
         });
 
+        // Mapear cuántas herramientas tiene cada obra
+        const toolsMap = (allToolsData || []).reduce((acc: any, t: any) => {
+          if (t.current_obra_id) acc[t.current_obra_id] = (acc[t.current_obra_id] || 0) + 1;
+          return acc;
+        }, {});
+
+        // Mapear cuántos empleados tiene cada obra
+        const empsMap = (allEmpsData || []).reduce((acc: any, e: any) => {
+          if (e.obra_id) acc[e.obra_id] = (acc[e.obra_id] || 0) + 1;
+          return acc;
+        }, {});
+
+        // Filtrar obras activas que tienen encargado, herramientas y personal
+        const activeSitesCount = (activeObrasData || []).filter((o: any) => {
+          const hasManager = o.encargado_name && o.encargado_name.trim() !== '';
+          const hasTools = (toolsMap[o.id] || 0) > 0;
+          const hasPersonnel = (empsMap[o.id] || 0) > 0;
+          return hasManager && hasTools && hasPersonnel;
+        }).length;
+
         // Desktop stats
         const activeRequestsCount = pTools + aTools + pPersonal;
 
@@ -142,7 +170,7 @@ export default function Dashboard() {
           activeRequests: activeRequestsCount,
           availableTools: availTools || 0,
           inTransit: transitToolsCount || 0,
-          activeSites: activeObras || 0
+          activeSites: activeSitesCount
         });
 
         // Fetch recent activities
