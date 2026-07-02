@@ -5,9 +5,12 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { HardHat, Search, Clock, Camera } from 'lucide-react';
+import { HardHat, Search, Clock, Camera, Plus, Trash2, Edit2, Check } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { compressImage } from '../lib/imageUtils';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Empleado {
   id: string;
@@ -16,6 +19,7 @@ interface Empleado {
   status: 'Disponible' | 'En traslado' | 'Trabajando' | 'Libre';
   specialty: string | null;
   photo_url: string | null;
+  whatsapp: string | null;
   obras: { name: string; encargado_name: string | null } | null;
 }
 
@@ -60,6 +64,77 @@ export default function Personal() {
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'logistica';
 
+  // Profile modal state
+  const [selectedEmpForProfile, setSelectedEmpForProfile] = useState<Empleado | null>(null);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [profileForm, setProfileForm] = useState<{
+    full_name: string;
+    specialty: string;
+    whatsapp: string;
+    status: 'Disponible' | 'En traslado' | 'Trabajando' | 'Libre';
+    photo_url: string | null;
+  }>({
+    full_name: '',
+    specialty: '',
+    whatsapp: '',
+    status: 'Disponible',
+    photo_url: null
+  });
+  const [profileUpdating, setProfileUpdating] = useState(false);
+  const profilePhotoInputRef = useRef<HTMLInputElement>(null);
+
+  const handleOpenProfile = (emp: Empleado) => {
+    setSelectedEmpForProfile(emp);
+    setProfileForm({
+      full_name: emp.full_name,
+      specialty: emp.specialty || '',
+      whatsapp: emp.whatsapp || '',
+      status: emp.status,
+      photo_url: emp.photo_url
+    });
+    setIsProfileOpen(true);
+  };
+
+  const handleProfilePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const compressed = await compressImage(file);
+      setProfileForm(prev => ({ ...prev, photo_url: compressed }));
+    } catch {
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo procesar la imagen.' });
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    if (!selectedEmpForProfile) return;
+    setProfileUpdating(true);
+    try {
+      const { error } = await supabase
+        .from('empleados')
+        .update({
+          full_name: profileForm.full_name,
+          specialty: profileForm.specialty,
+          whatsapp: profileForm.whatsapp || null,
+          status: profileForm.status,
+          photo_url: profileForm.photo_url
+        })
+        .eq('id', selectedEmpForProfile.id);
+
+      if (error) {
+        toast({ variant: 'destructive', title: 'Error', description: error.message });
+      } else {
+        toast({ title: 'Perfil actualizado', description: 'Los datos del empleado fueron guardados.' });
+        setIsProfileOpen(false);
+        fetchData();
+      }
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar el perfil.' });
+    } finally {
+      setProfileUpdating(false);
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, [profile]);
@@ -71,7 +146,7 @@ export default function Personal() {
     // Fetch Empleados
     const { data: empData, error: empError } = await supabase
       .from('empleados')
-      .select('id, full_name, obra_id, status, specialty, photo_url, obras:obra_id(name, encargado_name)')
+      .select('id, full_name, obra_id, status, specialty, photo_url, whatsapp, obras:obra_id(name, encargado_name)')
       .order('full_name');
       
     if (empError) {
@@ -84,6 +159,7 @@ export default function Personal() {
         status: e.status || (e.obra_id ? 'Trabajando' : 'Disponible'),
         specialty: e.specialty || 'Electricista',
         photo_url: e.photo_url,
+        whatsapp: e.whatsapp || null,
         obras: Array.isArray(e.obras) ? e.obras[0] : e.obras
       }));
       setEmpleados(dataWithDefaults as Empleado[]);
@@ -530,7 +606,13 @@ export default function Personal() {
 
                             {/* Detalles */}
                             <div className="min-w-0 space-y-0.5">
-                              <p className="font-extrabold text-xs text-[#031530] truncate">{emp.full_name}</p>
+                              <p 
+                                className="font-extrabold text-xs text-[#031530] truncate cursor-pointer hover:underline hover:text-blue-600 transition-colors"
+                                onClick={() => handleOpenProfile(emp)}
+                                title="Ver y editar perfil"
+                              >
+                                {emp.full_name}
+                              </p>
                               <p className="text-[9px] text-slate-450 font-bold uppercase tracking-wide">
                                 {emp.specialty || 'Electricista'}
                               </p>
@@ -693,6 +775,137 @@ export default function Personal() {
           e.target.value = '';
         }}
       />
+
+      {/* Modal de Perfil de Empleado (Ver y Editar) */}
+      <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
+        <DialogContent className="rounded-3xl w-[95%] max-w-md bg-white border-slate-100 shadow-xl overflow-hidden p-0">
+          <div className="bg-gradient-to-r from-[#031530] to-[#042454] text-white p-5 pb-6 relative">
+            <DialogHeader className="text-left space-y-1">
+              <DialogTitle className="text-xl font-extrabold tracking-tight">Ficha del Operario</DialogTitle>
+              <p className="text-slate-350 text-xs font-semibold">Visualización y edición de datos básicos</p>
+            </DialogHeader>
+
+            {/* Avatar en cabecera */}
+            <div className="absolute -bottom-10 right-6">
+              <div className="relative group">
+                <div className="w-20 h-20 rounded-2xl overflow-hidden bg-slate-50 border-4 border-white shadow-md flex items-center justify-center">
+                  {profileForm.photo_url ? (
+                    <img src={profileForm.photo_url} alt={profileForm.full_name} className="w-full h-full object-cover" />
+                  ) : (
+                    <HardHat className="h-10 w-10 text-slate-400" />
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => profilePhotoInputRef.current?.click()}
+                  className="absolute -bottom-1 -right-1 bg-blue-600 text-white rounded-lg p-1.5 shadow-md hover:bg-blue-700 border-2 border-white transition-all duration-200"
+                  title="Cambiar Foto"
+                >
+                  <Camera className="h-3 w-3" />
+                </button>
+                <input
+                  type="file"
+                  ref={profilePhotoInputRef}
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleProfilePhotoChange}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6 pt-12 space-y-4">
+            {/* Campo Nombre */}
+            <div className="space-y-1">
+              <Label htmlFor="profile-name" className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nombre Completo</Label>
+              <Input
+                id="profile-name"
+                value={profileForm.full_name}
+                onChange={e => setProfileForm(prev => ({ ...prev, full_name: e.target.value }))}
+                className="rounded-xl border-slate-200 focus-visible:ring-blue-600 font-semibold text-slate-800"
+                placeholder="Ej: Pérez, Juan Carlos"
+              />
+            </div>
+
+            {/* Campo Especialidad */}
+            <div className="space-y-1">
+              <Label htmlFor="profile-specialty" className="text-xs font-bold text-slate-500 uppercase tracking-wider">Especialidad</Label>
+              <Input
+                id="profile-specialty"
+                value={profileForm.specialty}
+                onChange={e => setProfileForm(prev => ({ ...prev, specialty: e.target.value }))}
+                className="rounded-xl border-slate-200 focus-visible:ring-blue-600 font-semibold text-slate-800"
+                placeholder="Ej: Electricista, Ayudante, Oficial"
+              />
+            </div>
+
+            {/* Campo WhatsApp / Teléfono */}
+            <div className="space-y-1">
+              <Label htmlFor="profile-whatsapp" className="text-xs font-bold text-slate-500 uppercase tracking-wider">WhatsApp / Teléfono</Label>
+              <Input
+                id="profile-whatsapp"
+                value={profileForm.whatsapp || ''}
+                onChange={e => setProfileForm(prev => ({ ...prev, whatsapp: e.target.value }))}
+                className="rounded-xl border-slate-200 focus-visible:ring-blue-600 font-semibold text-slate-800"
+                placeholder="Ej: +54 9 381..."
+              />
+            </div>
+
+            {/* Campo Estado */}
+            <div className="space-y-1">
+              <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Estado de Disponibilidad</Label>
+              <Select
+                value={profileForm.status}
+                onValueChange={(val: any) => setProfileForm(prev => ({ ...prev, status: val }))}
+              >
+                <SelectTrigger className="rounded-xl border-slate-200 focus:ring-blue-600 font-semibold text-slate-800 bg-white">
+                  <SelectValue placeholder="Seleccione un estado" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-slate-100 bg-white shadow-md">
+                  <SelectItem value="Disponible" className="font-semibold text-slate-700">Disponible</SelectItem>
+                  <SelectItem value="Trabajando" className="font-semibold text-slate-700">Trabajando</SelectItem>
+                  <SelectItem value="En traslado" className="font-semibold text-slate-700">En traslado</SelectItem>
+                  <SelectItem value="Libre" className="font-semibold text-slate-700">Libre</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Obra Actual (Lectura) */}
+            {selectedEmpForProfile?.obras && (
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Obra Asignada Actualmente</p>
+                <p className="text-xs font-extrabold text-peie-blue">{selectedEmpForProfile.obras.name}</p>
+                {selectedEmpForProfile.obras.encargado_name && (
+                  <p className="text-[9px] text-slate-500 font-medium">Coordinador: {selectedEmpForProfile.obras.encargado_name}</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="bg-slate-50 p-4 border-t border-slate-100 gap-2 sm:gap-0 rounded-b-3xl">
+            <DialogClose asChild>
+              <Button 
+                variant="ghost" 
+                className="rounded-xl hover:bg-slate-200 text-slate-600 font-bold text-xs"
+              >
+                Cancelar
+              </Button>
+            </DialogClose>
+            <Button
+              onClick={handleSaveProfile}
+              disabled={profileUpdating || !profileForm.full_name.trim()}
+              className="bg-blue-600 text-white hover:bg-blue-700 rounded-xl font-extrabold text-xs px-5 shadow-md shadow-blue-600/10 flex items-center gap-1.5"
+            >
+              {profileUpdating ? 'Guardando...' : (
+                <>
+                  <Check className="h-3.5 w-3.5" />
+                  Guardar Cambios
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
