@@ -17,17 +17,32 @@ import {
   Search,
   HelpCircle,
   ArrowRight,
-  MessageCircle
+  MessageCircle,
+  LogOut,
+  Info,
+  ChevronDown
 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuLabel, 
+  DropdownMenuSeparator, 
+  DropdownMenuTrigger 
+} from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { profile } = useAuthStore();
+  const { profile, signOut } = useAuthStore();
   const { toast } = useToast();
 
   const [deviceMode] = useState<'auto' | 'mobile' | 'desktop'>(() => {
     return (localStorage.getItem('login_device_mode') as any) || 'auto';
   });
+
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   const mobileDashboardClass = deviceMode === 'mobile'
     ? 'block space-y-5 max-w-md mx-auto px-2'
@@ -711,21 +726,64 @@ export default function Dashboard() {
 
           {/* Botones de acción y perfil del usuario */}
           <div className="flex items-center gap-4">
-            <button className="p-2 text-slate-400 hover:text-peie-blue hover:bg-slate-50 rounded-full transition-all" aria-label="Buscar">
+            <button 
+              onClick={() => navigate('/herramientas')}
+              className="p-2 text-slate-400 hover:text-peie-blue hover:bg-slate-50 rounded-full transition-all" 
+              aria-label="Buscar"
+            >
               <Search size={20} />
             </button>
-            <button className="p-2 text-slate-400 hover:text-peie-blue hover:bg-slate-50 rounded-full transition-all" aria-label="Ayuda">
+            <button 
+              onClick={() => setIsHelpOpen(true)}
+              className="p-2 text-slate-400 hover:text-peie-blue hover:bg-slate-50 rounded-full transition-all" 
+              aria-label="Ayuda"
+            >
               <HelpCircle size={20} />
             </button>
             
-            {/* Avatar */}
-            <div className="flex items-center gap-2 cursor-pointer bg-white border border-slate-100 shadow-[0_8px_30px_rgba(0,0,0,0.02)] hover:bg-slate-50 p-1.5 px-3 rounded-xl transition-all">
-              <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shadow-sm">
-                {profile?.full_name?.charAt(0).toUpperCase() || 'U'}
-              </div>
-              <span className="text-xs font-bold text-slate-700 capitalize">{profile?.full_name?.split(' ')[0]}</span>
-              <ChevronRight size={12} className="text-slate-400 rotate-90" />
-            </div>
+            {/* Avatar Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <div className="flex items-center gap-2 cursor-pointer bg-white border border-slate-100 shadow-[0_8px_30px_rgba(0,0,0,0.02)] hover:bg-slate-50 p-1.5 px-3 rounded-xl transition-all select-none">
+                  <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shadow-sm">
+                    {profile?.full_name?.charAt(0).toUpperCase() || 'U'}
+                  </div>
+                  <span className="text-xs font-bold text-slate-700 capitalize">{profile?.full_name?.split(' ')[0]}</span>
+                  <ChevronDown size={12} className="text-slate-400" />
+                </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 bg-white border border-slate-100 shadow-xl rounded-xl p-1.5">
+                <DropdownMenuLabel className="px-2.5 py-2 text-xs">
+                  <p className="font-bold text-slate-800 truncate">{profile?.full_name || 'Usuario'}</p>
+                  <p className="text-[10px] text-slate-400 capitalize mt-0.5">
+                    {profile?.role === 'solicitante' ? 'Coordinador' : (profile?.role === 'logistica' ? 'Logística' : 'Administrador')}
+                  </p>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-slate-100 my-1" />
+                <DropdownMenuItem 
+                  onClick={() => navigate('/mis-obras')}
+                  className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-slate-600 hover:text-peie-blue hover:bg-slate-50 rounded-lg cursor-pointer transition-colors"
+                >
+                  <Building size={14} />
+                  <span>Mis Obras</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => navigate('/herramientas')}
+                  className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-slate-600 hover:text-peie-blue hover:bg-slate-50 rounded-lg cursor-pointer transition-colors"
+                >
+                  <Wrench size={14} />
+                  <span>Herramientas</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-slate-100 my-1" />
+                <DropdownMenuItem 
+                  onClick={signOut}
+                  className="flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
+                >
+                  <LogOut size={14} />
+                  <span>Cerrar Sesión</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
         </div>
@@ -1138,6 +1196,81 @@ export default function Dashboard() {
         </footer>
 
       </div>
+
+      {/* Modal de Ayuda y Guía de PEIE Tools */}
+      <Dialog open={isHelpOpen} onOpenChange={setIsHelpOpen}>
+        <DialogContent className="rounded-3xl w-[95%] max-w-md bg-white border-slate-100 shadow-xl overflow-hidden p-0">
+          <div className="bg-gradient-to-r from-[#031530] to-[#042454] text-white p-5 pb-6 relative">
+            <DialogHeader className="text-left space-y-1">
+              <DialogTitle className="text-xl font-extrabold tracking-tight flex items-center gap-2">
+                <HelpCircle className="h-5 w-5 text-sky-400" />
+                <span>Ayuda y Soporte</span>
+              </DialogTitle>
+              <p className="text-slate-350 text-xs font-semibold">Guía de uso y contacto directo</p>
+            </DialogHeader>
+          </div>
+
+          <div className="p-6 space-y-5">
+            {/* Guía Rápida */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <Info className="h-3.5 w-3.5 text-blue-600" />
+                Guía Rápida de PEIE Tools
+              </h4>
+              <ul className="text-xs text-slate-650 space-y-2 list-disc list-inside pl-1 font-medium">
+                <li>
+                  <strong className="text-slate-800">Búsqueda de Herramientas:</strong> Usa el icono de lupa del header o haz clic en "Buscar Herramienta" para consultar el stock, disponibilidad y estado.
+                </li>
+                <li>
+                  <strong className="text-slate-800">Lectores QR y de Barras:</strong> Utiliza la cámara de tu celular para escanear y registrar traslados rápidos sin tipear códigos manualmente.
+                </li>
+                <li>
+                  <strong className="text-slate-800">Modo Sin Conexión (PWA):</strong> Si te quedas sin señal en la obra, la app guarda datos clave en caché para que puedas seguir consultando.
+                </li>
+              </ul>
+            </div>
+
+            <DropdownMenuSeparator className="bg-slate-100" />
+
+            {/* Soporte Técnico */}
+            <div className="space-y-3">
+              <div>
+                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Soporte Técnico Directo</h4>
+                <p className="text-[11px] text-slate-450 font-medium mt-1">¿Tienes dudas o necesitas reportar una falla? Comunicate directamente por WhatsApp:</p>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <a 
+                  href="https://wa.me/5493814015738"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center justify-between p-3 bg-emerald-50/50 hover:bg-emerald-50 border border-emerald-100/50 rounded-2xl cursor-pointer transition-all duration-200 group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                      <MessageCircle size={16} className="stroke-[2.5]" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-extrabold text-slate-800">Federico Grande</p>
+                      <p className="text-[10px] text-emerald-600 font-bold">Administrador General</p>
+                    </div>
+                  </div>
+                  <ChevronRight size={14} className="text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-slate-50 p-4 border-t border-slate-100 flex justify-end rounded-b-3xl">
+            <Button 
+              onClick={() => setIsHelpOpen(false)}
+              className="bg-blue-600 text-white hover:bg-blue-700 rounded-xl font-bold text-xs px-5 shadow-md shadow-blue-600/10"
+            >
+              Entendido
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
     </div>
   );
