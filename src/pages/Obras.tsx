@@ -333,67 +333,76 @@ export default function Obras() {
       {loading ? (
         <div className="text-center py-8 text-muted-foreground">Cargando obras...</div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="flex flex-col gap-3">
           {filteredObras.map(obra => (
-            <Card key={obra.id} className={`relative group ${!obra.active ? 'opacity-60 grayscale' : ''}`}>
-              <CardHeader className="pb-2 flex flex-row items-start justify-between space-y-0">
-                <div className="flex items-center space-x-2">
-                  <div className="p-2 bg-peie-light/10 rounded-md">
-                    <Building className="h-5 w-5 text-peie-blue" />
+            <Card key={obra.id} className={`relative group transition-all duration-200 hover:shadow-md p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${!obra.active ? 'opacity-65 grayscale bg-slate-50' : 'bg-white'}`}>
+              <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                <div className="p-3 bg-peie-light/10 rounded-2xl text-peie-blue shrink-0">
+                  <Building className="h-6 w-6" />
+                </div>
+                <div className="min-w-0 flex-1 grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 items-center">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-base font-bold text-slate-800 truncate leading-snug">{obra.name}</CardTitle>
+                      {obra.code && <span className="text-[10px] font-mono bg-slate-100 border px-1.5 py-0.5 rounded text-slate-500 shrink-0">{obra.code}</span>}
+                    </div>
+                    <p className="text-xs text-slate-400 font-semibold truncate mt-1 flex items-center gap-1">📍 {obra.address || 'Sin dirección'}</p>
                   </div>
-                  <div>
-                    <CardTitle className="text-lg line-clamp-1">{obra.name}</CardTitle>
-                    {obra.code && <span className="text-xs font-mono bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">{obra.code}</span>}
+                  
+                  <div className="text-xs text-slate-600">
+                    <p className="font-semibold"><strong className="text-slate-400 font-medium">Coordinador:</strong> {obra.encargado_name || 'Sin coordinador'}</p>
+                    <p className="mt-0.5"><strong className="text-slate-400 font-medium">Teléfono:</strong> {obra.phone || 'Sin teléfono'}</p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {obra.latitude && obra.longitude ? (
+                      <a 
+                        href={`https://www.google.com/maps?q=${obra.latitude},${obra.longitude}`} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:underline font-semibold bg-blue-50/50 border border-blue-100 rounded-xl px-3 py-1.5"
+                      >
+                        🗺️ Maps
+                      </a>
+                    ) : (
+                      <span className="text-xs text-slate-300 italic">Sin ubicación</span>
+                    )}
+                    {!obra.active && <span className="text-[10px] font-black bg-rose-50 text-rose-600 border border-rose-100 px-2 py-0.5 rounded-full">Inactiva</span>}
                   </div>
                 </div>
-                <div className="flex gap-1 -mr-2 -mt-2">
-                  {isAdmin && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className={`${obra.active ? 'text-green-600 hover:bg-green-50' : 'text-slate-400 hover:bg-slate-100 hover:text-green-600'}`}
-                      onClick={() => handleToggleActive(obra)}
-                      title={obra.active ? 'Desactivar Obra' : 'Activar Obra'}
-                    >
-                      <Power className="h-4 w-4" />
-                    </Button>
-                  )}
+              </div>
+
+              <div className="flex items-center gap-1.5 self-end md:self-auto border-t md:border-t-0 pt-2.5 md:pt-0 w-full md:w-auto justify-end">
+                {isAdmin && (
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="text-muted-foreground hover:text-peie-blue"
-                    onClick={() => handleOpenEdit(obra)}
+                    className={`h-9 w-9 rounded-xl ${obra.active ? 'text-green-600 hover:bg-green-50' : 'text-slate-400 hover:bg-slate-100 hover:text-green-600'}`}
+                    onClick={() => handleToggleActive(obra)}
+                    title={obra.active ? 'Desactivar Obra' : 'Activar Obra'}
                   >
-                    <Edit className="h-4 w-4" />
+                    <Power className="h-4 w-4" />
                   </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="text-destructive hover:bg-destructive/10"
-                    onClick={() => handleDelete(obra.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="text-sm space-y-1 mt-2 text-muted-foreground">
-                <p><strong>📍</strong> {obra.address || 'Sin dirección'}</p>
-                <p><strong>👤</strong> {obra.encargado_name || 'Sin coordinador'}</p>
-                <p><strong>📞</strong> {obra.phone || 'Sin teléfono'}</p>
-                {obra.latitude && obra.longitude && (
-                  <div className="pt-2">
-                    <a 
-                      href={`https://www.google.com/maps?q=${obra.latitude},${obra.longitude}`} 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
-                      className="inline-flex items-center text-xs text-blue-600 hover:underline font-semibold"
-                    >
-                      🗺️ Ver en Google Maps
-                    </a>
-                  </div>
                 )}
-                {!obra.active && <p className="text-red-500 font-semibold mt-2">Inactiva</p>}
-              </CardContent>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-9 w-9 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-peie-blue"
+                  onClick={() => handleOpenEdit(obra)}
+                  title="Editar Obra"
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-9 w-9 rounded-xl text-rose-500 hover:bg-rose-50"
+                  onClick={() => handleDelete(obra.id)}
+                  title="Eliminar Obra"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             </Card>
           ))}
           {obras.length === 0 && (

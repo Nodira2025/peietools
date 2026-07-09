@@ -168,7 +168,11 @@ export default function MisObras() {
       .eq('obra_id', obra.id)
       .eq('active', true)
       .order('full_name');
-    setEmpleados(emps || []);
+    const mappedEmps = (emps || []).map((e: any) => ({
+      ...e,
+      status: e.status === 'Disponible' || e.status === 'Libre' ? 'Libre' : 'Trabajando'
+    }));
+    setEmpleados(mappedEmps);
   };
 
   const releaseHerramienta = async (hId: string) => {
@@ -183,7 +187,7 @@ export default function MisObras() {
 
   const releaseEmpleado = async (eId: string) => {
     if (!window.confirm('¿Liberar este empleado de la obra? Quedará disponible para nuevos traslados.')) return;
-    const { error } = await supabase.from('empleados').update({ obra_id: null, status: 'Disponible' }).eq('id', eId);
+    const { error } = await supabase.from('empleados').update({ obra_id: null, status: 'Libre' }).eq('id', eId);
     if (error) toast({ variant: 'destructive', title: 'Error', description: error.message });
     else {
       toast({ title: 'Liberado', description: 'El empleado ya no pertenece a esta obra.' });
@@ -335,8 +339,7 @@ export default function MisObras() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {empleados.map(emp => {
-                const statusStyle = emp.status === 'Disponible' || emp.status === 'Libre' ? 'bg-green-50 text-green-600 border-green-150' :
-                                    emp.status === 'En traslado' ? 'bg-blue-50 text-blue-600 border-blue-150' :
+                const statusStyle = emp.status === 'Libre' ? 'bg-green-50 text-green-600 border-green-150' :
                                     'bg-indigo-50 text-indigo-600 border-indigo-150';
 
                 return (
@@ -352,13 +355,13 @@ export default function MisObras() {
                         </div>
                         <div>
                           <p className="font-bold text-xs text-slate-800">{emp.full_name}</p>
-                          <p className="text-[9px] text-slate-400 font-semibold">{emp.specialty || 'Operario Activo'}</p>
+                          <p className="text-[9px] text-slate-450 font-semibold">{emp.specialty || 'Operario Activo'}</p>
                         </div>
                       </div>
                       
                       <div className="flex items-center gap-2 pr-3 shrink-0">
                         <span className={`text-[9px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${statusStyle}`}>
-                          {emp.status === 'Disponible' || emp.status === 'Libre' ? 'Libre' : 'En Obra'}
+                          {emp.status === 'Libre' ? 'Libre' : 'En Obra'}
                         </span>
                         {isSpecialRole && (
                           <button 
@@ -599,52 +602,54 @@ export default function MisObras() {
       {loading ? (
         <div className="text-center py-12 text-muted-foreground">Cargando obras...</div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="flex flex-col gap-3">
           {filteredObras.slice(0, visibleCount).map(obra => (
             <Card
               key={obra.id}
-              className="cursor-pointer hover:shadow-md active:scale-[0.99] transition-all rounded-[24px] border border-slate-100 bg-white relative overflow-hidden flex flex-col justify-between"
+              className={`cursor-pointer hover:shadow-md active:scale-[0.99] transition-all rounded-2xl border border-slate-100 p-4 relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${!obra.active ? 'opacity-65 grayscale bg-slate-50' : 'bg-white'}`}
               onClick={() => selectObra(obra)}
             >
-              <CardContent className="p-5 flex justify-between items-start">
-                <div className="flex-1 min-w-0 space-y-1">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                      <Building2 className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-black text-sm text-[#031530] truncate">{obra.name}</p>
-                      <p className="text-[10px] text-slate-400 font-semibold truncate">{obra.address || 'Sin dirección'}</p>
-                    </div>
+              <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl shrink-0">
+                  <Building2 className="h-6 w-6" />
+                </div>
+                <div className="min-w-0 flex-1 grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 items-center">
+                  <div className="min-w-0">
+                    <p className="font-black text-sm text-[#031530] truncate">{obra.name}</p>
+                    <p className="text-[10.5px] text-slate-400 font-semibold truncate mt-0.5">📍 {obra.address || 'Sin dirección'}</p>
                   </div>
                   
-                  {obra.encargado_name && (
-                    <p className="text-[10px] text-slate-400 font-semibold mt-1">
+                  {obra.encargado_name ? (
+                    <p className="text-xs text-slate-400 font-semibold">
                       Coordinador: <span className="text-[#031530] font-black">{obra.encargado_name}</span>
                     </p>
+                  ) : (
+                    <span className="text-xs text-slate-300 italic">Sin coordinador</span>
                   )}
 
-                  <div className="flex items-center gap-3 mt-3 pt-1">
-                    <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-slate-500">
-                      <Wrench className="h-3.5 w-3.5 text-slate-400" />
+                  <div className="flex items-center gap-4">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-black text-slate-500">
+                      <Wrench className="h-4 w-4 text-slate-400" />
                       {obra.toolCount || 0} Herramientas
                     </span>
-                    <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-slate-500">
-                      <HardHat className="h-3.5 w-3.5 text-slate-400" />
+                    <span className="inline-flex items-center gap-1.5 text-xs font-black text-slate-500">
+                      <HardHat className="h-4 w-4 text-slate-400" />
                       {obra.empCount || 0} Personal
                     </span>
                   </div>
                 </div>
+              </div>
 
-                {/* Status Badge */}
-                <span className={`text-[9px] font-black uppercase tracking-wider px-3 py-1 rounded-full ${
+              <div className="flex items-center gap-2 self-end md:self-auto shrink-0">
+                <span className={`text-[9px] font-black uppercase tracking-wider px-3 py-1 rounded-full border ${
                   obra.active 
-                    ? 'bg-emerald-50 text-emerald-600' 
-                    : 'bg-slate-100 text-slate-500'
+                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
+                    : 'bg-slate-100 text-slate-500 border-slate-200'
                 }`}>
                   {obra.active ? 'Activa' : 'Pausada'}
                 </span>
-              </CardContent>
+                <ChevronRight className="h-5 w-5 text-slate-300 group-hover:translate-x-1 transition-transform" />
+              </div>
             </Card>
           ))}
           

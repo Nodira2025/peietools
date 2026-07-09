@@ -16,7 +16,7 @@ interface Empleado {
   id: string;
   full_name: string;
   obra_id: string | null;
-  status: 'Disponible' | 'En traslado' | 'Trabajando' | 'Libre';
+  status: 'Trabajando' | 'Libre';
   specialty: string | null;
   photo_url: string | null;
   whatsapp: string | null;
@@ -71,13 +71,13 @@ export default function Personal() {
     full_name: string;
     specialty: string;
     whatsapp: string;
-    status: 'Disponible' | 'En traslado' | 'Trabajando' | 'Libre';
+    status: 'Trabajando' | 'Libre';
     photo_url: string | null;
   }>({
     full_name: '',
     specialty: '',
     whatsapp: '',
-    status: 'Disponible',
+    status: 'Libre',
     photo_url: null
   });
   const [profileUpdating, setProfileUpdating] = useState(false);
@@ -89,7 +89,7 @@ export default function Personal() {
       full_name: emp.full_name,
       specialty: emp.specialty || '',
       whatsapp: emp.whatsapp || '',
-      status: emp.status,
+      status: emp.status === 'Disponible' || emp.status === 'Libre' ? 'Libre' : 'Trabajando',
       photo_url: emp.photo_url
     });
     setIsProfileOpen(true);
@@ -156,7 +156,7 @@ export default function Personal() {
         id: e.id,
         full_name: e.full_name,
         obra_id: e.obra_id,
-        status: e.status || (e.obra_id ? 'Trabajando' : 'Disponible'),
+        status: e.status ? (e.status === 'Disponible' || e.status === 'Libre' ? 'Libre' : 'Trabajando') : (e.obra_id ? 'Trabajando' : 'Libre'),
         specialty: e.specialty || 'Electricista',
         photo_url: e.photo_url,
         whatsapp: e.whatsapp || null,
@@ -248,12 +248,11 @@ export default function Personal() {
     const matchesObra = !filterObra || e.obra_id === filterObra;
     const matchesSpecialty = !filterSpecialty || e.specialty === filterSpecialty;
     
-    const computedStatus = e.status || (e.obra_id ? 'Trabajando' : 'Disponible');
     let matchesStatus = true;
     if (filterType === 'free') {
-      matchesStatus = computedStatus === 'Disponible' || computedStatus === 'Libre' || !e.obra_id;
+      matchesStatus = e.status === 'Libre' || !e.obra_id;
     } else if (filterType === 'busy') {
-      matchesStatus = computedStatus === 'Trabajando' || computedStatus === 'En traslado' || !!e.obra_id;
+      matchesStatus = e.status === 'Trabajando' || !!e.obra_id;
     }
     
     return matchesSearch && matchesObra && matchesSpecialty && matchesStatus;
@@ -351,13 +350,13 @@ export default function Personal() {
   const groupedByObra: Record<string, { name: string; encargado_name?: string | null; id?: string; list: Empleado[] }> = {};
 
   filteredEmpleados.forEach((emp) => {
-    const isLibre = emp.status === 'Disponible' || emp.status === 'Libre' || !emp.obra_id;
+    const isLibre = emp.status === 'Libre' || !emp.obra_id;
     const obraKey = isLibre ? 'Sin Asignar' : (emp.obra_id || 'Sin Asignar');
 
     if (!groupedByObra[obraKey]) {
       groupedByObra[obraKey] = {
         id: isLibre ? undefined : emp.obra_id || undefined,
-        name: isLibre ? 'Operarios Libres / Disponibles' : (emp.obras?.name || 'Obra Desconocida'),
+        name: isLibre ? 'Operarios Libres' : (emp.obras?.name || 'Obra Desconocida'),
         encargado_name: isLibre ? null : (emp.obras?.encargado_name || null),
         list: []
       };
@@ -487,8 +486,8 @@ export default function Personal() {
         <div className="flex gap-2 p-1 bg-slate-100 rounded-xl overflow-x-auto no-scrollbar">
           {[
             { value: 'all', label: `Todos ${empleados.length}` },
-            { value: 'free', label: `Libres ${empleados.filter(e => e.status === 'Disponible' || e.status === 'Libre' || !e.obra_id).length}` },
-            { value: 'busy', label: `En Obra ${empleados.filter(e => e.status === 'Trabajando' || e.status === 'En traslado' || e.obra_id).length}` }
+            { value: 'free', label: `Libres ${empleados.filter(e => e.status === 'Libre' || !e.obra_id).length}` },
+            { value: 'busy', label: `En Obra ${empleados.filter(e => e.status === 'Trabajando' || e.obra_id).length}` }
           ].map(opt => (
             <Button 
               key={opt.value}
@@ -576,7 +575,7 @@ export default function Personal() {
                 {/* Grilla de Operarios en la Obra */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {group.list.map(emp => {
-                    const isLibre = emp.status === 'Disponible' || emp.status === 'Libre' || !emp.obra_id;
+                    const isLibre = emp.status === 'Libre' || !emp.obra_id;
                     const badgeStyle = isLibre 
                       ? 'bg-green-50 text-green-600 border-green-150' 
                       : 'bg-blue-50 text-blue-600 border-blue-150';
@@ -862,10 +861,8 @@ export default function Personal() {
                   <SelectValue placeholder="Seleccione un estado" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl border-slate-100 bg-white shadow-md">
-                  <SelectItem value="Disponible" className="font-semibold text-slate-700">Disponible</SelectItem>
-                  <SelectItem value="Trabajando" className="font-semibold text-slate-700">Trabajando</SelectItem>
-                  <SelectItem value="En traslado" className="font-semibold text-slate-700">En traslado</SelectItem>
                   <SelectItem value="Libre" className="font-semibold text-slate-700">Libre</SelectItem>
+                  <SelectItem value="Trabajando" className="font-semibold text-slate-700">Trabajando</SelectItem>
                 </SelectContent>
               </Select>
             </div>

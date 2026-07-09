@@ -22,6 +22,7 @@ interface Herramienta {
   name: string;
   code: string;
   current_obra_id: string | null;
+  status: string;
   obras?: { name: string } | null;
 }
 
@@ -55,11 +56,10 @@ export default function NuevaSolicitud() {
 
   useEffect(() => {
     async function fetchData() {
-      // 1. Cargar herramientas disponibles
+      // 1. Cargar todas las herramientas
       const { data: toolsData } = await supabase
         .from('herramientas')
-        .select('id, name, code, current_obra_id, obras(name)')
-        .eq('status', 'Disponible')
+        .select('id, name, code, current_obra_id, status, obras(name)')
         .order('name');
       if (toolsData) setHerramientas(toolsData as unknown as Herramienta[]);
 
@@ -213,7 +213,7 @@ export default function NuevaSolicitud() {
           <form onSubmit={handleSubmit} className="space-y-4">
             
             <div className="space-y-1.5">
-              <Label htmlFor="tool" className="text-xs font-semibold text-slate-700">Herramienta Disponible *</Label>
+              <Label htmlFor="tool" className="text-xs font-semibold text-slate-700">Herramienta *</Label>
               <Select value={selectedToolId} onValueChange={setSelectedToolId} required>
                 <SelectTrigger className="h-11 rounded-xl text-slate-800">
                   <SelectValue placeholder="Selecciona qué herramienta necesitas" />
@@ -224,10 +224,13 @@ export default function NuevaSolicitud() {
                       <span className="font-mono text-xs text-slate-400 mr-2">[{t.code}]</span> 
                       <span className="font-medium text-slate-800">{t.name}</span>
                       <span className="text-[10px] text-slate-400 ml-1">({t.obras?.name || 'Sin obra'})</span>
+                      {t.status !== 'Disponible' && (
+                        <span className="text-[10px] font-semibold text-amber-600 ml-2">({t.status})</span>
+                      )}
                     </SelectItem>
                   ))}
                   {herramientas.length === 0 && (
-                    <div className="p-2 text-center text-xs text-slate-400">No hay herramientas con estado 'Disponible'</div>
+                    <div className="p-2 text-center text-xs text-slate-400">No hay herramientas registradas</div>
                   )}
                 </SelectContent>
               </Select>
@@ -251,7 +254,7 @@ export default function NuevaSolicitud() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="targetObra" className="text-xs font-semibold text-slate-700">Obra o Base de Destino *</Label>
+              <Label htmlFor="targetObra" className="text-xs font-semibold text-slate-700">Destino *</Label>
               <Select value={targetObraId} onValueChange={setTargetObraId} required>
                 <SelectTrigger className="h-11 rounded-xl text-slate-800">
                   <SelectValue placeholder="¿Hacia dónde debe enviarse?" />

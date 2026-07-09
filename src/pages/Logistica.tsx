@@ -244,11 +244,12 @@ export default function Logistica() {
   const getStatusStyle = (status: string) => {
     switch(status) {
       case 'Pendiente': return { bg: 'bg-orange-50 border-orange-200', icon: <Clock className="h-6 w-6 text-orange-500" />, color: 'text-orange-600', label: 'PENDIENTE' };
-      case 'Asignada': return { bg: 'bg-blue-50 border-blue-200', icon: <CheckCircle className="h-6 w-6 text-blue-500" />, color: 'text-blue-600', label: 'ASIGNADA' };
-      case 'En retiro': return { bg: 'bg-purple-50 border-purple-200', icon: <Package className="h-6 w-6 text-purple-500" />, color: 'text-purple-600', label: 'EN RETIRO' };
-      case 'En traslado': return { bg: 'bg-sky-50 border-sky-200', icon: <Truck className="h-6 w-6 text-sky-500" />, color: 'text-sky-600', label: 'EN TRASLADO' };
-      case 'Entregada': return { bg: 'bg-green-50 border-green-200', icon: <CheckCircle className="h-6 w-6 text-green-500" />, color: 'text-green-600', label: 'ENTREGADA' };
-      default: return { bg: 'bg-slate-50 border-slate-200', icon: <Clock className="h-6 w-6 text-slate-400" />, color: 'text-slate-500', label: status };
+      case 'Asignada': return { bg: 'bg-blue-50 border-blue-200', icon: <CheckCircle className="h-6 w-6 text-blue-500" />, color: 'text-blue-600', label: 'RECIBIDO/LEÍDO' };
+      case 'En retiro':
+      case 'En traslado': return { bg: 'bg-sky-50 border-sky-200', icon: <Truck className="h-6 w-6 text-sky-500" />, color: 'text-sky-600', label: 'EN CURSO' };
+      case 'Entregada':
+      case 'Confirmada': return { bg: 'bg-green-50 border-green-200', icon: <CheckCircle className="h-6 w-6 text-green-500" />, color: 'text-green-600', label: 'ENTREGADO' };
+      default: return { bg: 'bg-slate-50 border-slate-200', icon: <Clock className="h-6 w-6 text-slate-400" />, color: 'text-slate-500', label: status.toUpperCase() };
     }
   };
 

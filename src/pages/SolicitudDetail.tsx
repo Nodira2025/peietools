@@ -76,12 +76,13 @@ export default function SolicitudDetail() {
   const getStatusBadge = (status: string) => {
     switch(status) {
       case 'Pendiente': return <span className="flex items-center text-orange-600 bg-orange-100 px-3 py-1.5 rounded-full text-xs font-bold"><Clock className="w-3 h-3 mr-1" /> Pendiente</span>;
-      case 'Asignada': return <span className="flex items-center text-blue-600 bg-blue-100 px-3 py-1.5 rounded-full text-xs font-bold"><AlertCircle className="w-3 h-3 mr-1" /> Asignada</span>;
-      case 'En retiro': return <span className="flex items-center text-purple-600 bg-purple-100 px-3 py-1.5 rounded-full text-xs font-bold"><Package className="w-3 h-3 mr-1" /> En Retiro</span>;
-      case 'En traslado': return <span className="flex items-center text-peie-blue bg-peie-light/20 px-3 py-1.5 rounded-full text-xs font-bold"><Truck className="w-3 h-3 mr-1" /> En Traslado</span>;
-      case 'Entregada': return <span className="flex items-center text-green-600 bg-green-100 px-3 py-1.5 rounded-full text-xs font-bold"><CheckCircle className="w-3 h-3 mr-1" /> Entregada</span>;
-      case 'Confirmada': return <span className="flex items-center text-emerald-700 bg-emerald-100 px-3 py-1.5 rounded-full text-xs font-bold"><CheckCircle className="w-3 h-3 mr-1" /> Confirmada</span>;
+      case 'Asignada': return <span className="flex items-center text-blue-600 bg-blue-100 px-3 py-1.5 rounded-full text-xs font-bold"><CheckCircle className="w-3 h-3 mr-1" /> Recibido/Leído</span>;
+      case 'En retiro':
+      case 'En traslado': return <span className="flex items-center text-peie-blue bg-peie-light/20 px-3 py-1.5 rounded-full text-xs font-bold"><Truck className="w-3 h-3 mr-1" /> En curso</span>;
+      case 'Entregada':
+      case 'Confirmada': return <span className="flex items-center text-green-600 bg-green-100 px-3 py-1.5 rounded-full text-xs font-bold"><CheckCircle className="w-3 h-3 mr-1" /> Entregado</span>;
       case 'Rechazada': return <span className="flex items-center text-red-700 bg-red-100 px-3 py-1.5 rounded-full text-xs font-bold"><AlertCircle className="w-3 h-3 mr-1" /> Rechazada</span>;
+      case 'Cancelada': return <span className="flex items-center text-rose-700 bg-rose-100 px-3 py-1.5 rounded-full text-xs font-bold"><AlertCircle className="w-3 h-3 mr-1" /> Cancelada</span>;
       default: return <span className="bg-gray-100 px-3 py-1.5 rounded-full text-xs">{status}</span>;
     }
   };
@@ -382,27 +383,21 @@ export default function SolicitudDetail() {
                     className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold w-full h-12 rounded-xl shadow-md text-sm"
                   >
                     <CheckCircle className="mr-2 h-4 w-4" />
-                    Aceptar Pedido y Avisar por WhatsApp
+                    Marcar como Recibido/Leído y Avisar por WhatsApp
                   </Button>
                 )}
                 {solicitud.status === 'Asignada' && (
-                  <Button onClick={() => updateStatus('En retiro')} className="bg-purple-600 hover:bg-purple-700 text-white w-full h-12 rounded-xl text-sm">
-                    <Package className="mr-2 h-4 w-4" />
-                    Marcar En Retiro
-                  </Button>
-                )}
-                {solicitud.status === 'En retiro' && (
-                  <Button onClick={() => updateStatus('En traslado')} className="bg-peie-blue hover:bg-peie-blue/90 text-white w-full h-12 rounded-xl text-sm">
+                  <Button onClick={() => updateStatus('En traslado')} className="bg-peie-blue hover:bg-peie-blue/90 text-white w-full h-12 rounded-xl text-sm font-bold">
                     <Truck className="mr-2 h-4 w-4" />
-                    Marcar En Traslado
+                    Marcar En curso
                   </Button>
                 )}
-                {solicitud.status === 'En traslado' && (
+                {(solicitud.status === 'En retiro' || solicitud.status === 'En traslado') && (
                   <Dialog open={isValidationOpen} onOpenChange={(open) => { setIsValidationOpen(open); if(!open) setInputSecurityCode(''); }}>
                     <DialogTrigger asChild>
                       <Button className="bg-green-600 hover:bg-green-700 text-white w-full h-12 rounded-xl text-sm font-bold">
                         <CheckCircle className="mr-2 h-4 w-4" />
-                        Validar y Marcar Entregada
+                        Validar y Marcar como Entregado
                       </Button>
                     </DialogTrigger>
                     <DialogContent className="rounded-3xl w-[90%] max-w-md">

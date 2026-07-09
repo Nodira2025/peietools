@@ -123,7 +123,7 @@ export default function Reportes() {
       const { data: empData } = await supabase.from('empleados').select('id, status');
       if (empData) {
         setTotalEmpleados(empData.length);
-        setEmpleadosDisponibles(empData.filter(e => e.status === 'Disponible').length);
+        setEmpleadosDisponibles(empData.filter(e => e.status === 'Disponible' || e.status === 'Libre').length);
       }
 
     } catch (error) {

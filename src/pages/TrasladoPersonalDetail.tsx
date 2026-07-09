@@ -146,7 +146,7 @@ export default function TrasladoPersonalDetail() {
     const { data: empData } = await supabase.from('empleados').select('obra_id').eq('id', traslado.empleado_id).single();
     await supabase
       .from('empleados')
-      .update({ status: empData?.obra_id ? 'Trabajando' : 'Disponible' })
+      .update({ status: empData?.obra_id ? 'Trabajando' : 'Libre' })
       .eq('id', traslado.empleado_id);
 
     toast({ title: 'Traslado Rechazado', description: 'Notificando al encargado...' });
@@ -196,7 +196,7 @@ export default function TrasladoPersonalDetail() {
         await supabase
           .from('empleados')
           .update({ 
-            status: traslado.source_obra_id ? 'Trabajando' : 'Disponible',
+            status: traslado.source_obra_id ? 'Trabajando' : 'Libre',
             obra_id: traslado.source_obra_id || null
           })
           .eq('id', traslado.empleado_id);

@@ -141,15 +141,13 @@ export default function Solicitudes() {
       case 'Pendiente': 
         return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200/60 shadow-sm"><Clock className="w-3.5 h-3.5 animate-pulse" /> Pendiente</span>;
       case 'Asignada': 
-        return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/60 shadow-sm"><AlertCircle className="w-3.5 h-3.5" /> Asignada</span>;
+        return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/60 shadow-sm"><CheckCircle className="w-3.5 h-3.5" /> Recibido/Leído</span>;
       case 'En retiro': 
-        return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/60 shadow-sm"><Truck className="w-3.5 h-3.5" /> En Retiro</span>;
       case 'En traslado': 
-        return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200/60 shadow-sm"><Truck className="w-3.5 h-3.5" /> En Traslado</span>;
+        return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200/60 shadow-sm"><Truck className="w-3.5 h-3.5" /> En curso</span>;
       case 'Entregada': 
-        return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 shadow-sm"><CheckCircle className="w-3.5 h-3.5" /> Entregada</span>;
       case 'Confirmada': 
-        return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200 shadow-sm"><CheckCircle className="w-3.5 h-3.5" /> Confirmada</span>;
+        return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 shadow-sm"><CheckCircle className="w-3.5 h-3.5" /> Entregado</span>;
       case 'Cancelada':
       case 'Rechazada':
         return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200/60 shadow-sm"><AlertCircle className="w-3.5 h-3.5" /> {status}</span>;

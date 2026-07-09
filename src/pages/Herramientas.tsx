@@ -16,17 +16,23 @@ import {
   Ruler, 
   Car, 
   ChevronLeft, 
-  Building2
+  Building2,
+  LayoutGrid,
+  List,
+  Download,
+  Truck
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import FilterBar from '../components/FilterBar';
+import * as XLSX from 'xlsx';
 
 interface Herramienta {
   id: string;
   code: string;
   name: string;
   brand: string | null;
+  model: string | null;
   status: string;
   category: string | null;
   current_obra_id: string | null;
@@ -42,6 +48,7 @@ export default function Herramientas() {
   const [filterObra, setFilterObra] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterEncargado, setFilterEncargado] = useState('');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -149,6 +156,30 @@ export default function Herramientas() {
   const statusUnicos = [...new Set(herramientas.map(h => h.status))].sort();
   const encargadosUnicos = [...new Set(herramientas.map(h => h.obras?.encargado_name).filter((name): name is string => !!name))].sort();
 
+  const exportToExcel = () => {
+    if (filtered.length === 0) {
+      toast({ variant: 'destructive', title: 'Sin datos', description: 'No hay herramientas filtradas para exportar.' });
+      return;
+    }
+
+    const data = filtered.map(h => ({
+      'Código': h.code,
+      'Nombre': h.name,
+      'Marca': h.brand || 'Genérica',
+      'Modelo': h.model || 'N/A',
+      'Categoría': h.category || 'Otros',
+      'Estado': h.status,
+      'Obra Actual': h.obras?.name || 'Base Central',
+      'Coordinador': h.obras?.encargado_name || 'Sin asignar'
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Herramientas");
+    XLSX.writeFile(workbook, `Inventario_Herramientas_${selectedCategory || 'General'}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast({ title: 'Éxito', description: 'Inventario exportado a Excel correctamente.' });
+  };
+
   return (
     <div className="space-y-6 pb-safe">
       
@@ -235,8 +266,8 @@ export default function Herramientas() {
         /* VISTA DE HERRAMIENTAS DENTRO DE UNA CATEGORÍA */
         <div className="space-y-4">
           {/* Buscador e Inputs de Filtrado */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="relative md:col-span-2">
+          <div className="flex flex-col md:flex-row gap-3">
+            <div className="relative flex-1">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <Input 
                 placeholder="Buscar por nombre, código o marca..." 
@@ -245,13 +276,40 @@ export default function Herramientas() {
                 className="pl-10 h-11 rounded-xl border-slate-200" 
               />
             </div>
-            <Button 
-              variant="outline"
-              className="h-11 rounded-xl border-slate-200 text-slate-600 font-medium"
-              onClick={() => { setSearchTerm(''); setFilterObra(''); setFilterStatus(''); setFilterEncargado(''); }}
-            >
-              Limpiar Filtros
-            </Button>
+            <div className="flex items-center gap-2 self-end w-full md:w-auto">
+              <Button 
+                variant="outline"
+                className="h-11 rounded-xl border-slate-200 text-slate-600 font-medium flex-1 md:flex-initial"
+                onClick={() => { setSearchTerm(''); setFilterObra(''); setFilterStatus(''); setFilterEncargado(''); }}
+              >
+                Limpiar Filtros
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={exportToExcel}
+                className="h-11 rounded-xl border-slate-200 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 font-medium flex items-center gap-1.5 flex-1 md:flex-initial"
+              >
+                <Download className="h-4 w-4" /> Exportar Excel
+              </Button>
+              <div className="flex items-center border border-slate-200 rounded-xl p-1 bg-slate-50 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('grid')}
+                  className={`p-1.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white text-peie-blue shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  title="Vista Grilla"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('list')}
+                  className={`p-1.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white text-peie-blue shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  title="Vista Lista"
+                >
+                  <List className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Chips de Estado Rápidos */}
@@ -295,63 +353,132 @@ export default function Herramientas() {
             }}
           />
 
-          {/* Grilla de Herramientas (2 columnas en móvil, 5 en PC/pantallas grandes) */}
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6">
-            {filtered.map((h) => {
-              const styles = getStatusStyle(h.status);
-              return (
-                <Card 
-                  key={h.id} 
-                  className={`group relative overflow-hidden transition-all duration-200 cursor-pointer flex flex-col justify-between hover:shadow-lg rounded-2xl border ${styles.border}`} 
-                  onClick={() => navigate('/herramientas/' + h.id)}
-                >
-                  <div>
-                    {/* Imagen de cabecera */}
-                    <div className="relative h-36 w-full bg-slate-50 border-b border-slate-100 overflow-hidden">
-                      {h.photo_url ? (
-                        <img 
-                          src={h.photo_url} 
-                          alt={h.name} 
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
-                          onError={e => { e.currentTarget.parentElement!.style.display = 'none'; }} 
-                        />
-                      ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-300 bg-slate-50/50">
-                          {getCategoryIcon(h.category)}
-                          <span className="text-[10px] mt-1 text-slate-400">Sin fotografía</span>
-                        </div>
-                      )}
-                      {/* Estado flotante sobre la foto en móvil */}
-                      <span className={`absolute top-2.5 right-2.5 text-[9px] font-bold px-2 py-0.5 rounded-full border shadow-sm ${styles.badge}`}>
-                        {h.status}
-                      </span>
-                    </div>
-
-                    <div className="p-4 space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-[9px] font-mono bg-slate-100 text-slate-500 px-2 py-0.5 rounded border border-slate-200/50">
-                          {h.code}
+          {/* Listado condicional según viewMode */}
+          {viewMode === 'grid' ? (
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6">
+              {filtered.map((h) => {
+                const styles = getStatusStyle(h.status);
+                return (
+                  <Card 
+                    key={h.id} 
+                    className={`group relative overflow-hidden transition-all duration-200 cursor-pointer flex flex-col justify-between hover:shadow-lg rounded-2xl border ${styles.border}`} 
+                    onClick={() => navigate('/herramientas/' + h.id)}
+                  >
+                    <div>
+                      {/* Imagen de cabecera */}
+                      <div className="relative h-36 w-full bg-slate-50 border-b border-slate-100 overflow-hidden">
+                        {h.photo_url ? (
+                          <img 
+                            src={h.photo_url} 
+                            alt={h.name} 
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+                            onError={e => { e.currentTarget.parentElement!.style.display = 'none'; }} 
+                          />
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center text-slate-300 bg-slate-50/50">
+                            {getCategoryIcon(h.category)}
+                            <span className="text-[10px] mt-1 text-slate-400">Sin fotografía</span>
+                          </div>
+                        )}
+                        {/* Estado flotante sobre la foto en móvil */}
+                        <span className={`absolute top-2.5 right-2.5 text-[9px] font-bold px-2 py-0.5 rounded-full border shadow-sm ${styles.badge}`}>
+                          {h.status}
                         </span>
-                        <span className="text-[10px] text-slate-400 font-semibold">{h.brand || 'Genérica'}</span>
                       </div>
 
-                      {/* Título más grande para Premium */}
-                      <h3 className="text-sm font-bold text-slate-800 line-clamp-2 leading-snug group-hover:text-peie-blue transition-colors">
-                        {h.name}
-                      </h3>
-                    </div>
-                  </div>
+                      <div className="p-4 space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[9px] font-mono bg-slate-100 text-slate-500 px-2 py-0.5 rounded border border-slate-200/50">
+                            {h.code}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-semibold">{h.brand || 'Genérica'}</span>
+                        </div>
 
-                  {/* Footer de la tarjeta con indicadores visuales mínimos */}
-                  <div className="p-4 pt-0 border-t border-slate-50 mt-auto bg-slate-50/30">
-                    <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-2 font-medium">
-                      <Building2 className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                      <span className="truncate">{h.obras?.name || 'Base Central'}</span>
+                        {/* Título más grande para Premium */}
+                        <h3 className="text-sm font-bold text-slate-800 line-clamp-2 leading-snug group-hover:text-peie-blue transition-colors">
+                          {h.name}
+                        </h3>
+                      </div>
                     </div>
-                  </div>
-                </Card>
-              );
-            })}
+
+                    {/* Footer de la tarjeta con indicadores visuales mínimos */}
+                    <div className="p-3 pt-2.5 border-t border-slate-50 mt-auto bg-slate-50/20 flex items-center justify-between gap-1.5">
+                      <div className="flex items-center gap-1 text-[11px] text-slate-500 font-semibold min-w-0">
+                        <Building2 className="h-3 w-3 text-slate-400 shrink-0" />
+                        <span className="truncate">{h.obras?.name || 'Base Central'}</span>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate('/solicitudes/nueva', { state: { herramientaId: h.id } });
+                        }}
+                        className="bg-peie-blue hover:bg-peie-blue/90 text-white font-bold h-7 rounded-lg text-[10px] px-2.5 flex items-center gap-0.5 shrink-0 shadow-sm"
+                      >
+                        <Truck className="h-3 w-3" /> Pedir
+                      </Button>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {filtered.map((h) => {
+                const styles = getStatusStyle(h.status);
+                return (
+                  <Card 
+                    key={h.id}
+                    onClick={() => navigate('/herramientas/' + h.id)}
+                    className={`group relative overflow-hidden transition-all duration-200 cursor-pointer p-4 border rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 hover:shadow-md ${styles.border}`}
+                  >
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 overflow-hidden">
+                        {h.photo_url ? (
+                          <img src={h.photo_url} alt={h.name} className="w-full h-full object-cover" />
+                        ) : (
+                          getCategoryIcon(h.category)
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-mono bg-slate-100 text-slate-500 px-2 py-0.5 rounded border border-slate-200/50">
+                            {h.code}
+                          </span>
+                          <span className="text-xs text-slate-400 font-semibold">{h.brand || 'Genérica'} {h.model ? `· ${h.model}` : ''}</span>
+                        </div>
+                        <h3 className="text-sm font-bold text-slate-800 mt-1 leading-snug group-hover:text-peie-blue transition-colors">
+                          {h.name}
+                        </h3>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap md:flex-nowrap items-center gap-4 md:gap-6 self-stretch md:self-auto justify-between md:justify-end">
+                      <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                        <Building2 className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        <span className="truncate">{h.obras?.name || 'Base Central'}</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border shadow-sm ${styles.badge}`}>
+                          {h.status}
+                        </span>
+                        <Button
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate('/solicitudes/nueva', { state: { herramientaId: h.id } });
+                          }}
+                          className="bg-peie-blue hover:bg-peie-blue/90 text-white font-bold h-8 rounded-lg text-xs px-3 flex items-center gap-1 shadow-sm"
+                        >
+                          <Truck className="h-3 w-3" /> Pedir
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
 
 
 
