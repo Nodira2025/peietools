@@ -495,9 +495,8 @@ export default function Herramientas() {
               </div>
             )}
           </div>
-        </div>
-      )}
-    </div>
-  );
-}
+        )}
+      </div>
+    );
+  }
 
