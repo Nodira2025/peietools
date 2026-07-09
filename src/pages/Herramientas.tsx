@@ -180,6 +180,30 @@ export default function Herramientas() {
     toast({ title: 'Éxito', description: 'Inventario exportado a Excel correctamente.' });
   };
 
+  const exportAllToExcel = () => {
+    if (herramientas.length === 0) {
+      toast({ variant: 'destructive', title: 'Sin datos', description: 'No hay herramientas para exportar.' });
+      return;
+    }
+
+    const data = herramientas.map(h => ({
+      'Código': h.code,
+      'Nombre': h.name,
+      'Marca': h.brand || 'Genérica',
+      'Modelo': h.model || 'N/A',
+      'Categoría': h.category || 'Otros',
+      'Estado': h.status,
+      'Obra Actual': h.obras?.name || 'Base Central',
+      'Coordinador': h.obras?.encargado_name || 'Sin asignar'
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Inventario Completo");
+    XLSX.writeFile(workbook, `Inventario_Herramientas_Completo_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast({ title: 'Éxito', description: 'Inventario completo exportado a Excel correctamente.' });
+  };
+
   return (
     <div className="space-y-6 pb-safe">
       
@@ -207,7 +231,16 @@ export default function Herramientas() {
               : 'Selecciona una categoría para ver y gestionar sus herramientas'}
           </p>
         </div>
-        <div className="flex gap-2 w-full sm:w-auto">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+          {!selectedCategory && (
+            <Button 
+              variant="outline" 
+              onClick={exportAllToExcel}
+              className="flex-1 sm:flex-none h-11 rounded-xl border-slate-200 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 font-medium"
+            >
+              <Download className="mr-2 h-4 w-4" /> Exportar Excel
+            </Button>
+          )}
           <Button variant="outline" className="flex-1 sm:flex-none h-11 rounded-xl" onClick={() => navigate('/herramientas/scanner')}>
             <QrCode className="mr-2 h-4 w-4" /> QR
           </Button>
