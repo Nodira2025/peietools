@@ -63,7 +63,7 @@ export default function NuevaHerramienta() {
           const cleanName = file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ");
           setAiText(`Lectura de archivo "${cleanName}": Código detectado QR: TAL-${Math.floor(100 + Math.random() * 900)}. Producto: Taladro percutor Bosch GSB 18V.`);
         }
-        toast({ title: 'Foto procesada', description: 'Se guardó la foto para la herramienta y se analizó con IA.' });
+        toast({ title: 'Foto procesada', description: 'Se guardó la foto para la herramienta y se analizó.' });
       } catch (err) {
         toast({ variant: 'destructive', title: 'Error', description: 'No se pudo procesar la imagen.' });
       }
@@ -152,7 +152,7 @@ Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Elementos de segur
 
         toast({
           title: '¡Formulario Autocompletado!',
-          description: 'La IA analizó la información y rellenó los campos correspondientes. Revisalos antes de registrar.'
+          description: 'Se analizó la información y se rellenaron los campos correspondientes. Revisalos antes de registrar.'
         });
       } else {
         toast({
@@ -165,8 +165,8 @@ Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Elementos de segur
       console.error(err);
       toast({
         variant: 'destructive',
-        title: 'Error de IA',
-        description: err.message || 'No se pudo completar el análisis con IA.'
+        title: 'Error de Análisis',
+        description: err.message || 'No se pudo completar el análisis de la información.'
       });
     } finally {
       setAiLoading(false);
@@ -228,7 +228,7 @@ Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Elementos de segur
         </Button>
       </div>
 
-      {/* Asistente de IA para Carga Rápida */}
+      {/* Asistente para Carga Rápida */}
       <Card className="shadow-lg border border-peie-blue/15 bg-gradient-to-br from-white to-peie-light/5 rounded-2xl overflow-hidden">
         <CardHeader className="pb-3 pt-5 px-6">
           <div className="flex items-center gap-2">
@@ -236,8 +236,8 @@ Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Elementos de segur
               <Sparkles size={20} />
             </div>
             <div>
-              <CardTitle className="text-base font-black text-slate-800 uppercase tracking-tight">Carga Rápida Asistida con IA</CardTitle>
-              <CardDescription className="text-xs">Escribí una descripción corta o subí una foto de la etiqueta/código de barras de la herramienta y la IA rellenará el formulario por vos.</CardDescription>
+              <CardTitle className="text-base font-black text-slate-800 uppercase tracking-tight">Carga Rápida Asistida</CardTitle>
+              <CardDescription className="text-xs">Escribí una descripción corta o subí una foto de la etiqueta/código de barras de la herramienta y se rellenará el formulario por vos.</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -305,11 +305,11 @@ Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Elementos de segur
               {aiLoading ? (
                 <>
                   <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                  IA analizando...
+                  Analizando...
                 </>
               ) : (
                 <>
-                  <Sparkles size={14} /> Auto-rellenar con IA
+                  <Sparkles size={14} /> Auto-rellenar
                 </>
               )}
             </Button>
