@@ -175,6 +175,31 @@ export default function BusquedaVisual() {
     }
   };
 
+  const handleManualSearchSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!manualSearch.trim()) return;
+
+    if (filteredTools.length === 1) {
+      setSelectedManualTool(filteredTools[0]);
+      setManualSearch(`${filteredTools[0].name} [${filteredTools[0].code}]`);
+      toast({ title: 'Herramienta identificada', description: `Se seleccionó: ${filteredTools[0].name}` });
+    } else if (filteredTools.length > 1) {
+      // Seleccionar el primer resultado coincidente por defecto
+      setSelectedManualTool(filteredTools[0]);
+      setManualSearch(`${filteredTools[0].name} [${filteredTools[0].code}]`);
+      toast({ 
+        title: 'Coincidencia múltiple', 
+        description: `Se seleccionó el primer resultado: ${filteredTools[0].name}. Podés elegir otro de la lista si no es correcto.` 
+      });
+    } else {
+      toast({ 
+        variant: 'destructive', 
+        title: 'Sin resultados', 
+        description: 'No se encontraron herramientas con esa descripción en el inventario.' 
+      });
+    }
+  };
+
   // Filtrar herramientas para el buscador manual de fallback
   const filteredTools = allTools.filter(t => {
     if (!manualSearch.trim()) return false;
@@ -318,27 +343,37 @@ export default function BusquedaVisual() {
                 <p className="text-xs text-slate-500">Buscá la herramienta por su nombre, código o marca. Podés usar el micrófono para dictar si te resulta más rápido.</p>
               </div>
 
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  <Input
-                    placeholder="Escribí o dictá el nombre de la herramienta..."
-                    value={manualSearch}
-                    onChange={e => {
-                      setManualSearch(e.target.value);
+              <form onSubmit={handleManualSearchSubmit} className="space-y-3">
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input
+                      placeholder="Escribí o dictá el nombre de la herramienta..."
+                      value={manualSearch}
+                      onChange={e => {
+                        setManualSearch(e.target.value);
+                        setSelectedManualTool(null);
+                      }}
+                      className="pl-9 h-11 rounded-xl bg-white border-slate-200"
+                    />
+                  </div>
+                  <VoiceInputButton 
+                    onTranscript={(text) => {
+                      setManualSearch(text);
                       setSelectedManualTool(null);
-                    }}
-                    className="pl-9 h-11 rounded-xl bg-white border-slate-200"
+                    }} 
+                    className="h-11 w-11 shrink-0" 
                   />
                 </div>
-                <VoiceInputButton 
-                  onTranscript={(text) => {
-                    setManualSearch(text);
-                    setSelectedManualTool(null);
-                  }} 
-                  className="h-11 w-11 shrink-0" 
-                />
-              </div>
+
+                <Button 
+                  type="submit" 
+                  disabled={!manualSearch.trim()} 
+                  className="w-full h-11 bg-peie-blue hover:bg-peie-blue/90 text-white font-bold rounded-xl flex items-center justify-center gap-1.5"
+                >
+                  <Check size={18} /> Confirmar Selección
+                </Button>
+              </form>
 
               {/* Lista de coincidencias manuales */}
               {filteredTools.length > 0 && !selectedManualTool && (
