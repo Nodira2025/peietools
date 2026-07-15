@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Truck, MessageCircle, AlertCircle } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { buildWhatsAppLink, APP_URL } from '../lib/whatsapp';
+import { WhatsAppPreviewModal } from '../components/WhatsAppPreviewModal';
 
 interface Obra {
   id: string;
@@ -54,6 +55,12 @@ export default function NuevaSolicitud() {
   const [comments, setComments] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // WhatsApp Preview state
+  const [waPreviewOpen, setWaPreviewOpen] = useState(false);
+  const [waPreviewPhone, setWaPreviewPhone] = useState('');
+  const [waPreviewMessage, setWaPreviewMessage] = useState('');
+  const [waPreviewRecipientName, setWaPreviewRecipientName] = useState('');
+
   useEffect(() => {
     async function fetchData() {
       // 1. Cargar todas las herramientas
@@ -74,12 +81,12 @@ export default function NuevaSolicitud() {
         setObras(validObras);
       }
 
-      // 3. Cargar Personal de Logística (únicamente rol logistica)
+      // 3. Cargar Personal de Logística (rol logistica o admin)
       const { data: logisticaData } = await supabase
         .from('profiles')
         .select('id, full_name, whatsapp, role')
         .eq('active', true)
-        .eq('role', 'logistica')
+        .in('role', ['logistica', 'admin'])
         .order('full_name');
       if (logisticaData) setPersonalLogistica(logisticaData as PersonalLogistica[]);
     }
@@ -169,11 +176,10 @@ export default function NuevaSolicitud() {
         APP_URL + '/solicitudes/' + newSolicitud.id
       ].join('\n');
 
-      // Redirigir a la vista de solicitudes para limpiar y abrir el WhatsApp
-      navigate('/solicitudes');
-      setTimeout(() => {
-        window.open(buildWhatsAppLink(logisticaUser.whatsapp!, waMessage), '_blank');
-      }, 300);
+      setWaPreviewPhone(logisticaUser.whatsapp!);
+      setWaPreviewMessage(waMessage);
+      setWaPreviewRecipientName(logisticaUser.full_name);
+      setWaPreviewOpen(true);
     }
   };
 
@@ -344,6 +350,18 @@ export default function NuevaSolicitud() {
           </form>
         </CardContent>
       </Card>
+
+      {/* Reusable WhatsApp Preview Modal */}
+      <WhatsAppPreviewModal
+        isOpen={waPreviewOpen}
+        onClose={() => {
+          setWaPreviewOpen(false);
+          navigate('/solicitudes');
+        }}
+        phone={waPreviewPhone}
+        message={waPreviewMessage}
+        recipientName={waPreviewRecipientName}
+      />
     </div>
   );
 }
