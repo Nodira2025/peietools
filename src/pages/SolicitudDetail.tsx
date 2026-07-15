@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Clock, CheckCircle, Truck, AlertCircle, Package, Search, User, Trash2 } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { buildWhatsAppLink, APP_URL } from '../lib/whatsapp';
+import { WhatsAppPreviewModal } from '../components/WhatsAppPreviewModal';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
@@ -31,6 +32,12 @@ export default function SolicitudDetail() {
   const [isRejectionOpen, setIsRejectionOpen] = useState(false);
 
   const [inputSecurityCode, setInputSecurityCode] = useState('');
+
+  // WhatsApp Preview state
+  const [waPreviewOpen, setWaPreviewOpen] = useState(false);
+  const [waPreviewPhone, setWaPreviewPhone] = useState('');
+  const [waPreviewMessage, setWaPreviewMessage] = useState('');
+  const [waPreviewRecipientName, setWaPreviewRecipientName] = useState('');
 
   const userRole = profile?.role?.toLowerCase();
   const isLogistica = userRole === 'logistica' || userRole === 'admin';
@@ -142,7 +149,7 @@ export default function SolicitudDetail() {
 
     if (newStatus === 'Asignada') {
       // Logistica acepta → avisar al encargado solicitante
-      toast({ title: 'Pedido Aceptado!', description: 'Avisando al encargado por WhatsApp...' });
+      toast({ title: 'Pedido Aceptado!', description: 'Abriendo plantilla de WhatsApp...' });
       const requesterPhone = solicitud.profiles?.whatsapp;
       if (requesterPhone) {
         const msg = [
@@ -159,11 +166,14 @@ export default function SolicitudDetail() {
           'El envio ya se encuentra en curso. Segui el estado aca:',
           APP_URL + '/solicitudes/' + solicitud.id
         ].join('\n');
-        setTimeout(() => { window.open(buildWhatsAppLink(requesterPhone, msg), '_blank'); }, 300);
+        setWaPreviewPhone(requesterPhone);
+        setWaPreviewMessage(msg);
+        setWaPreviewRecipientName(solicitud.profiles.full_name);
+        setWaPreviewOpen(true);
       }
     } else if (newStatus === 'Confirmada') {
       // Recepcion confirmada → avisar al de logistica
-      toast({ title: 'Recepcion Confirmada!', description: 'Generando comprobante y avisando a Logistica...' });
+      toast({ title: 'Recepcion Confirmada!', description: 'Generando comprobante y abriendo plantilla de WhatsApp...' });
       setReceivedByName(finalRecipient);
       setShowReceipt(true);
       const logisticaPhone = solicitud.assigned?.whatsapp;
@@ -183,7 +193,10 @@ export default function SolicitudDetail() {
           'Ver comprobante:',
           APP_URL + '/solicitudes/' + solicitud.id
         ].join('\n');
-        setTimeout(() => { window.open(buildWhatsAppLink(logisticaPhone, msg), '_blank'); }, 300);
+        setWaPreviewPhone(logisticaPhone);
+        setWaPreviewMessage(msg);
+        setWaPreviewRecipientName(solicitud.assigned?.full_name || 'Logística');
+        setWaPreviewOpen(true);
       }
     } else {
       toast({ title: 'Estado actualizado', description: 'Nuevo estado: ' + newStatus });
@@ -241,7 +254,10 @@ export default function SolicitudDetail() {
         'Podés ver los detalles o volver a solicitar acá:',
         APP_URL + '/solicitudes/' + solicitud.id
       ].join('\n');
-      window.open(buildWhatsAppLink(requesterPhone, msg), '_blank');
+      setWaPreviewPhone(requesterPhone);
+      setWaPreviewMessage(msg);
+      setWaPreviewRecipientName(solicitud.profiles.full_name);
+      setWaPreviewOpen(true);
     }
 
     setRejecting(false);
@@ -631,7 +647,10 @@ export default function SolicitudDetail() {
                       'Ver solicitud:',
                       APP_URL + '/solicitudes/' + solicitud.id
                     ].join('\n');
-                    window.open(buildWhatsAppLink(logisticaPhone, msg), '_blank');
+                    setWaPreviewPhone(logisticaPhone);
+                    setWaPreviewMessage(msg);
+                    setWaPreviewRecipientName(solicitud.assigned?.full_name || 'Logística');
+                    setWaPreviewOpen(true);
                   }}
                   className="w-full h-12 rounded-xl text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 text-sm font-semibold"
                 >
@@ -784,6 +803,15 @@ export default function SolicitudDetail() {
           </Button>
         </div>
       )}
+
+      {/* Reusable WhatsApp Preview Modal */}
+      <WhatsAppPreviewModal
+        isOpen={waPreviewOpen}
+        onClose={() => setWaPreviewOpen(false)}
+        phone={waPreviewPhone}
+        message={waPreviewMessage}
+        recipientName={waPreviewRecipientName}
+      />
     </div>
   );
 }

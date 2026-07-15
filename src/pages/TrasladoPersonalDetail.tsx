@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Clock, CheckCircle, MapPin, HardHat, AlertCircle, Trash2 } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { buildWhatsAppLink, APP_URL } from '../lib/whatsapp';
+import { WhatsAppPreviewModal } from '../components/WhatsAppPreviewModal';
 import { FileText, Share2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
@@ -24,6 +25,12 @@ export default function TrasladoPersonalDetail() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [rejecting, setRejecting] = useState(false);
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
+
+  // WhatsApp Preview state
+  const [waPreviewOpen, setWaPreviewOpen] = useState(false);
+  const [waPreviewPhone, setWaPreviewPhone] = useState('');
+  const [waPreviewMessage, setWaPreviewMessage] = useState('');
+  const [waPreviewRecipientName, setWaPreviewRecipientName] = useState('');
 
   useEffect(() => {
     if (id) fetchTraslado();
@@ -115,7 +122,10 @@ export default function TrasladoPersonalDetail() {
           `${APP_URL}/personal/traslados/${traslado.id}`
         ].join('\n');
 
-        window.open(buildWhatsAppLink(traslado.requester.whatsapp.replace(/\D/g, ''), msg), '_blank'); 
+        setWaPreviewPhone(traslado.requester.whatsapp.replace(/\D/g, ''));
+        setWaPreviewMessage(msg);
+        setWaPreviewRecipientName(traslado.requester.full_name);
+        setWaPreviewOpen(true);
       }
       
       fetchTraslado();
@@ -165,7 +175,10 @@ export default function TrasladoPersonalDetail() {
         'Podés ver los detalles acá:',
         APP_URL + '/personal/traslados/' + traslado.id
       ].join('\n');
-      window.open(buildWhatsAppLink(requesterPhone, msg), '_blank');
+      setWaPreviewPhone(requesterPhone);
+      setWaPreviewMessage(msg);
+      setWaPreviewRecipientName(traslado.requester.full_name);
+      setWaPreviewOpen(true);
     }
 
     setRejecting(false);
@@ -187,7 +200,10 @@ export default function TrasladoPersonalDetail() {
     ].join('\n');
 
     const phone = traslado.requester?.whatsapp || '';
-    window.open(buildWhatsAppLink(phone.replace(/\D/g, ''), msg), '_blank');
+    setWaPreviewPhone(phone.replace(/\D/g, ''));
+    setWaPreviewMessage(msg);
+    setWaPreviewRecipientName(traslado.requester?.full_name || 'Solicitante');
+    setWaPreviewOpen(true);
   };
 
   const handleDelete = async () => {
@@ -483,9 +499,17 @@ export default function TrasladoPersonalDetail() {
               </div>
             </div>
           )}
-
         </CardContent>
       </Card>
+
+      {/* Reusable WhatsApp Preview Modal */}
+      <WhatsAppPreviewModal
+        isOpen={waPreviewOpen}
+        onClose={() => setWaPreviewOpen(false)}
+        phone={waPreviewPhone}
+        message={waPreviewMessage}
+        recipientName={waPreviewRecipientName}
+      />
     </div>
   );
 }

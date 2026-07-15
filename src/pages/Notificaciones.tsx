@@ -6,6 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useAuthStore } from '../store/auth';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { WhatsAppPreviewModal } from '../components/WhatsAppPreviewModal';
+import { buildWhatsAppLink } from '../lib/whatsapp';
 import { 
   Bell, 
   Clock, 
@@ -17,7 +21,9 @@ import {
   HardHat,
   ArrowRight,
   MapPin,
-  ChevronRight
+  ChevronRight,
+  Search,
+  Filter
 } from 'lucide-react';
 
 interface NotificacionHerramienta {
@@ -57,6 +63,70 @@ export default function Notificaciones() {
   const [toolsNotifications, setToolsNotifications] = useState<NotificacionHerramienta[]>([]);
   const [personalNotifications, setPersonalNotifications] = useState<NotificacionPersonal[]>([]);
 
+  // Local storage helpers to track whatsapp notifications sent
+  const getWhatsappSentList = (): string[] => {
+    try {
+      return JSON.parse(localStorage.getItem('whatsapp_sent_notifications') || '[]');
+    } catch {
+      return [];
+    }
+  };
+
+  const markWhatsappAsSent = (id: string) => {
+    try {
+      const list = getWhatsappSentList();
+      if (!list.includes(id)) {
+        list.push(id);
+        localStorage.setItem('whatsapp_sent_notifications', JSON.stringify(list));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Filter states
+  const [filterStatus, setFilterStatus] = useState<string>('');
+  const [filterWhatsapp, setFilterWhatsapp] = useState<'all' | 'pending' | 'sent'>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // WhatsApp Preview state
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewPhone, setPreviewPhone] = useState('');
+  const [previewMessage, setPreviewMessage] = useState('');
+  const [previewNotificationId, setPreviewNotificationId] = useState<string | null>(null);
+  const [previewRecipientName, setPreviewRecipientName] = useState<string>('');
+
+  const handleOpenWhatsappPreview = (item: any, type: 'tools' | 'personal') => {
+    let phone = '';
+    let message = '';
+    let recipientName = '';
+    
+    if (type === 'tools') {
+      phone = item.profiles?.whatsapp || '';
+      recipientName = item.profiles?.full_name || 'Solicitante';
+      message = `*Aviso de PEIE Tools - Traslado de Herramienta*\n` +
+                `Hola, te notificamos sobre la solicitud de la herramienta *${item.herramientas?.name}* (Código: ${item.herramientas?.code || '-'}).\n` +
+                `Estado: *${item.status}*\n` +
+                `Destino: ${item.target_obra?.name || '-'}\n` +
+                `Solicitado por: ${item.profiles?.full_name || '-'}`;
+    } else {
+      phone = item.requester?.whatsapp || item.empleados?.whatsapp || '';
+      recipientName = item.requester?.full_name || 'Solicitante';
+      message = `*Aviso de PEIE Tools - Traslado de Personal*\n` +
+                `Hola, te notificamos sobre el traslado de *${item.empleados?.full_name || 'Personal'}*.\n` +
+                `Origen: ${item.source_obra?.name || 'Sin obra'}\n` +
+                `Destino: ${item.target_obra?.name || '-'}\n` +
+                `Estado: *${item.status}*\n` +
+                `Solicitado por: ${item.requester?.full_name || 'Admin'}`;
+    }
+    
+    setPreviewPhone(phone);
+    setPreviewMessage(message);
+    setPreviewNotificationId(item.id);
+    setPreviewRecipientName(recipientName);
+    setIsPreviewOpen(true);
+  };
+
   useEffect(() => {
     if (profile) {
       fetchNotifications();
@@ -73,9 +143,9 @@ export default function Notificaciones() {
         .from('solicitudes')
         .select(`
           id, requester_id, assigned_to, priority, status, created_at, comments, security_code,
-          profiles!solicitudes_requester_id_fkey(full_name),
+          profiles!solicitudes_requester_id_fkey(full_name, whatsapp),
           herramientas!solicitudes_herramienta_id_fkey(name, code),
-          target_obra:obras!solicitudes_target_obra_id_fkey(name)
+          target_obra:obras!solicitudes_target_obra_id_fkey(name, encargado_name)
         `)
         .order('created_at', { ascending: false });
 
@@ -86,10 +156,10 @@ export default function Notificaciones() {
         .from('traslados_personal')
         .select(`
           id, requester_id, source_obra_id, target_obra_id, status, created_at,
-          empleados!traslados_personal_empleado_id_fkey(full_name),
+          empleados!traslados_personal_empleado_id_fkey(full_name, whatsapp),
           source_obra:obras!traslados_personal_source_obra_id_fkey(name, encargado_name),
           target_obra:obras!traslados_personal_target_obra_id_fkey(name, encargado_name),
-          requester:profiles!traslados_personal_requester_id_fkey(full_name)
+          requester:profiles!traslados_personal_requester_id_fkey(full_name, whatsapp)
         `)
         .order('created_at', { ascending: false });
 
@@ -162,6 +232,56 @@ export default function Notificaciones() {
     }
   };
 
+  const filteredToolsNotifications = toolsNotifications.filter(item => {
+    // 1. Matches Search
+    const matchesSearch = !searchQuery || 
+      (item.herramientas?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.herramientas?.code || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.profiles?.full_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.target_obra?.name || '').toLowerCase().includes(searchQuery.toLowerCase());
+
+    // 2. Matches Status
+    const matchesStatusVal = !filterStatus || (
+      filterStatus === 'Pendiente' ? (item.status === 'Pendiente' || item.status === 'Asignada') :
+      filterStatus === 'En camino' ? (item.status === 'En retiro' || item.status === 'En traslado') :
+      filterStatus === 'Completado' ? (item.status === 'Entregada' || item.status === 'Confirmada' || item.status === 'Confirmado') :
+      filterStatus === 'Cancelado' ? (item.status === 'Cancelada' || item.status === 'Rechazada' || item.status === 'Rechazado') :
+      true
+    );
+
+    // 3. Matches Whatsapp
+    const isSent = getWhatsappSentList().includes(item.id);
+    const matchesWhatsappVal = filterWhatsapp === 'all' || 
+      (filterWhatsapp === 'pending' ? !isSent : isSent);
+
+    return matchesSearch && matchesStatusVal && matchesWhatsappVal;
+  });
+
+  const filteredPersonalNotifications = personalNotifications.filter(item => {
+    // 1. Matches Search
+    const matchesSearch = !searchQuery || 
+      (item.empleados?.full_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.source_obra?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.target_obra?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.requester?.full_name || '').toLowerCase().includes(searchQuery.toLowerCase());
+
+    // 2. Matches Status
+    const matchesStatusVal = !filterStatus || (
+      filterStatus === 'Pendiente' ? (item.status === 'Pendiente' || item.status === 'Asignada') :
+      filterStatus === 'En camino' ? (item.status === 'En retiro' || item.status === 'En traslado') :
+      filterStatus === 'Completado' ? (item.status === 'Entregada' || item.status === 'Confirmada' || item.status === 'Confirmado') :
+      filterStatus === 'Cancelado' ? (item.status === 'Cancelada' || item.status === 'Rechazada' || item.status === 'Rechazado') :
+      true
+    );
+
+    // 3. Matches Whatsapp
+    const isSent = getWhatsappSentList().includes(item.id);
+    const matchesWhatsappVal = filterWhatsapp === 'all' || 
+      (filterWhatsapp === 'pending' ? !isSent : isSent);
+
+    return matchesSearch && matchesStatusVal && matchesWhatsappVal;
+  });
+
   return (
     <div className="space-y-6 pb-safe max-w-4xl mx-auto">
       
@@ -178,6 +298,53 @@ export default function Notificaciones() {
         </div>
       </div>
 
+      {/* Filtros */}
+      <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100 flex flex-col md:flex-row md:items-center gap-3">
+        {/* Búsqueda */}
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Input 
+            placeholder="Buscar por operario, herramienta, obra..." 
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="pl-9 h-9 rounded-xl border-slate-200 focus-visible:ring-peie-blue bg-white text-slate-800"
+          />
+        </div>
+
+        {/* Selector de Estado */}
+        <select 
+          value={filterStatus}
+          onChange={e => setFilterStatus(e.target.value)}
+          className="h-9 rounded-xl border border-slate-200 px-3 text-xs bg-white text-slate-700 font-semibold shadow-sm focus:outline-none"
+        >
+          <option value="">Estado: Todos</option>
+          <option value="Pendiente">Pendiente</option>
+          <option value="En camino">En camino</option>
+          <option value="Completado">Completado</option>
+          <option value="Cancelado">Cancelado</option>
+        </select>
+
+        {/* Selector de WhatsApp */}
+        <select 
+          value={filterWhatsapp}
+          onChange={e => setFilterWhatsapp(e.target.value as any)}
+          className="h-9 rounded-xl border border-slate-200 px-3 text-xs bg-white text-slate-700 font-semibold shadow-sm focus:outline-none"
+        >
+          <option value="all">WhatsApp: Todos</option>
+          <option value="pending">WhatsApp: Pendientes</option>
+          <option value="sent">WhatsApp: Notificados</option>
+        </select>
+
+        {(searchQuery || filterStatus || filterWhatsapp !== 'all') && (
+          <button 
+            onClick={() => { setSearchQuery(''); setFilterStatus(''); setFilterWhatsapp('all'); }}
+            className="text-xs text-rose-500 font-black hover:underline shrink-0 px-2"
+          >
+            × Limpiar
+          </button>
+        )}
+      </div>
+
       {loading ? (
         <div className="text-center py-16 text-muted-foreground">
           <div className="w-8 h-8 border-4 border-peie-blue/20 border-t-peie-blue rounded-full animate-spin mx-auto mb-3" />
@@ -187,116 +354,175 @@ export default function Notificaciones() {
         <Tabs value={activeTab} onValueChange={(val: any) => setActiveTab(val)} className="space-y-4">
           <TabsList className="bg-slate-100/80 p-1 rounded-2xl w-full grid grid-cols-2 max-w-md mx-auto">
             <TabsTrigger value="tools" className="rounded-xl py-2.5 text-xs font-bold transition-all data-[state=active]:bg-white data-[state=active]:text-peie-blue data-[state=active]:shadow-sm">
-              <Wrench className="w-3.5 h-3.5 mr-1.5" /> Herramientas ({toolsNotifications.length})
+              <Wrench className="w-3.5 h-3.5 mr-1.5" /> Herramientas ({filteredToolsNotifications.length})
             </TabsTrigger>
             <TabsTrigger value="personal" className="rounded-xl py-2.5 text-xs font-bold transition-all data-[state=active]:bg-white data-[state=active]:text-peie-blue data-[state=active]:shadow-sm">
-              <HardHat className="w-3.5 h-3.5 mr-1.5" /> Personal ({personalNotifications.length})
+              <HardHat className="w-3.5 h-3.5 mr-1.5" /> Personal ({filteredPersonalNotifications.length})
             </TabsTrigger>
           </TabsList>
 
           {/* TAB: HERRAMIENTAS */}
           <TabsContent value="tools" className="space-y-3 pt-2">
-            {toolsNotifications.map((s) => (
+            {filteredToolsNotifications.map((s) => (
               <Card 
                 key={s.id} 
                 className="group border border-slate-100 hover:border-peie-blue/10 hover:shadow-md transition-all duration-200 rounded-2xl overflow-hidden cursor-pointer"
                 onClick={() => navigate(`/solicitudes/${s.id}`, { state: { from: '/notificaciones' } })}
               >
-                <CardContent className="p-4 flex gap-4 items-center">
-                  <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-peie-blue/5 group-hover:text-peie-blue shrink-0 transition-colors">
-                    <Wrench className="w-5 h-5" />
-                  </div>
-                  
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <div className="flex justify-between items-start gap-2">
-                      <h4 className="text-sm font-bold text-slate-800 truncate group-hover:text-peie-blue transition-colors">
-                        {s.herramientas?.name || 'Herramienta'}
-                      </h4>
-                      {getStatusBadge(s.status)}
+                <CardContent className="p-4 flex gap-4 items-center justify-between">
+                  <div className="flex gap-4 items-center min-w-0 flex-1">
+                    <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-peie-blue/5 group-hover:text-peie-blue shrink-0 transition-colors">
+                      <Wrench className="w-5 h-5" />
                     </div>
+                    
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex justify-between items-start gap-2">
+                        <h4 className="text-sm font-bold text-slate-800 truncate group-hover:text-peie-blue transition-colors">
+                          {s.herramientas?.name || 'Herramienta'}
+                        </h4>
+                        {getStatusBadge(s.status)}
+                      </div>
 
-                    <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono">
-                      <span>Cód: {s.herramientas?.code || '-'}</span>
-                      <span>•</span>
-                      <span className="flex items-center gap-0.5">
-                        <span className={`w-1.5 h-1.5 rounded-full ${getPriorityStyle(s.priority)}`} /> Prioridad {s.priority}
-                      </span>
+                      <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono">
+                        <span>Cód: {s.herramientas?.code || '-'}</span>
+                        <span>•</span>
+                        <span className="flex items-center gap-0.5">
+                          <span className={`w-1.5 h-1.5 rounded-full ${getPriorityStyle(s.priority)}`} /> Prioridad {s.priority}
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-slate-500 font-medium">
+                        Solicitante: <span className="text-slate-800">{s.profiles?.full_name}</span> hacia <span className="text-slate-800 font-semibold">{s.target_obra?.name}</span>
+                      </p>
+
+                      <p className="text-[10px] text-slate-400 pt-0.5">
+                        {new Date(s.created_at).toLocaleString('es-AR')}
+                      </p>
                     </div>
-
-                    <p className="text-xs text-slate-500 font-medium">
-                      Solicitante: <span className="text-slate-800">{s.profiles?.full_name}</span> hacia <span className="text-slate-800 font-semibold">{s.target_obra?.name}</span>
-                    </p>
-
-                    <p className="text-[10px] text-slate-400 pt-0.5">
-                      {new Date(s.created_at).toLocaleString('es-AR')}
-                    </p>
                   </div>
 
-                  <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-peie-blue transition-colors" />
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className={`h-8 px-2.5 text-[10px] font-black rounded-xl flex items-center gap-1.5 border shadow-sm transition-all duration-200 ${
+                        getWhatsappSentList().includes(s.id)
+                          ? 'border-slate-100 text-slate-450 bg-slate-50 hover:bg-slate-100 hover:text-slate-600'
+                          : 'border-emerald-200 text-emerald-600 bg-emerald-50/50 hover:bg-emerald-50 hover:text-emerald-700'
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenWhatsappPreview(s, 'tools');
+                      }}
+                    >
+                      <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                        <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.09-3.846c1.62.963 3.426 1.47 5.278 1.471 5.516 0 10.01-4.498 10.014-10.02.002-2.673-1.04-5.187-2.936-7.086-1.897-1.9-4.411-2.946-7.083-2.947-5.525 0-10.02 4.5-10.024 10.022-.002 1.737.452 3.427 1.316 4.939l-1.002 3.66 3.737-.98zm11.378-7.79c-.3-.15-1.77-.874-2.045-.975-.276-.1-.476-.15-.676.15-.2.3-.775.975-.95 1.174-.175.2-.35.225-.65.075-.3-.15-1.263-.465-2.403-1.485-.888-.79-1.487-1.77-1.663-2.07-.175-.3-.019-.461.13-.61.135-.133.3-.349.45-.523.15-.174.2-.3.3-.5.1-.2.05-.375-.025-.525-.075-.15-.676-1.625-.925-2.225-.244-.595-.513-.51-.676-.51-.162-.008-.349-.01-.536-.01-.187 0-.49.07-.747.349-.257.276-.98.958-.98 2.337s1.003 2.707 1.143 2.894c.14.188 1.974 3.014 4.782 4.228.668.288 1.19.46 1.597.59.672.214 1.28.184 1.762.11.536-.08 1.77-.724 2.02-1.388.25-.664.25-1.233.175-1.353-.075-.12-.275-.22-.575-.37z"/>
+                      </svg>
+                      <span>{getWhatsappSentList().includes(s.id) ? 'Reenviar' : 'Notificar'}</span>
+                    </Button>
+                    <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-peie-blue transition-colors animate-pulse" />
+                  </div>
                 </CardContent>
               </Card>
             ))}
 
-            {toolsNotifications.length === 0 && (
+            {filteredToolsNotifications.length === 0 && (
               <div className="text-center py-16 bg-white rounded-3xl border border-dashed border-slate-200 max-w-md mx-auto">
-                <Bell className="w-10 h-10 text-slate-300 mx-auto mb-2.5" />
+                <Bell className="w-10 h-10 text-slate-350 mx-auto mb-2.5" />
                 <h3 className="text-sm font-bold text-slate-700">Sin notificaciones de herramientas</h3>
-                <p className="text-xs text-slate-400 mt-1">No tienes traslados de herramientas pendientes o recientes.</p>
+                <p className="text-xs text-slate-400 mt-1">No se encontraron traslados de herramientas con los filtros seleccionados.</p>
               </div>
             )}
           </TabsContent>
 
           {/* TAB: PERSONAL */}
           <TabsContent value="personal" className="space-y-3 pt-2">
-            {personalNotifications.map((p) => (
+            {filteredPersonalNotifications.map((p) => (
               <Card 
                 key={p.id} 
                 className="group border border-slate-100 hover:border-peie-blue/10 hover:shadow-md transition-all duration-200 rounded-2xl overflow-hidden cursor-pointer"
                 onClick={() => navigate(`/personal/traslados/${p.id}`, { state: { from: '/notificaciones' } })}
               >
-                <CardContent className="p-4 flex gap-4 items-center">
-                  <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-peie-blue/5 group-hover:text-peie-blue shrink-0 transition-colors">
-                    <User className="w-5 h-5" />
-                  </div>
-                  
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <div className="flex justify-between items-start gap-2">
-                      <h4 className="text-sm font-bold text-slate-800 truncate group-hover:text-peie-blue transition-colors">
-                        {p.empleados?.full_name || 'Operario'}
-                      </h4>
-                      {getStatusBadge(p.status)}
+                <CardContent className="p-4 flex gap-4 items-center justify-between">
+                  <div className="flex gap-4 items-center min-w-0 flex-1">
+                    <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-peie-blue/5 group-hover:text-peie-blue shrink-0 transition-colors">
+                      <User className="w-5 h-5" />
                     </div>
+                    
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex justify-between items-start gap-2">
+                        <h4 className="text-sm font-bold text-slate-800 truncate group-hover:text-peie-blue transition-colors">
+                          {p.empleados?.full_name || 'Operario'}
+                        </h4>
+                        {getStatusBadge(p.status)}
+                      </div>
 
-                    <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-                      <span className="truncate text-red-600">{p.source_obra?.name || 'Sin obra'}</span>
-                      <ArrowRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span className="truncate text-green-600">{p.target_obra?.name}</span>
+                      <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                        <span className="truncate text-red-600">{p.source_obra?.name || 'Sin obra'}</span>
+                        <ArrowRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="truncate text-green-600">{p.target_obra?.name}</span>
+                      </div>
+
+                      <p className="text-[10px] text-slate-400">
+                        Solicitado por: <span className="font-semibold">{p.requester?.full_name || 'Admin'}</span>
+                      </p>
+
+                      <p className="text-[10px] text-slate-400 pt-0.5">
+                        {new Date(p.created_at).toLocaleString('es-AR')}
+                      </p>
                     </div>
-
-                    <p className="text-[10px] text-slate-400">
-                      Solicitado por: <span className="font-semibold">{p.requester?.full_name || 'Admin'}</span>
-                    </p>
-
-                    <p className="text-[10px] text-slate-400 pt-0.5">
-                      {new Date(p.created_at).toLocaleString('es-AR')}
-                    </p>
                   </div>
 
-                  <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-peie-blue transition-colors" />
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className={`h-8 px-2.5 text-[10px] font-black rounded-xl flex items-center gap-1.5 border shadow-sm transition-all duration-200 ${
+                        getWhatsappSentList().includes(p.id)
+                          ? 'border-slate-100 text-slate-450 bg-slate-50 hover:bg-slate-100 hover:text-slate-600'
+                          : 'border-emerald-200 text-emerald-600 bg-emerald-50/50 hover:bg-emerald-50 hover:text-emerald-700'
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenWhatsappPreview(p, 'personal');
+                      }}
+                    >
+                      <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                        <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.09-3.846c1.62.963 3.426 1.47 5.278 1.471 5.516 0 10.01-4.498 10.014-10.02.002-2.673-1.04-5.187-2.936-7.086-1.897-1.9-4.411-2.946-7.083-2.947-5.525 0-10.02 4.5-10.024 10.022-.002 1.737.452 3.427 1.316 4.939l-1.002 3.66 3.737-.98zm11.378-7.79c-.3-.15-1.77-.874-2.045-.975-.276-.1-.476-.15-.676.15-.2.3-.775.975-.95 1.174-.175.2-.35.225-.65.075-.3-.15-1.263-.465-2.403-1.485-.888-.79-1.487-1.77-1.663-2.07-.175-.3-.019-.461.13-.61.135-.133.3-.349.45-.523.15-.174.2-.3.3-.5.1-.2.05-.375-.025-.525-.075-.15-.676-1.625-.925-2.225-.244-.595-.513-.51-.676-.51-.162-.008-.349-.01-.536-.01-.187 0-.49.07-.747.349-.257.276-.98.958-.98 2.337s1.003 2.707 1.143 2.894c.14.188 1.974 3.014 4.782 4.228.668.288 1.19.46 1.597.59.672.214 1.28.184 1.762.11.536-.08 1.77-.724 2.02-1.388.25-.664.25-1.233.175-1.353-.075-.12-.275-.22-.575-.37z"/>
+                      </svg>
+                      <span>{getWhatsappSentList().includes(p.id) ? 'Reenviar' : 'Notificar'}</span>
+                    </Button>
+                    <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-peie-blue transition-colors animate-pulse" />
+                  </div>
                 </CardContent>
               </Card>
             ))}
 
-            {personalNotifications.length === 0 && (
+            {filteredPersonalNotifications.length === 0 && (
               <div className="text-center py-16 bg-white rounded-3xl border border-dashed border-slate-200 max-w-md mx-auto">
-                <Bell className="w-10 h-10 text-slate-300 mx-auto mb-2.5" />
+                <Bell className="w-10 h-10 text-slate-350 mx-auto mb-2.5" />
                 <h3 className="text-sm font-bold text-slate-700">Sin notificaciones de personal</h3>
-                <p className="text-xs text-slate-400 mt-1">No tienes traslados de personal pendientes o recientes.</p>
+                <p className="text-xs text-slate-400 mt-1">No se encontraron traslados de personal con los filtros seleccionados.</p>
               </div>
             )}
           </TabsContent>
         </Tabs>
       )}
+
+      {/* Reusable WhatsApp Preview Modal */}
+      <WhatsAppPreviewModal
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        phone={previewPhone}
+        message={previewMessage}
+        recipientName={previewRecipientName}
+        onConfirm={(finalPhone, finalMessage) => {
+          if (previewNotificationId) {
+            markWhatsappAsSent(previewNotificationId);
+          }
+          toast({ title: 'Notificación registrada', description: 'Se marcó la notificación como enviada por WhatsApp.' });
+        }}
+      />
     </div>
   );
 }
