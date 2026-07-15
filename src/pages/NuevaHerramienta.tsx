@@ -11,6 +11,8 @@ import { ArrowLeft, Plus, Sparkles, Camera, Upload, Trash2 } from 'lucide-react'
 import { useAuthStore } from '../store/auth';
 import { Textarea } from '@/components/ui/textarea';
 import { compressImage } from '../lib/imageUtils';
+import { analyzeToolImage } from '../lib/openrouter';
+import VoiceInputButton from '../components/VoiceInputButton';
 
 interface Obra {
   id: string;
@@ -68,99 +70,109 @@ export default function NuevaHerramienta() {
     }
   };
 
-  const handleAiAutofill = () => {
+  const handleAiAutofill = async () => {
     setAiLoading(true);
-    
-    setTimeout(() => {
-      let textToParse = aiText;
-      
-      if (!textToParse.trim() && uploadedPhotoName) {
-        textToParse = `Código QR detectado: TAL-209. Taladro Inalámbrico Stanley Fatmax 20v. Modelo SCD711. Categoría: Taladros.`;
+    try {
+      let result: any = null;
+
+      if (photoUrl) {
+        // Enviar la foto real a OpenRouter
+        result = await analyzeToolImage(photoUrl);
+      } else if (aiText.trim()) {
+        // Si no hay foto pero sí hay texto, usamos OpenRouter para parsear el texto
+        const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+        if (!apiKey) {
+          throw new Error('La API Key de OpenRouter (VITE_OPENROUTER_API_KEY) no está configurada.');
+        }
+        
+        const prompt = `Analizá el siguiente texto que describe una herramienta de construcción y devolvé un objeto JSON estructurado con las siguientes propiedades. No agregues markdown adicional ni etiquetas de código (como \`\`\`json), devolvé estrictamente el string JSON:
+{
+  "nombre_sugerido": "Nombre de la herramienta en español",
+  "marca": "Marca identificada",
+  "modelo": "Modelo específico si se menciona",
+  "categoria": "Categoría que mejor se adapte",
+  "descripcion_breve": "Descripción técnica corta"
+}
+Texto: "${aiText}"
+
+Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Elementos de seguridad', 'Instrumentos de medición', 'Vehículos', 'Otros'. Si no podés identificar una propiedad, dejala en blanco ("").`;
+
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+            'HTTP-Referer': 'https://peietools.com',
+            'X-Title': 'PEIE Tools'
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-2.5-flash',
+            messages: [
+              {
+                role: 'user',
+                content: prompt
+              }
+            ],
+            response_format: { type: 'json_object' }
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Error al llamar a OpenRouter para procesar el texto.');
+        }
+
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content;
+        if (content) {
+          result = JSON.parse(content.trim());
+        }
       }
 
-      const lower = textToParse.toLowerCase();
-      
-      // 1. Detectar Código
-      const codeMatch = textToParse.match(/[A-Z]{3,4}-\d{3,4}/i) || textToParse.match(/\b\d{10,13}\b/);
-      let detectedCode = codeMatch ? codeMatch[0].toUpperCase() : '';
-      if (!detectedCode) {
-        const words = lower.split(/\s+/);
-        const prefix = words.some(w => w.includes('talad')) ? 'TAL' 
-          : words.some(w => w.includes('amol')) ? 'AMO' 
-          : words.some(w => w.includes('escal')) ? 'ESC' 
-          : words.some(w => w.includes('med')) ? 'MED' 
-          : 'HER';
-        detectedCode = `${prefix}-${Math.floor(100 + Math.random() * 900)}`;
-      }
+      if (result) {
+        if (result.nombre_sugerido) setName(result.nombre_sugerido);
+        if (result.marca) setBrand(result.marca);
+        if (result.modelo) setModel(result.modelo);
+        if (result.categoria) {
+          const validCats = ['Escaleras', 'Amoladoras', 'Taladros', 'Elementos de seguridad', 'Instrumentos de medición', 'Vehículos', 'Otros'];
+          const matched = validCats.find(c => c.toLowerCase() === result.categoria.toLowerCase());
+          if (matched) setCategory(matched);
+          else setCategory('Otros');
+        }
+        if (result.descripcion_breve) setDescription(result.descripcion_breve);
 
-      // 2. Detectar Marca
-      const brands = ['dewalt', 'makita', 'bosch', 'milwaukee', 'stanley', 'philco', 'skil', 'black & decker', 'black and decker', 'honda', 'karcher', 'fluke'];
-      const detectedBrand = brands.find(b => lower.includes(b)) || '';
-      const formattedBrand = detectedBrand ? detectedBrand.charAt(0).toUpperCase() + detectedBrand.slice(1) : '';
+        // Generar código sugerido si está vacío (ej: TAL-123)
+        if (!code) {
+          const prefix = result.categoria === 'Taladros' ? 'TAL'
+            : result.categoria === 'Amoladoras' ? 'AMO'
+            : result.categoria === 'Escaleras' ? 'ESC'
+            : result.categoria === 'Instrumentos de medición' ? 'MED'
+            : 'HER';
+          setCode(`${prefix}-${Math.floor(100 + Math.random() * 900)}`);
+        }
 
-      // 3. Detectar Modelo
-      const modelMatch = textToParse.match(/\b([A-Z]{2,4}\d{3,4}[A-Z]*|\d{3,4}[A-Z]{2,4})\b/i) || textToParse.match(/modelo\s+([a-z0-9\-]+)/i);
-      const detectedModel = modelMatch ? modelMatch[1].toUpperCase() : '';
-
-      // 4. Detectar Categoría
-      let detectedCategory = 'Otros';
-      if (lower.includes('amoladora') || lower.includes('angular') || lower.includes('disco')) {
-        detectedCategory = 'Amoladoras';
-      } else if (lower.includes('taladro') || lower.includes('percutor') || lower.includes('roto') || lower.includes('atornillador')) {
-        detectedCategory = 'Taladros';
-      } else if (lower.includes('escalera') || lower.includes('andamio')) {
-        detectedCategory = 'Escaleras';
-      } else if (lower.includes('seguridad') || lower.includes('arnes') || lower.includes('casco') || lower.includes('chaleco')) {
-        detectedCategory = 'Elementos de seguridad';
-      } else if (lower.includes('medicion') || lower.includes('medición') || lower.includes('tester') || lower.includes('multimetro') || lower.includes('cinta')) {
-        detectedCategory = 'Instrumentos de medición';
-      } else if (lower.includes('camioneta') || lower.includes('vehiculo') || lower.includes('auto') || lower.includes('camion')) {
-        detectedCategory = 'Vehículos';
-      }
-
-      // 5. Detectar Obra
-      const detectedObra = obras.find(o => lower.includes(o.name.toLowerCase()));
-      if (detectedObra) {
-        setCurrentObraId(detectedObra.id);
-      }
-
-      // 6. Detectar Nombre
-      let detectedName = '';
-      const nameKeywords = ['amoladora', 'taladro', 'escalera', 'multimetro', 'tester', 'atornillador', 'rotopercutor', 'lijadora', 'sierra', 'generador', 'compresor'];
-      const foundKeyword = nameKeywords.find(k => lower.includes(k));
-      if (foundKeyword) {
-        detectedName = foundKeyword.charAt(0).toUpperCase() + foundKeyword.slice(1);
-        if (formattedBrand) detectedName += ` ${formattedBrand}`;
-        if (detectedModel) detectedName += ` ${detectedModel}`;
+        toast({
+          title: '¡Formulario Autocompletado!',
+          description: 'La IA analizó la información y rellenó los campos correspondientes. Revisalos antes de registrar.'
+        });
       } else {
-        detectedName = textToParse.split(/[.,]/)[0].slice(0, 40).trim();
+        toast({
+          variant: 'destructive',
+          title: 'Error de análisis',
+          description: 'No se obtuvo información válida para autocompletar.'
+        });
       }
-
-      // 7. Descripción
-      const detectedDesc = textToParse
-        .replace(codeMatch?.[0] || '', '')
-        .replace(detectedBrand, '')
-        .replace(detectedModel, '')
-        .replace(/lectura de archivo/i, '')
-        .replace(/código detectado qr/i, '')
-        .replace(/producto/i, '')
-        .replace(/["':]/g, '')
-        .trim();
-
-      if (detectedCode) setCode(detectedCode);
-      if (detectedName) setName(detectedName);
-      if (formattedBrand) setBrand(formattedBrand);
-      if (detectedModel) setModel(detectedModel);
-      if (detectedCategory) setCategory(detectedCategory);
-      if (detectedDesc) setDescription(detectedDesc.slice(0, 100));
-
-      setAiLoading(false);
+    } catch (err: any) {
+      console.error(err);
       toast({
-        title: '¡Formulario Autocompletado!',
-        description: 'La IA analizó la información y rellenó los campos correspondientes. Revisalos antes de registrar.'
+        variant: 'destructive',
+        title: 'Error de IA',
+        description: err.message || 'No se pudo completar el análisis con IA.'
       });
-    }, 1500);
+    } finally {
+      setAiLoading(false);
+    }
   };
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -339,38 +351,47 @@ export default function NuevaHerramienta() {
 
               <div className="space-y-1.5">
                 <Label htmlFor="name" className="text-xs font-semibold text-slate-700">Nombre de la Herramienta *</Label>
-                <Input 
-                  id="name" 
-                  placeholder="Ej: Taladro Percutor Rotopercutor" 
-                  value={name} 
-                  onChange={e => setName(e.target.value)}
-                  className="h-11 rounded-xl"
-                  required 
-                />
+                <div className="flex gap-2">
+                  <Input 
+                    id="name" 
+                    placeholder="Ej: Taladro Percutor Rotopercutor" 
+                    value={name} 
+                    onChange={e => setName(e.target.value)}
+                    className="h-11 rounded-xl flex-1"
+                    required 
+                  />
+                  <VoiceInputButton onTranscript={(text) => setName(text)} className="h-11 w-11 shrink-0" />
+                </div>
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="brand" className="text-xs font-semibold text-slate-700">Marca</Label>
-                <Input 
-                  id="brand" 
-                  placeholder="Ej: DeWalt" 
-                  value={brand} 
-                  onChange={e => setBrand(e.target.value)}
-                  className="h-11 rounded-xl" 
-                />
+                <div className="flex gap-2">
+                  <Input 
+                    id="brand" 
+                    placeholder="Ej: DeWalt" 
+                    value={brand} 
+                    onChange={e => setBrand(e.target.value)}
+                    className="h-11 rounded-xl flex-1" 
+                  />
+                  <VoiceInputButton onTranscript={(text) => setBrand(text)} className="h-11 w-11 shrink-0" />
+                </div>
               </div>
 
               <div className="space-y-1.5">
                 <Label htmlFor="model" className="text-xs font-semibold text-slate-700">Modelo</Label>
-                <Input 
-                  id="model" 
-                  placeholder="Ej: DCD778" 
-                  value={model} 
-                  onChange={e => setModel(e.target.value)}
-                  className="h-11 rounded-xl" 
-                />
+                <div className="flex gap-2">
+                  <Input 
+                    id="model" 
+                    placeholder="Ej: DCD778" 
+                    value={model} 
+                    onChange={e => setModel(e.target.value)}
+                    className="h-11 rounded-xl flex-1" 
+                  />
+                  <VoiceInputButton onTranscript={(text) => setModel(text)} className="h-11 w-11 shrink-0" />
+                </div>
               </div>
             </div>
 
@@ -410,13 +431,16 @@ export default function NuevaHerramienta() {
 
             <div className="space-y-1.5">
               <Label htmlFor="desc" className="text-xs font-semibold text-slate-700">Descripción o Características Adicionales</Label>
-              <Input 
-                id="desc" 
-                placeholder="Detalles sobre potencia, accesorios incluidos, estado visual..." 
-                value={description} 
-                onChange={e => setDescription(e.target.value)}
-                className="h-11 rounded-xl" 
-              />
+              <div className="flex gap-2">
+                <Input 
+                  id="desc" 
+                  placeholder="Detalles sobre potencia, accesorios incluidos, estado visual..." 
+                  value={description} 
+                  onChange={e => setDescription(e.target.value)}
+                  className="h-11 rounded-xl flex-1" 
+                />
+                <VoiceInputButton onTranscript={(text) => setDescription(text)} className="h-11 w-11 shrink-0" />
+              </div>
             </div>
 
             {/* Foto de la Herramienta */}

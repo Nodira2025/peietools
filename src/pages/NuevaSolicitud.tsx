@@ -11,6 +11,7 @@ import { ArrowLeft, Truck, MessageCircle, AlertCircle, Search } from 'lucide-rea
 import { useAuthStore } from '../store/auth';
 import { buildWhatsAppLink, APP_URL } from '../lib/whatsapp';
 import { WhatsAppPreviewModal } from '../components/WhatsAppPreviewModal';
+import VoiceInputButton from '../components/VoiceInputButton';
 
 interface Obra {
   id: string;
@@ -445,13 +446,16 @@ export default function NuevaSolicitud() {
 
               <div className="space-y-1.5">
                 <Label htmlFor="comments" className="text-xs font-semibold text-slate-700">Comentarios Adicionales</Label>
-                <Input 
-                  id="comments" 
-                  placeholder="Ej: Se requiere para hormigonado de losa..." 
-                  value={comments} 
-                  onChange={e => setComments(e.target.value)}
-                  className="h-11 rounded-xl"
-                />
+                <div className="flex gap-2">
+                  <Input 
+                    id="comments" 
+                    placeholder="Ej: Se requiere para hormigonado de losa..." 
+                    value={comments} 
+                    onChange={e => setComments(e.target.value)}
+                    className="h-11 rounded-xl flex-1"
+                  />
+                  <VoiceInputButton onTranscript={(text) => setComments(text)} className="h-11 w-11 shrink-0" />
+                </div>
               </div>
             </div>
 
