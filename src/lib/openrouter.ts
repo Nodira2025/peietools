@@ -120,3 +120,68 @@ Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Elementos de segur
   }
 }
 
+/**
+ * Interpreta texto libre del usuario (dictado por voz, mal escrito, informal)
+ * y devuelve términos de búsqueda estructurados para encontrar una herramienta.
+ */
+export async function interpretUserInput(userText: string): Promise<{ terminos: string[]; tipo_herramienta: string; descripcion: string }> {
+  let apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+  if (!apiKey) {
+    apiKey = localStorage.getItem('VITE_OPENROUTER_API_KEY') || '';
+  }
+  if (!apiKey) throw new Error('CONFIG_REQUIRED');
+
+  const prompt = `Sos un asistente de logística en una obra de construcción. Un obrero te describe una herramienta de la forma más informal posible (puede tener errores ortográficos, usar jerga de obra, o describirla por su aspecto o uso). Tu trabajo es interpretar qué herramienta busca.
+
+Texto del obrero: "${userText}"
+
+Devolvé estrictamente un JSON (sin markdown) con:
+{
+  "terminos": ["lista", "de", "palabras", "clave", "para", "buscar"],
+  "tipo_herramienta": "nombre correcto de la herramienta en español",
+  "descripcion": "descripción clara de lo que el obrero quiere decir"
+}
+
+Ejemplos de interpretación:
+- "el aparato azul para cortar fierro" → tipo: "amoladora" o "sierra sensitiva"
+- "la maquinita que hace agujeros" → tipo: "taladro"
+- "esa cosa amarilla para medir" → tipo: "nivel laser" o "cinta métrica"
+- "el matafuego" → tipo: "matafuegos" o "extintor"`;
+
+  try {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'HTTP-Referer': 'https://peietools.com',
+        'X-Title': 'PEIE Tools'
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [{ role: 'user', content: prompt }],
+        response_format: { type: 'json_object' }
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || `Error API: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) throw new Error('Respuesta vacía');
+
+    try {
+      return JSON.parse(content.trim());
+    } catch {
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) return JSON.parse(jsonMatch[0]);
+      throw new Error('Respuesta sin formato JSON válido');
+    }
+  } catch (error: any) {
+    console.error('[OpenRouter] Error en interpretUserInput:', error);
+    throw error;
+  }
+}
