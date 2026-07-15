@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,12 +18,20 @@ import {
   Search,
   Wrench,
   MapPin,
+  Building,
+  Volume2,
+  VolumeX,
   Mic,
-  Building
+  ChevronRight,
+  RotateCcw,
+  ImageIcon
 } from 'lucide-react';
 import { compressImage } from '../lib/imageUtils';
 import { analyzeToolImage, interpretUserInput } from '../lib/openrouter';
+import { speak, stopSpeaking, setVoiceEnabled, isVoiceEnabled, isSpeechSupported } from '../lib/voiceGuide';
 import VoiceInputButton from '../components/VoiceInputButton';
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface Herramienta {
   id: string;
@@ -43,571 +51,763 @@ interface Obra {
   name: string;
 }
 
-type FlowStep = 'idle' | 'loading' | 'show_matches' | 'filter_by_obra' | 'voice_assist' | 'confirmed';
+// Wizard steps - one question per screen
+type WizardStep = 
+  | 'welcome'           // "¿Cómo querés encontrar la herramienta?"
+  | 'photo_upload'      // "Sacá una foto o subí de la galería"
+  | 'photo_loading'     // "Analizando..."
+  | 'photo_results'     // "¿Cuál es tu herramienta?" (top 3)
+  | 'select_obra'       // "¿En qué obra estaba?"
+  | 'tools_in_obra'     // "Tocá tu herramienta" (list from obra)
+  | 'voice_describe'    // "Describí la herramienta con tu voz"
+  | 'voice_loading'     // "Interpretando..."
+  | 'voice_results'     // "¿Es alguna de estas?"
+  | 'confirm_tool'      // "¿Es esta la herramienta?"
+  | 'select_action';    // "¿Qué querés hacer con esta herramienta?"
+
+// ─── Component ───────────────────────────────────────────────────────────────
 
 export default function BusquedaVisual() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // Data
   const [allTools, setAllTools] = useState<Herramienta[]>([]);
   const [obras, setObras] = useState<Obra[]>([]);
+
+  // Wizard state
+  const [step, setStep] = useState<WizardStep>('welcome');
+  const [voiceOn, setVoiceOn] = useState(true);
+
+  // Photo flow
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-  const [uploadedPhotoName, setUploadedPhotoName] = useState('');
-  
-  const [flowStep, setFlowStep] = useState<FlowStep>('idle');
   const [aiResult, setAiResult] = useState<any>(null);
-  
-  // Top matches from fuzzy search
   const [topMatches, setTopMatches] = useState<{ tool: Herramienta; score: number }[]>([]);
-  
-  // Selected tool (final)
-  const [activeTool, setActiveTool] = useState<Herramienta | null>(null);
-  
-  // Obra filter step
-  const [selectedObra, setSelectedObra] = useState<string | null>(null);
+
+  // Obra flow
+  const [selectedObra, setSelectedObra] = useState<Obra | null>(null);
   const [toolsInObra, setToolsInObra] = useState<Herramienta[]>([]);
-  
-  // Voice assist step
+
+  // Voice flow
   const [voiceText, setVoiceText] = useState('');
-  const [voiceLoading, setVoiceLoading] = useState(false);
   const [voiceResults, setVoiceResults] = useState<Herramienta[]>([]);
 
-  // Load full inventory + obras list
+  // Final selection
+  const [activeTool, setActiveTool] = useState<Herramienta | null>(null);
+
+  // ─── Data Loading ────────────────────────────────────────────────────────
+
   useEffect(() => {
     async function loadData() {
       const [toolsRes, obrasRes] = await Promise.all([
         supabase.from('herramientas').select('*, obras(name)'),
         supabase.from('obras').select('id, name').eq('active', true).order('name')
       ]);
-      
       if (toolsRes.data) {
-        const normalized = toolsRes.data.map((h: any) => ({
+        setAllTools(toolsRes.data.map((h: any) => ({
           ...h,
           obras: Array.isArray(h.obras) ? h.obras[0] : h.obras
-        })) as Herramienta[];
-        setAllTools(normalized);
+        })) as Herramienta[]);
       }
-      if (obrasRes.data) {
-        setObras(obrasRes.data);
-      }
+      if (obrasRes.data) setObras(obrasRes.data);
     }
     loadData();
   }, []);
 
-  // Reset everything for a new search
-  const resetSearch = () => {
-    setFlowStep('idle');
+  // ─── Voice Guide ─────────────────────────────────────────────────────────
+
+  const guideSpeak = useCallback((text: string) => {
+    if (voiceOn) speak(text);
+  }, [voiceOn]);
+
+  const toggleVoice = () => {
+    const newState = !voiceOn;
+    setVoiceOn(newState);
+    setVoiceEnabled(newState);
+    if (!newState) stopSpeaking();
+  };
+
+  // Speak on step change
+  useEffect(() => {
+    const messages: Record<WizardStep, string> = {
+      welcome: '¿Cómo querés encontrar la herramienta? Podés sacar una foto, buscar por obra, o describir la herramienta con tu voz.',
+      photo_upload: 'Sacá una foto de la herramienta o elegí una de tu galería.',
+      photo_loading: 'Analizando la imagen. Esperá un momento.',
+      photo_results: 'Encontré estas herramientas parecidas. Tocá la que sea la tuya.',
+      select_obra: '¿En qué obra estaba la herramienta? Tocá la obra.',
+      tools_in_obra: 'Estas son las herramientas de esa obra. Tocá la tuya.',
+      voice_describe: 'Describí la herramienta con tus palabras. Podés decir cómo se ve, para qué sirve, o de qué color es. Apretá el botón del micrófono y hablá.',
+      voice_loading: 'Estoy interpretando lo que dijiste. Esperá un momento.',
+      voice_results: 'Encontré estas herramientas. Tocá la que sea la tuya.',
+      confirm_tool: '¿Es esta la herramienta que buscás? Si es correcta, tocá Sí.',
+      select_action: '¿Qué querés hacer con esta herramienta? Elegí una opción.',
+    };
+    if (messages[step]) {
+      // Small delay so the UI renders first
+      const timer = setTimeout(() => guideSpeak(messages[step]), 400);
+      return () => clearTimeout(timer);
+    }
+  }, [step, guideSpeak]);
+
+  // ─── Navigation Helpers ──────────────────────────────────────────────────
+
+  const goToStep = (newStep: WizardStep) => {
+    stopSpeaking();
+    setStep(newStep);
+  };
+
+  const resetAll = () => {
+    stopSpeaking();
+    setStep('welcome');
+    setPhotoUrl(null);
     setAiResult(null);
     setTopMatches([]);
-    setActiveTool(null);
     setSelectedObra(null);
     setToolsInObra([]);
     setVoiceText('');
     setVoiceResults([]);
-    setPhotoUrl(null);
-    setUploadedPhotoName('');
+    setActiveTool(null);
   };
+
+  // ─── Photo Flow ──────────────────────────────────────────────────────────
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setUploadedPhotoName(file.name);
-      setAiResult(null);
-      setTopMatches([]);
-      setActiveTool(null);
-      setSelectedObra(null);
-      setVoiceText('');
-      setVoiceResults([]);
-      
-      try {
-        setFlowStep('loading');
-        const compressed = await compressImage(file);
-        setPhotoUrl(compressed);
-        
-        const parsed = await analyzeToolImage(compressed);
-        setAiResult(parsed);
-        console.log('[BusquedaVisual] AI result:', parsed);
+    if (!file) return;
 
-        findTopMatches(parsed);
-      } catch (err: any) {
-        console.error(err);
-        if (err.message === 'CONFIG_REQUIRED') {
-          const userKey = window.prompt("Ingresá tu API Key de OpenRouter para habilitar el reconocimiento visual (se guarda en tu navegador):");
-          if (userKey) {
-            localStorage.setItem('VITE_OPENROUTER_API_KEY', userKey.trim());
-            toast({ title: "API Key guardada", description: "Intentá de nuevo cargar la foto." });
-          }
-        } else {
-          toast({
-            variant: 'destructive',
-            title: 'Error de Análisis',
-            description: err.message || 'No se pudo identificar la herramienta.'
-          });
-        }
-        setFlowStep('idle');
+    goToStep('photo_loading');
+
+    try {
+      const compressed = await compressImage(file);
+      setPhotoUrl(compressed);
+
+      const parsed = await analyzeToolImage(compressed);
+      setAiResult(parsed);
+
+      // Fuzzy match top 3
+      const matches = findTopMatches(parsed);
+      if (matches.length > 0) {
+        setTopMatches(matches);
+        goToStep('photo_results');
+      } else {
+        toast({ title: 'No se encontró en el inventario', description: 'Probá buscando por obra.' });
+        goToStep('select_obra');
       }
+    } catch (err: any) {
+      if (err.message === 'CONFIG_REQUIRED') {
+        const userKey = window.prompt("Ingresá tu API Key de OpenRouter:");
+        if (userKey) {
+          localStorage.setItem('VITE_OPENROUTER_API_KEY', userKey.trim());
+          toast({ title: "Llave guardada", description: "Intentá de nuevo." });
+        }
+      } else {
+        toast({ variant: 'destructive', title: 'Error', description: err.message || 'No se pudo analizar la foto.' });
+      }
+      goToStep('photo_upload');
     }
   };
 
   const findTopMatches = (aiData: any) => {
-    if (allTools.length === 0) {
-      setFlowStep('filter_by_obra');
-      return;
-    }
-
     const brandNorm = (aiData.marca || '').toLowerCase().trim();
     const modelNorm = (aiData.modelo || '').toLowerCase().trim();
     const nameNorm = (aiData.nombre_sugerido || '').toLowerCase().trim();
     const catNorm = (aiData.categoria || '').toLowerCase().trim();
 
-    const scoredTools = allTools.map(tool => {
+    const scored = allTools.map(tool => {
       let score = 0;
       const tName = tool.name.toLowerCase();
       const tBrand = (tool.brand || '').toLowerCase();
       const tModel = (tool.model || '').toLowerCase();
       const tCat = (tool.category || '').toLowerCase();
 
-      // Brand match
-      if (brandNorm && tBrand && (tBrand.includes(brandNorm) || brandNorm.includes(tBrand))) {
-        score += 15;
-      }
-
-      // Model match
+      if (brandNorm && tBrand && (tBrand.includes(brandNorm) || brandNorm.includes(tBrand))) score += 15;
       if (modelNorm && tModel) {
         if (tModel === modelNorm) score += 30;
         else if (tModel.includes(modelNorm) || modelNorm.includes(tModel)) score += 20;
       }
-
-      // Name match (word-level)
       if (nameNorm && tName) {
-        const nameWords = nameNorm.split(/\s+/);
-        const matchWords = nameWords.filter(w => w.length > 2 && tName.includes(w));
-        score += matchWords.length * 5;
-        
-        // Bonus for exact substring
-        if (tName.includes(nameNorm) || nameNorm.includes(tName)) {
-          score += 10;
-        }
+        const words = nameNorm.split(/\s+/);
+        score += words.filter(w => w.length > 2 && tName.includes(w)).length * 5;
+        if (tName.includes(nameNorm) || nameNorm.includes(tName)) score += 10;
       }
-
-      // Category match
-      if (catNorm && tCat && (tCat.includes(catNorm) || catNorm.includes(tCat))) {
-        score += 5;
-      }
-
+      if (catNorm && tCat && (tCat.includes(catNorm) || catNorm.includes(tCat))) score += 5;
       return { tool, score };
     });
 
-    // Take top 3 with minimum score
-    const sorted = scoredTools.filter(x => x.score > 5).sort((a, b) => b.score - a.score).slice(0, 3);
-
-    if (sorted.length > 0) {
-      setTopMatches(sorted);
-      setFlowStep('show_matches');
-    } else {
-      setTopMatches([]);
-      toast({
-        title: 'No se encontró en el inventario',
-        description: 'Podés buscar por obra o describir la herramienta con tu voz.'
-      });
-      setFlowStep('filter_by_obra');
-    }
+    return scored.filter(x => x.score > 5).sort((a, b) => b.score - a.score).slice(0, 3);
   };
 
-  // When user selects a tool from top matches
-  const handleSelectMatch = (tool: Herramienta) => {
-    setActiveTool(tool);
-    setFlowStep('confirmed');
-  };
+  // ─── Obra Flow ───────────────────────────────────────────────────────────
 
-  // When user rejects all matches
-  const handleRejectAll = () => {
-    setTopMatches([]);
-    setFlowStep('filter_by_obra');
-  };
-
-  // Filter tools by selected obra
-  const handleSelectObra = (obraId: string) => {
-    setSelectedObra(obraId);
-    const filtered = allTools.filter(t => t.obra_id === obraId);
+  const handleSelectObra = (obra: Obra) => {
+    setSelectedObra(obra);
+    const filtered = allTools.filter(t => t.obra_id === obra.id);
     setToolsInObra(filtered);
+    goToStep('tools_in_obra');
   };
 
-  // AI-assisted voice search
+  // ─── Voice Flow ──────────────────────────────────────────────────────────
+
   const handleVoiceSearch = async () => {
     if (!voiceText.trim()) return;
+    goToStep('voice_loading');
 
     try {
-      setVoiceLoading(true);
       const interpreted = await interpretUserInput(voiceText);
-      console.log('[BusquedaVisual] AI interpreted:', interpreted);
+      toast({ title: `Entendido: "${interpreted.tipo_herramienta}"`, description: interpreted.descripcion });
 
-      toast({
-        title: `Entendido: "${interpreted.tipo_herramienta}"`,
-        description: interpreted.descripcion
-      });
-
-      // Search allTools using interpreted terms
-      const terms = [
-        interpreted.tipo_herramienta.toLowerCase(), 
-        ...interpreted.terminos.map(t => t.toLowerCase())
-      ];
-      
+      const terms = [interpreted.tipo_herramienta.toLowerCase(), ...interpreted.terminos.map(t => t.toLowerCase())];
       const scored = allTools.map(tool => {
         let score = 0;
-        const tName = tool.name.toLowerCase();
-        const tBrand = (tool.brand || '').toLowerCase();
-        const tModel = (tool.model || '').toLowerCase();
-        const tCat = (tool.category || '').toLowerCase();
-        const allText = `${tName} ${tBrand} ${tModel} ${tCat}`;
-
+        const allText = `${tool.name} ${tool.brand || ''} ${tool.model || ''} ${tool.category || ''}`.toLowerCase();
         for (const term of terms) {
-          if (term.length < 2) continue;
-          const termWords = term.split(/\s+/);
-          for (const w of termWords) {
+          for (const w of term.split(/\s+/)) {
             if (w.length > 2 && allText.includes(w)) score += 5;
           }
         }
         return { tool, score };
       });
 
-      // Filter by obra if selected
-      let results = scored.filter(x => x.score > 0);
-      if (selectedObra) {
-        results = results.filter(x => x.tool.obra_id === selectedObra);
-      }
-      
-      const sorted = results.sort((a, b) => b.score - a.score).slice(0, 5);
-      setVoiceResults(sorted.map(x => x.tool));
+      const results = scored.filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, 5);
+      setVoiceResults(results.map(x => x.tool));
 
-      if (sorted.length === 0) {
-        toast({ 
-          variant: 'destructive', 
-          title: 'Sin resultados', 
-          description: 'No se encontraron herramientas con esa descripción. Intentá con otras palabras.' 
-        });
+      if (results.length > 0) {
+        goToStep('voice_results');
+      } else {
+        toast({ variant: 'destructive', title: 'No encontré nada', description: 'Probá con otras palabras o buscá por obra.' });
+        goToStep('voice_describe');
       }
     } catch (err: any) {
-      console.error(err);
-      toast({
-        variant: 'destructive',
-        title: 'Error al interpretar',
-        description: err.message || 'No se pudo interpretar la descripción.'
-      });
-    } finally {
-      setVoiceLoading(false);
+      toast({ variant: 'destructive', title: 'Error', description: err.message });
+      goToStep('voice_describe');
     }
   };
 
-  // Render a tool card (reused in multiple steps)
-  const ToolCard = ({ tool, onSelect, highlight = false }: { tool: Herramienta; onSelect: () => void; highlight?: boolean }) => (
+  // ─── Tool Selection ──────────────────────────────────────────────────────
+
+  const handleSelectTool = (tool: Herramienta) => {
+    setActiveTool(tool);
+    goToStep('confirm_tool');
+  };
+
+  const handleConfirmTool = () => {
+    goToStep('select_action');
+  };
+
+  const handleRejectTool = () => {
+    setActiveTool(null);
+    goToStep('select_obra');
+  };
+
+  // ─── Reusable UI Components ──────────────────────────────────────────────
+
+  const ToolCard = ({ tool, onSelect }: { tool: Herramienta; onSelect: () => void }) => (
     <button
       type="button"
       onClick={onSelect}
-      className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all active:scale-[0.98] ${
-        highlight 
-          ? 'border-peie-blue bg-peie-blue/5 shadow-md' 
-          : 'border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50/30 shadow-sm'
-      }`}
+      className="w-full flex items-center gap-3 p-4 rounded-2xl border-2 border-slate-200 bg-white text-left transition-all active:scale-[0.97] active:border-peie-blue hover:border-blue-300 hover:shadow-md"
     >
       {tool.photo_url ? (
-        <img src={tool.photo_url} alt={tool.name} className="w-16 h-16 object-cover rounded-lg border border-slate-100 shrink-0" />
+        <img src={tool.photo_url} alt={tool.name} className="w-16 h-16 object-cover rounded-xl border border-slate-100 shrink-0" />
       ) : (
-        <div className="w-16 h-16 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 shrink-0">
-          <Wrench size={22} />
+        <div className="w-16 h-16 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 shrink-0">
+          <Wrench size={24} />
         </div>
       )}
-      <div className="flex-1 min-w-0 space-y-0.5">
-        <p className="text-[10px] font-mono font-bold text-peie-blue uppercase">{tool.code}</p>
-        <p className="text-sm font-bold text-slate-800 truncate">{tool.name}</p>
-        <p className="text-[11px] text-slate-500 truncate">
+      <div className="flex-1 min-w-0">
+        <p className="text-base font-bold text-slate-800 truncate">{tool.name}</p>
+        <p className="text-xs text-slate-500 truncate">
           {tool.brand || 'Sin marca'} {tool.model ? `· ${tool.model}` : ''}
         </p>
-        <div className="flex items-center gap-1 mt-0.5">
-          <MapPin size={10} className="text-slate-400 shrink-0" />
-          <span className="text-[10px] font-semibold text-slate-600 truncate">{tool.obras?.name || 'Base Central'}</span>
+        <div className="flex items-center gap-1 mt-1">
+          <MapPin size={12} className="text-peie-blue shrink-0" />
+          <span className="text-xs font-bold text-peie-blue truncate">{tool.obras?.name || 'Base Central'}</span>
         </div>
       </div>
-      <Check size={18} className="text-slate-300 shrink-0" />
+      <ChevronRight size={20} className="text-slate-300 shrink-0" />
     </button>
   );
 
+  const StepHeader = ({ title, subtitle }: { title: string; subtitle?: string }) => (
+    <div className="text-center space-y-2 py-2">
+      <h2 className="text-xl font-black text-slate-800 leading-tight">{title}</h2>
+      {subtitle && <p className="text-sm text-slate-500 font-medium">{subtitle}</p>}
+    </div>
+  );
+
+  const BackButton = ({ onBack }: { onBack: () => void }) => (
+    <button
+      type="button"
+      onClick={() => { stopSpeaking(); onBack(); }}
+      className="flex items-center gap-1 text-xs font-bold text-slate-400 hover:text-peie-blue transition-colors py-2"
+    >
+      <ArrowLeft size={14} /> Volver
+    </button>
+  );
+
+  // ─── Render ──────────────────────────────────────────────────────────────
+
   return (
-    <div className="space-y-6 max-w-xl mx-auto pb-safe">
-      <div className="flex items-center">
-        <Button variant="ghost" onClick={() => navigate('/herramientas')} className="p-0 hover:bg-transparent text-peie-blue">
-          <ArrowLeft className="mr-2 h-4 w-4" /> Volver al Inventario
+    <div className="space-y-4 max-w-xl mx-auto pb-safe">
+      {/* Top bar */}
+      <div className="flex items-center justify-between">
+        <Button variant="ghost" onClick={() => { stopSpeaking(); navigate('/herramientas'); }} className="p-0 hover:bg-transparent text-peie-blue text-xs">
+          <ArrowLeft className="mr-1 h-4 w-4" /> Inventario
         </Button>
+        {isSpeechSupported() && (
+          <button
+            type="button"
+            onClick={toggleVoice}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+              voiceOn 
+                ? 'bg-peie-blue text-white' 
+                : 'bg-slate-100 text-slate-500'
+            }`}
+          >
+            {voiceOn ? <Volume2 size={14} /> : <VolumeX size={14} />}
+            {voiceOn ? 'Voz ON' : 'Voz OFF'}
+          </button>
+        )}
       </div>
 
       <Card className="shadow-xl border-0 ring-1 ring-peie-blue/5 overflow-hidden rounded-2xl">
         <div className="h-1.5 bg-gradient-to-r from-peie-blue via-peie-light to-peie-blue" />
-        <CardHeader className="pb-4 pt-6 px-6">
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-xl bg-peie-blue/10 text-peie-blue font-bold">
-              <Camera size={20} />
-            </div>
-            <div>
-              <CardTitle className="text-xl font-bold text-peie-blue">Buscador de Herramientas</CardTitle>
-              <CardDescription className="text-xs">Sacá una foto, elegí por obra o describila con tu voz</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
+        <CardContent className="px-5 py-6 space-y-5">
 
-        <CardContent className="px-6 pb-6 space-y-6">
-          {/* 1. Photo Upload (Always visible when not confirmed) */}
-          {flowStep !== 'confirmed' && (
-            <div className="space-y-3">
-              <div className="flex flex-col sm:flex-row gap-3">
-                <input type="file" id="search-photo-camera" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoUpload} />
-                <input type="file" id="search-photo-gallery" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
-                <Label
-                  htmlFor="search-photo-camera"
-                  className="flex-1 flex items-center justify-center gap-2 h-14 rounded-xl border-2 border-peie-blue/30 border-dashed bg-peie-blue/5 text-sm text-peie-blue font-bold hover:bg-peie-blue/10 cursor-pointer active:scale-95 transition-all text-center"
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {/* STEP: WELCOME                                                   */}
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {step === 'welcome' && (
+            <div className="space-y-5">
+              <StepHeader 
+                title="¿Cómo querés encontrar la herramienta?" 
+                subtitle="Elegí una opción"
+              />
+
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => goToStep('photo_upload')}
+                  className="w-full flex items-center gap-4 p-5 rounded-2xl bg-gradient-to-r from-peie-blue to-peie-light text-white active:scale-[0.97] transition-all shadow-lg shadow-peie-blue/20"
                 >
-                  📷 Sacar Foto
-                </Label>
-                <Label
-                  htmlFor="search-photo-gallery"
-                  className="flex-1 flex items-center justify-center gap-2 h-14 rounded-xl border-2 border-slate-200 border-dashed bg-white text-sm text-slate-700 font-bold hover:bg-violet-50 hover:border-violet-300 cursor-pointer active:scale-95 transition-all text-center"
+                  <div className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                    <Camera size={28} />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-lg font-black">SACAR FOTO</p>
+                    <p className="text-xs text-white/80 font-medium">Le saco una foto y la busco</p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => goToStep('select_obra')}
+                  className="w-full flex items-center gap-4 p-5 rounded-2xl bg-white border-2 border-slate-200 text-slate-800 active:scale-[0.97] transition-all hover:border-blue-200"
                 >
-                  📁 Elegir de Galería
-                </Label>
+                  <div className="w-14 h-14 rounded-xl bg-blue-50 flex items-center justify-center text-peie-blue shrink-0">
+                    <Building size={28} />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-lg font-black">BUSCAR POR OBRA</p>
+                    <p className="text-xs text-slate-500 font-medium">Sé en qué obra estaba</p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => goToStep('voice_describe')}
+                  className="w-full flex items-center gap-4 p-5 rounded-2xl bg-white border-2 border-slate-200 text-slate-800 active:scale-[0.97] transition-all hover:border-emerald-200"
+                >
+                  <div className="w-14 h-14 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
+                    <Mic size={28} />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-lg font-black">DESCRIBIR CON VOZ</p>
+                    <p className="text-xs text-slate-500 font-medium">La describo y la busco</p>
+                  </div>
+                </button>
               </div>
-
-              {uploadedPhotoName && (
-                <p className="text-xs text-center text-slate-500 font-semibold">
-                  Foto cargada: <span className="text-peie-blue">{uploadedPhotoName}</span>
-                </p>
-              )}
             </div>
           )}
 
-          {/* Loading */}
-          {flowStep === 'loading' && (
-            <div className="flex flex-col items-center justify-center py-10 space-y-3">
-              <div className="w-9 h-9 border-4 border-peie-blue/20 border-t-peie-blue rounded-full animate-spin" />
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-peie-blue animate-pulse">
-                <Sparkles size={14} /> Analizando imagen y buscando coincidencias...
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {/* STEP: PHOTO UPLOAD                                              */}
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {step === 'photo_upload' && (
+            <div className="space-y-5">
+              <BackButton onBack={resetAll} />
+              <StepHeader 
+                title="📷 Sacale una foto" 
+                subtitle="Apuntá a la herramienta y sacá la foto"
+              />
+
+              <div className="space-y-3">
+                <input type="file" id="wizard-photo-camera" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoUpload} />
+                <input type="file" id="wizard-photo-gallery" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+
+                <Label
+                  htmlFor="wizard-photo-camera"
+                  className="flex items-center justify-center gap-3 h-20 rounded-2xl border-2 border-peie-blue/40 border-dashed bg-peie-blue/5 text-peie-blue text-lg font-black cursor-pointer active:scale-95 transition-all"
+                >
+                  <Camera size={28} /> SACAR FOTO
+                </Label>
+
+                <Label
+                  htmlFor="wizard-photo-gallery"
+                  className="flex items-center justify-center gap-3 h-14 rounded-2xl border-2 border-slate-200 border-dashed bg-white text-slate-600 text-sm font-bold cursor-pointer active:scale-95 transition-all"
+                >
+                  <ImageIcon size={18} /> Elegir de galería
+                </Label>
               </div>
             </div>
           )}
 
-          {/* 2. TOP MATCHES - Show up to 3 candidates */}
-          {flowStep === 'show_matches' && topMatches.length > 0 && (
-            <div className="space-y-4 border border-slate-100 rounded-2xl p-4 bg-slate-50/50">
-              <div className="text-center space-y-1">
-                <span className="text-xs font-bold bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full">
-                  {topMatches.length === 1 ? '1 Coincidencia' : `${topMatches.length} Coincidencias`}
-                </span>
-                <h3 className="text-base font-black text-slate-800 mt-2">¿Cuál es tu herramienta?</h3>
-                <p className="text-xs text-slate-500">Tocá la herramienta correcta</p>
-              </div>
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {/* STEP: PHOTO LOADING                                             */}
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {step === 'photo_loading' && (
+            <div className="flex flex-col items-center justify-center py-16 space-y-4">
+              <div className="w-12 h-12 border-4 border-peie-blue/20 border-t-peie-blue rounded-full animate-spin" />
+              <p className="text-sm font-bold text-peie-blue animate-pulse flex items-center gap-2">
+                <Sparkles size={16} /> Analizando la foto...
+              </p>
+              <p className="text-xs text-slate-400">Esto tarda unos segundos</p>
+            </div>
+          )}
 
-              <div className="space-y-2.5">
-                {topMatches.map(({ tool, score }, i) => (
-                  <ToolCard
-                    key={tool.id}
-                    tool={tool}
-                    onSelect={() => handleSelectMatch(tool)}
-                    highlight={i === 0}
-                  />
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {/* STEP: PHOTO RESULTS (top 3)                                     */}
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {step === 'photo_results' && (
+            <div className="space-y-5">
+              <BackButton onBack={resetAll} />
+              <StepHeader 
+                title="¿Cuál es tu herramienta?" 
+                subtitle="Tocá la correcta"
+              />
+
+              <div className="space-y-3">
+                {topMatches.map(({ tool }) => (
+                  <ToolCard key={tool.id} tool={tool} onSelect={() => handleSelectTool(tool)} />
                 ))}
               </div>
 
-              <Button
-                onClick={handleRejectAll}
-                variant="outline"
-                className="w-full border-slate-200 text-rose-600 hover:bg-rose-50 hover:border-rose-200 font-bold h-11 rounded-xl flex items-center justify-center gap-1.5"
+              <button
+                type="button"
+                onClick={() => goToStep('select_obra')}
+                className="w-full flex items-center justify-center gap-2 h-12 rounded-xl border-2 border-rose-200 text-rose-600 font-bold text-sm active:scale-[0.97] transition-all hover:bg-rose-50"
               >
                 <X size={18} /> Ninguna de estas
-              </Button>
+              </button>
             </div>
           )}
 
-          {/* 3. FILTER BY OBRA - When no match or user rejected all */}
-          {flowStep === 'filter_by_obra' && (
-            <div className="space-y-4 border border-slate-100 rounded-2xl p-4 bg-slate-50/50">
-              <div className="space-y-1">
-                <h3 className="text-sm font-bold text-slate-700 flex items-center gap-1.5">
-                  <Building size={16} className="text-peie-blue" /> ¿En qué obra estaba la herramienta?
-                </h3>
-                <p className="text-xs text-slate-500">Seleccioná la obra donde usaste o viste la herramienta para mostrar todas las disponibles ahí.</p>
-              </div>
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {/* STEP: SELECT OBRA                                               */}
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {step === 'select_obra' && (
+            <div className="space-y-5">
+              <BackButton onBack={resetAll} />
+              <StepHeader 
+                title="¿En qué obra estaba?" 
+                subtitle="Tocá la obra donde viste la herramienta"
+              />
 
-              {/* Obra selector */}
-              <div className="grid grid-cols-1 gap-2 max-h-44 overflow-y-auto">
+              <div className="space-y-2.5 max-h-[50vh] overflow-y-auto">
                 {obras.map(obra => (
                   <button
                     key={obra.id}
                     type="button"
-                    onClick={() => handleSelectObra(obra.id)}
-                    className={`w-full px-4 py-3 rounded-xl border text-left text-sm font-bold transition-all active:scale-[0.98] flex items-center gap-2 ${
-                      selectedObra === obra.id 
-                        ? 'border-peie-blue bg-peie-blue/10 text-peie-blue' 
-                        : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200'
-                    }`}
+                    onClick={() => handleSelectObra(obra)}
+                    className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl border-2 border-slate-200 bg-white text-left text-base font-bold text-slate-700 active:scale-[0.97] transition-all hover:border-peie-blue hover:bg-blue-50/30"
                   >
-                    <MapPin size={14} className={selectedObra === obra.id ? 'text-peie-blue' : 'text-slate-400'} />
+                    <MapPin size={20} className="text-peie-blue shrink-0" />
                     {obra.name}
+                    <ChevronRight size={18} className="text-slate-300 ml-auto shrink-0" />
                   </button>
                 ))}
               </div>
 
-              {/* Tools in selected obra */}
-              {selectedObra && toolsInObra.length > 0 && (
-                <div className="space-y-2.5 pt-2">
-                  <p className="text-xs font-bold text-slate-600 uppercase tracking-wider">
-                    Herramientas en esta obra ({toolsInObra.length})
-                  </p>
-                  <div className="space-y-2 max-h-72 overflow-y-auto">
-                    {toolsInObra.map(tool => (
-                      <ToolCard
-                        key={tool.id}
-                        tool={tool}
-                        onSelect={() => handleSelectMatch(tool)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {selectedObra && toolsInObra.length === 0 && (
-                <p className="text-xs text-center text-slate-500 py-4">No hay herramientas registradas en esta obra.</p>
-              )}
-
-              {/* Voice assist toggle */}
+              {/* Shortcut to voice */}
               <div className="pt-2 border-t border-slate-200">
-                <p className="text-xs text-slate-500 mb-2 text-center">¿No la encontrás? Describila con tus palabras</p>
-                
-                <div className="space-y-3">
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                      <Input
-                        placeholder="Ej: la amoladora azul grande..."
-                        value={voiceText}
-                        onChange={e => {
-                          setVoiceText(e.target.value);
-                          setVoiceResults([]);
-                        }}
-                        className="pl-9 h-11 rounded-xl bg-white border-slate-200"
-                      />
-                    </div>
-                    <VoiceInputButton 
-                      onTranscript={(text) => {
-                        setVoiceText(text);
-                        setVoiceResults([]);
-                      }} 
-                      className="h-11 w-11 shrink-0" 
-                    />
-                  </div>
-
-                  <Button
-                    type="button"
-                    onClick={handleVoiceSearch}
-                    disabled={!voiceText.trim() || voiceLoading}
-                    className="w-full h-11 bg-peie-blue hover:bg-peie-blue/90 text-white font-bold rounded-xl flex items-center justify-center gap-1.5"
-                  >
-                    {voiceLoading ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        Interpretando...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles size={16} /> Buscar herramienta
-                      </>
-                    )}
-                  </Button>
-
-                  {/* Voice search results */}
-                  {voiceResults.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-xs font-bold text-slate-600">Resultados encontrados:</p>
-                      {voiceResults.map(tool => (
-                        <ToolCard
-                          key={tool.id}
-                          tool={tool}
-                          onSelect={() => handleSelectMatch(tool)}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => goToStep('voice_describe')}
+                  className="w-full flex items-center justify-center gap-2 h-11 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-bold active:scale-[0.97] transition-all"
+                >
+                  <Mic size={16} /> No sé la obra, quiero describirla con voz
+                </button>
               </div>
             </div>
           )}
 
-          {/* 4. CONFIRMED - Tool selected, show actions */}
-          {flowStep === 'confirmed' && activeTool && (
-            <div className="space-y-4">
-              {/* Selected tool summary */}
-              <div className="border border-peie-blue/20 bg-peie-blue/5 rounded-2xl p-4 space-y-3">
-                <div className="text-center">
-                  <span className="text-xs font-bold bg-peie-blue text-white px-3 py-1 rounded-full">
-                    Herramienta Seleccionada
-                  </span>
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {/* STEP: TOOLS IN OBRA                                             */}
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {step === 'tools_in_obra' && (
+            <div className="space-y-5">
+              <BackButton onBack={() => goToStep('select_obra')} />
+              <StepHeader 
+                title={`Herramientas en ${selectedObra?.name || 'la obra'}`} 
+                subtitle={toolsInObra.length > 0 ? "Tocá la que buscás" : undefined}
+              />
+
+              {toolsInObra.length > 0 ? (
+                <div className="space-y-2.5 max-h-[55vh] overflow-y-auto">
+                  {toolsInObra.map(tool => (
+                    <ToolCard key={tool.id} tool={tool} onSelect={() => handleSelectTool(tool)} />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 space-y-3">
+                  <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto text-slate-400">
+                    <Wrench size={28} />
+                  </div>
+                  <p className="text-sm text-slate-500 font-medium">No hay herramientas en esta obra</p>
+                  <Button onClick={() => goToStep('select_obra')} variant="outline" className="rounded-xl font-bold">
+                    Elegir otra obra
+                  </Button>
+                </div>
+              )}
+
+              {/* Voice fallback */}
+              <div className="pt-2 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => goToStep('voice_describe')}
+                  className="w-full flex items-center justify-center gap-2 h-11 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-bold active:scale-[0.97] transition-all"
+                >
+                  <Mic size={16} /> No la encuentro, describir con voz
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {/* STEP: VOICE DESCRIBE                                            */}
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {step === 'voice_describe' && (
+            <div className="space-y-5">
+              <BackButton onBack={resetAll} />
+              <StepHeader 
+                title="🎤 Describí la herramienta" 
+                subtitle="Decí cómo es, de qué color, para qué sirve... lo que sea"
+              />
+
+              <div className="space-y-4">
+                {/* Big mic button */}
+                <div className="flex flex-col items-center gap-3">
+                  <VoiceInputButton
+                    onTranscript={(text) => setVoiceText(text)}
+                    className="!w-20 !h-20 !rounded-full shadow-lg"
+                  />
+                  <p className="text-xs text-slate-400 font-medium text-center">
+                    Tocá el micrófono y hablá
+                  </p>
                 </div>
 
-                <div className="flex items-center gap-3 bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                {/* Manual input as backup */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="O escribí acá..."
+                    value={voiceText}
+                    onChange={e => setVoiceText(e.target.value)}
+                    className="pl-9 h-12 rounded-xl bg-white border-slate-200 text-base"
+                  />
+                </div>
+
+                {voiceText.trim() && (
+                  <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+                    <p className="text-xs text-slate-400 font-bold uppercase mb-1">Lo que dijiste:</p>
+                    <p className="text-sm text-slate-800 font-medium">"{voiceText}"</p>
+                  </div>
+                )}
+
+                <Button
+                  type="button"
+                  onClick={handleVoiceSearch}
+                  disabled={!voiceText.trim()}
+                  className="w-full h-14 bg-peie-blue hover:bg-peie-blue/90 text-white font-black text-base rounded-2xl flex items-center justify-center gap-2"
+                >
+                  <Sparkles size={18} /> BUSCAR
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {/* STEP: VOICE LOADING                                             */}
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {step === 'voice_loading' && (
+            <div className="flex flex-col items-center justify-center py-16 space-y-4">
+              <div className="w-12 h-12 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin" />
+              <p className="text-sm font-bold text-emerald-700 animate-pulse flex items-center gap-2">
+                <Sparkles size={16} /> Interpretando lo que dijiste...
+              </p>
+            </div>
+          )}
+
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {/* STEP: VOICE RESULTS                                             */}
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {step === 'voice_results' && (
+            <div className="space-y-5">
+              <BackButton onBack={() => goToStep('voice_describe')} />
+              <StepHeader 
+                title="¿Es alguna de estas?" 
+                subtitle="Tocá la herramienta correcta"
+              />
+
+              <div className="space-y-2.5 max-h-[50vh] overflow-y-auto">
+                {voiceResults.map(tool => (
+                  <ToolCard key={tool.id} tool={tool} onSelect={() => handleSelectTool(tool)} />
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => goToStep('select_obra')}
+                className="w-full flex items-center justify-center gap-2 h-12 rounded-xl border-2 border-rose-200 text-rose-600 font-bold text-sm active:scale-[0.97] transition-all"
+              >
+                <X size={18} /> Ninguna, buscar por obra
+              </button>
+            </div>
+          )}
+
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {/* STEP: CONFIRM TOOL                                              */}
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {step === 'confirm_tool' && activeTool && (
+            <div className="space-y-5">
+              <StepHeader title="¿Es esta la herramienta?" />
+
+              {/* Big visual card */}
+              <div className="bg-white border-2 border-peie-blue/20 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center gap-4">
                   {activeTool.photo_url ? (
-                    <img src={activeTool.photo_url} alt={activeTool.name} className="w-20 h-20 object-cover rounded-lg border border-slate-100 shrink-0" />
+                    <img src={activeTool.photo_url} alt={activeTool.name} className="w-24 h-24 object-cover rounded-xl border border-slate-100 shrink-0" />
                   ) : (
-                    <div className="w-20 h-20 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 shrink-0">
-                      <Wrench size={24} />
+                    <div className="w-24 h-24 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 shrink-0">
+                      <Wrench size={32} />
                     </div>
                   )}
-                  <div className="space-y-0.5 min-w-0">
+                  <div className="space-y-1 min-w-0">
                     <p className="text-xs font-mono font-bold text-peie-blue uppercase">{activeTool.code}</p>
-                    <p className="text-sm font-bold text-slate-800 truncate">{activeTool.name}</p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-lg font-black text-slate-800 leading-tight">{activeTool.name}</p>
+                    <p className="text-sm text-slate-500">
                       {activeTool.brand || 'Sin marca'} {activeTool.model ? `· ${activeTool.model}` : ''}
                     </p>
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <MapPin size={10} className="text-slate-400" />
-                      <span className="text-[10px] font-semibold text-slate-600">{activeTool.obras?.name || 'Base Central'}</span>
+                    <div className="flex items-center gap-1 mt-1">
+                      <MapPin size={12} className="text-peie-blue" />
+                      <span className="text-xs font-bold text-peie-blue">{activeTool.obras?.name || 'Base Central'}</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Action buttons */}
-              <div className="grid grid-cols-1 gap-2.5">
-                <Button
-                  onClick={() => navigate('/solicitudes/nueva', { state: { herramientaId: activeTool.id } })}
-                  className="bg-peie-blue hover:bg-peie-blue/90 text-white font-semibold h-12 rounded-xl flex items-center justify-center gap-2"
+              {/* Big Yes / No buttons */}
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={handleConfirmTool}
+                  className="flex flex-col items-center justify-center gap-2 h-24 rounded-2xl bg-emerald-500 text-white font-black text-lg active:scale-[0.95] transition-all shadow-lg shadow-emerald-500/30"
                 >
-                  <Truck size={18} /> Solicitar Traslado a otra Obra
-                </Button>
-
-                <Button
-                  onClick={() => navigate('/ordenes/nueva', { state: { herramientaId: activeTool.id } })}
-                  variant="outline"
-                  className="border-slate-200 text-amber-700 bg-amber-50 hover:bg-amber-100 hover:border-amber-200 font-semibold h-12 rounded-xl flex items-center justify-center gap-2"
+                  <Check size={32} />
+                  SÍ
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRejectTool}
+                  className="flex flex-col items-center justify-center gap-2 h-24 rounded-2xl bg-rose-500 text-white font-black text-lg active:scale-[0.95] transition-all shadow-lg shadow-rose-500/30"
                 >
-                  <AlertTriangle size={18} /> Reportar Rotura o Falla
-                </Button>
-
-                <Button
-                  onClick={() => navigate(`/herramientas/${activeTool.id}`)}
-                  variant="outline"
-                  className="border-slate-200 text-slate-700 bg-white hover:bg-slate-50 font-semibold h-12 rounded-xl flex items-center justify-center gap-2"
-                >
-                  <FileText size={18} /> Ver Ficha de Inventario Completa
-                </Button>
+                  <X size={32} />
+                  NO
+                </button>
               </div>
-
-              {/* New search */}
-              <Button
-                onClick={resetSearch}
-                variant="ghost"
-                className="w-full text-xs text-slate-500 hover:text-peie-blue font-semibold"
-              >
-                Buscar otra herramienta
-              </Button>
             </div>
           )}
+
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {/* STEP: SELECT ACTION                                             */}
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {step === 'select_action' && activeTool && (
+            <div className="space-y-5">
+              <StepHeader title="¿Qué querés hacer?" />
+
+              {/* Tool mini-summary */}
+              <div className="bg-peie-blue/5 rounded-xl p-3 flex items-center gap-3 border border-peie-blue/10">
+                {activeTool.photo_url ? (
+                  <img src={activeTool.photo_url} alt={activeTool.name} className="w-12 h-12 object-cover rounded-lg shrink-0" />
+                ) : (
+                  <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 shrink-0">
+                    <Wrench size={18} />
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-slate-800 truncate">{activeTool.name}</p>
+                  <p className="text-xs text-peie-blue font-semibold flex items-center gap-1">
+                    <MapPin size={10} /> {activeTool.obras?.name || 'Base Central'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Action buttons - BIG and clear */}
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => { stopSpeaking(); navigate('/solicitudes/nueva', { state: { herramientaId: activeTool.id } }); }}
+                  className="w-full flex items-center gap-4 p-5 rounded-2xl bg-peie-blue text-white active:scale-[0.97] transition-all shadow-lg shadow-peie-blue/20"
+                >
+                  <div className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                    <Truck size={28} />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-lg font-black">MOVER A OTRA OBRA</p>
+                    <p className="text-xs text-white/80 font-medium">Pedir traslado de la herramienta</p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { stopSpeaking(); navigate('/ordenes/nueva', { state: { herramientaId: activeTool.id } }); }}
+                  className="w-full flex items-center gap-4 p-5 rounded-2xl bg-amber-500 text-white active:scale-[0.97] transition-all shadow-lg shadow-amber-500/20"
+                >
+                  <div className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                    <AlertTriangle size={28} />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-lg font-black">ESTÁ ROTA</p>
+                    <p className="text-xs text-white/80 font-medium">Reportar falla o rotura</p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { stopSpeaking(); navigate(`/herramientas/${activeTool.id}`); }}
+                  className="w-full flex items-center gap-4 p-5 rounded-2xl bg-white border-2 border-slate-200 text-slate-800 active:scale-[0.97] transition-all"
+                >
+                  <div className="w-14 h-14 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
+                    <FileText size={28} />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-lg font-black">VER FICHA</p>
+                    <p className="text-xs text-slate-500 font-medium">Ver toda la info de la herramienta</p>
+                  </div>
+                </button>
+              </div>
+
+              {/* Search another */}
+              <button
+                type="button"
+                onClick={resetAll}
+                className="w-full flex items-center justify-center gap-2 h-11 text-sm font-bold text-slate-400 hover:text-peie-blue transition-colors"
+              >
+                <RotateCcw size={14} /> Buscar otra herramienta
+              </button>
+            </div>
+          )}
+
         </CardContent>
       </Card>
     </div>
