@@ -10,12 +10,16 @@ export interface AnalyzedTool {
  * Envía una imagen en base64 a la API de OpenRouter para reconocer la herramienta.
  */
 export async function analyzeToolImage(base64Image: string): Promise<AnalyzedTool> {
-  const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+  let apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+  if (!apiKey) {
+    apiKey = localStorage.getItem('VITE_OPENROUTER_API_KEY') || '';
+  }
+  
   console.log('[OpenRouter] Iniciando análisis de imagen...');
   
   if (!apiKey) {
-    console.error('[OpenRouter] Error: VITE_OPENROUTER_API_KEY no está configurada en el archivo .env');
-    throw new Error('La API Key de OpenRouter (VITE_OPENROUTER_API_KEY) no está configurada.');
+    console.error('[OpenRouter] Error: API Key no configurada en variables de entorno ni en localStorage.');
+    throw new Error('CONFIG_REQUIRED');
   }
 
   // Extraer el base64 limpio y el tipo MIME

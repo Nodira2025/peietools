@@ -95,11 +95,25 @@ export default function BusquedaVisual() {
         findBestMatch(parsed);
       } catch (err: any) {
         console.error(err);
-        toast({
-          variant: 'destructive',
-          title: 'Error de Análisis',
-          description: err.message || 'No se pudo identificar la herramienta en la foto.'
-        });
+        if (err.message === 'CONFIG_REQUIRED') {
+          const userKey = window.prompt("Por favor, ingresá tu API Key de OpenRouter para habilitar el reconocimiento visual en este dispositivo (se guardará de forma segura en tu navegador):");
+          if (userKey) {
+            localStorage.setItem('VITE_OPENROUTER_API_KEY', userKey.trim());
+            toast({ title: "API Key guardada", description: "Intentá de nuevo cargar la foto ahora." });
+          } else {
+            toast({
+              variant: 'destructive',
+              title: 'Configuración Requerida',
+              description: 'Para usar el buscador con foto necesitas ingresar tu API Key de OpenRouter.'
+            });
+          }
+        } else {
+          toast({
+            variant: 'destructive',
+            title: 'Error de Análisis',
+            description: err.message || 'No se pudo identificar la herramienta en la foto.'
+          });
+        }
       } finally {
         setLoading(false);
       }

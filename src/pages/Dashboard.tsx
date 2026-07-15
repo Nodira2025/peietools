@@ -20,7 +20,8 @@ import {
   MessageCircle,
   LogOut,
   Info,
-  ChevronDown
+  ChevronDown,
+  Camera
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { 
@@ -415,8 +416,24 @@ export default function Dashboard() {
               </span>
             </div>
           </div>
-          <ChevronRight size={18} className="text-slate-400 group-hover:translate-x-0.5 transition-transform" />
         </Card>
+
+        {/* Buscador Visual Prioritario (Solo Móvil) */}
+        <div 
+          onClick={() => navigate('/herramientas/busqueda-visual')}
+          className="bg-gradient-to-r from-peie-blue to-peie-light text-white rounded-[24px] p-4 shadow-[0_4px_20px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_20px_rgba(0,0,0,0.08)] flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all duration-200"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-white shrink-0">
+              <Camera size={24} className="stroke-[2.5]" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-sm font-black uppercase tracking-wider leading-none">Buscar con Foto</h3>
+              <p className="text-[10px] text-slate-100 font-bold leading-tight">Identificá, trasladá o reportá fallas de herramientas al instante.</p>
+            </div>
+          </div>
+          <ChevronRight size={18} className="text-white shrink-0" />
+        </div>
 
         {/* Barra de Estadísticas Rápidas */}
         <div className="grid grid-cols-4 gap-2">
@@ -653,20 +670,17 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Escanear Código de Barras */}
+            {/* Buscar con Foto */}
             <div 
-              onClick={() => {
-                toast({ title: "Lector de código de barras", description: "Apunta al código de barras de la herramienta." });
-                navigate('/herramientas/scanner');
-              }}
+              onClick={() => navigate('/herramientas/busqueda-visual')}
               className="bg-white rounded-2xl p-3 border border-slate-100 flex flex-col items-center text-center justify-between cursor-pointer hover:shadow-sm min-h-[96px] active:scale-95 transition-all"
             >
-              <div className="w-10 h-10 rounded-full bg-green-50 text-green-600 flex items-center justify-center">
-                <FileText size={20} className="stroke-[2.5]" />
+              <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <Camera size={20} className="stroke-[2.5]" />
               </div>
               <div className="mt-1.5 flex flex-col items-center">
-                <span className="text-[8px] font-black text-slate-800 uppercase leading-none text-center">Código de Barras</span>
-                <span className="text-[6.5px] text-slate-400 font-bold mt-0.5">Escanea barras</span>
+                <span className="text-[8px] font-black text-slate-800 uppercase leading-none text-center">Buscador Foto</span>
+                <span className="text-[6.5px] text-slate-400 font-bold mt-0.5">Busca con cámara</span>
               </div>
             </div>
 
