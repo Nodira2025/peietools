@@ -47,6 +47,16 @@ export default function Personal() {
     if (tabParam === 'history') return 'history';
     return 'staff';
   });
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'history') {
+      setActiveTab('history');
+    } else {
+      setActiveTab('staff');
+    }
+  }, [location.search]);
   const [historial, setHistorial] = useState<any[]>([]);
   const [filterObra, setFilterObra] = useState('');
   const [filterSpecialty, setFilterSpecialty] = useState('');
