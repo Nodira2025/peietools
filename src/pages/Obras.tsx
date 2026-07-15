@@ -321,7 +321,7 @@ export default function Obras() {
         <FilterBar
           filters={[
             { key: 'manager', label: 'Coordinador', value: filterManager, options: encargadosUnicos },
-            { key: 'active', label: 'Estado', value: filterActive, options: [{ value: 'true', label: 'En proceso' }, { value: 'false', label: 'Finalizado' }] },
+            { key: 'active', label: 'Estado', value: filterActive, options: [{ value: 'true', label: 'Activa' }, { value: 'false', label: 'Inactiva' }] },
           ]}
           onFilterChange={(key, val) => {
             if (key === 'manager') setFilterManager(val);
@@ -367,7 +367,11 @@ export default function Obras() {
                     ) : (
                       <span className="text-xs text-slate-300 italic">Sin ubicación</span>
                     )}
-                    {!obra.active && <span className="text-[10px] font-black bg-rose-50 text-rose-600 border border-rose-100 px-2 py-0.5 rounded-full">Inactiva</span>}
+                    {obra.active ? (
+                      <span className="text-[10px] font-black bg-green-50 text-green-600 border border-green-100 px-2 py-0.5 rounded-full">Activa</span>
+                    ) : (
+                      <span className="text-[10px] font-black bg-rose-50 text-rose-600 border border-rose-100 px-2 py-0.5 rounded-full">Inactiva</span>
+                    )}
                   </div>
                 </div>
               </div>

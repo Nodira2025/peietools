@@ -222,7 +222,7 @@ export default function NuevoTrasladoPersonal() {
                     <div className="flex flex-col">
                       <span>{obra.name}</span>
                       <span className="text-[10px] text-slate-400 font-normal">
-                        {obra.status || 'En Proceso'} • {obra.encargado_name || 'Sin Encargado'}
+                        {obra.active ? 'Activa' : 'Inactiva'} • {obra.encargado_name || 'Sin Encargado'}
                       </span>
                     </div>
                   </div>

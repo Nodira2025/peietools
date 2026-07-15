@@ -264,7 +264,7 @@ export default function MisObras() {
             </div>
             
             <span className="text-[9px] font-black uppercase tracking-wider bg-white/15 px-3 py-1 rounded-full border border-white/10 text-white shrink-0">
-              {selectedObra.active ? 'Activa' : 'Pausada'}
+              {selectedObra.active ? 'Activa' : 'Inactiva'}
             </span>
           </div>
 
@@ -595,7 +595,7 @@ export default function MisObras() {
           className="h-9 rounded-xl border border-slate-200 px-3 text-xs bg-white text-slate-700 font-semibold shadow-sm focus:outline-none"
         >
           <option value="true">Activa</option>
-          <option value="false">Pausada</option>
+          <option value="false">Inactiva</option>
           <option value="">Todas</option>
         </select>
 
