@@ -84,6 +84,16 @@ export default function Personal() {
   const [profileUpdating, setProfileUpdating] = useState(false);
   const profilePhotoInputRef = useRef<HTMLInputElement>(null);
 
+  // Add employee modal state
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [addForm, setAddForm] = useState({
+    full_name: '',
+    specialty: 'Electricista',
+    whatsapp: '',
+    obra_id: ''
+  });
+  const [addSaving, setAddSaving] = useState(false);
+
   const handleOpenProfile = (emp: Empleado) => {
     setSelectedEmpForProfile(emp);
     setProfileForm({
@@ -131,6 +141,62 @@ export default function Personal() {
       }
     } catch (err: any) {
       toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar el perfil.' });
+    } finally {
+      setProfileUpdating(false);
+    }
+  };
+
+  const handleAddEmployee = async () => {
+    if (!addForm.full_name.trim()) return;
+    setAddSaving(true);
+    try {
+      const payload = {
+        full_name: addForm.full_name.trim(),
+        specialty: addForm.specialty.trim() || 'Electricista',
+        whatsapp: addForm.whatsapp.trim() || null,
+        obra_id: addForm.obra_id || null,
+        status: (addForm.obra_id ? 'Trabajando' : 'Libre') as 'Trabajando' | 'Libre',
+        active: true
+      };
+
+      const { error } = await supabase.from('empleados').insert([payload]);
+
+      if (error) {
+        toast({ variant: 'destructive', title: 'Error al agregar', description: error.message });
+      } else {
+        toast({ title: 'Operario agregado', description: `${payload.full_name} fue registrado con éxito.` });
+        setIsAddOpen(false);
+        setAddForm({ full_name: '', specialty: 'Electricista', whatsapp: '', obra_id: '' });
+        fetchData();
+      }
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo registrar al operario.' });
+    } finally {
+      setAddSaving(false);
+    }
+  };
+
+  const handleDeleteEmployee = async () => {
+    if (!selectedEmpForProfile) return;
+    const confirmDelete = window.confirm(`¿Estás seguro de que querés eliminar a ${selectedEmpForProfile.full_name}? Esta acción no se puede deshacer.`);
+    if (!confirmDelete) return;
+
+    setProfileUpdating(true);
+    try {
+      const { error } = await supabase
+        .from('empleados')
+        .delete()
+        .eq('id', selectedEmpForProfile.id);
+
+      if (error) {
+        toast({ variant: 'destructive', title: 'Error al eliminar', description: error.message });
+      } else {
+        toast({ title: 'Empleado eliminado', description: 'El operario fue removido del sistema.' });
+        setIsProfileOpen(false);
+        fetchData();
+      }
+    } catch (err) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo eliminar al empleado.' });
     } finally {
       setProfileUpdating(false);
     }
@@ -568,15 +634,27 @@ export default function Personal() {
           </div>
 
           {activeTab === 'staff' && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={exportToExcel}
-              className="h-9 rounded-xl border-slate-200 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 font-semibold shadow-sm flex items-center gap-1.5 ml-auto sm:ml-0"
-            >
-              <Download className="h-4 w-4" />
-              <span>Exportar Excel</span>
-            </Button>
+            <div className="flex items-center gap-2 ml-auto sm:ml-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={exportToExcel}
+                className="h-9 rounded-xl border-slate-200 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 font-semibold shadow-sm flex items-center gap-1.5"
+              >
+                <Download className="h-4 w-4" />
+                <span>Exportar Excel</span>
+              </Button>
+              {isAdmin && (
+                <Button
+                  size="sm"
+                  onClick={() => setIsAddOpen(true)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white h-9 rounded-xl font-semibold shadow-sm flex items-center gap-1.5"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Nuevo Operario</span>
+                </Button>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -1009,6 +1087,111 @@ export default function Personal() {
             )}
           </div>
 
+          <DialogFooter className="bg-slate-50 p-4 border-t border-slate-100 gap-2 sm:gap-0 rounded-b-3xl flex flex-row items-center justify-between">
+            {isAdmin && (
+              <Button
+                variant="ghost"
+                onClick={handleDeleteEmployee}
+                disabled={profileUpdating}
+                className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-xl font-extrabold text-xs px-3 flex items-center gap-1"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Eliminar</span>
+              </Button>
+            )}
+            <div className="flex gap-2 ml-auto">
+              <DialogClose asChild>
+                <Button 
+                  variant="ghost" 
+                  className="rounded-xl hover:bg-slate-200 text-slate-600 font-bold text-xs"
+                >
+                  Cancelar
+                </Button>
+              </DialogClose>
+              <Button
+                onClick={handleSaveProfile}
+                disabled={profileUpdating || !profileForm.full_name.trim()}
+                className="bg-blue-600 text-white hover:bg-blue-700 rounded-xl font-extrabold text-xs px-5 shadow-md shadow-blue-600/10 flex items-center gap-1.5"
+              >
+                {profileUpdating ? 'Guardando...' : (
+                  <>
+                    <Check className="h-3.5 w-3.5" />
+                    Guardar Cambios
+                  </>
+                )}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal para Agregar Operario (Solo Admin) */}
+      <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+        <DialogContent className="rounded-3xl w-[95%] max-w-md bg-white border-slate-100 shadow-xl overflow-hidden p-0">
+          <div className="bg-gradient-to-r from-[#031530] to-[#042454] text-white p-5 pb-6">
+            <DialogHeader className="text-left space-y-1">
+              <DialogTitle className="text-xl font-extrabold tracking-tight">Nuevo Operario</DialogTitle>
+              <p className="text-slate-300 text-xs font-semibold">Registrar un nuevo electricista en la nómina</p>
+            </DialogHeader>
+          </div>
+
+          <div className="p-6 space-y-4">
+            {/* Campo Nombre */}
+            <div className="space-y-1">
+              <Label htmlFor="add-name" className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nombre Completo</Label>
+              <Input
+                id="add-name"
+                value={addForm.full_name}
+                onChange={e => setAddForm(prev => ({ ...prev, full_name: e.target.value }))}
+                className="rounded-xl border-slate-200 focus-visible:ring-blue-600 font-semibold text-slate-800"
+                placeholder="Ej: Pérez, Juan Carlos"
+              />
+            </div>
+
+            {/* Campo Especialidad */}
+            <div className="space-y-1">
+              <Label htmlFor="add-specialty" className="text-xs font-bold text-slate-500 uppercase tracking-wider">Especialidad</Label>
+              <Input
+                id="add-specialty"
+                value={addForm.specialty}
+                onChange={e => setAddForm(prev => ({ ...prev, specialty: e.target.value }))}
+                className="rounded-xl border-slate-200 focus-visible:ring-blue-600 font-semibold text-slate-800"
+                placeholder="Ej: Electricista, Ayudante, Oficial"
+              />
+            </div>
+
+            {/* Campo WhatsApp */}
+            <div className="space-y-1">
+              <Label htmlFor="add-whatsapp" className="text-xs font-bold text-slate-500 uppercase tracking-wider">WhatsApp / Teléfono</Label>
+              <Input
+                id="add-whatsapp"
+                value={addForm.whatsapp}
+                onChange={e => setAddForm(prev => ({ ...prev, whatsapp: e.target.value }))}
+                className="rounded-xl border-slate-200 focus-visible:ring-blue-600 font-semibold text-slate-800"
+                placeholder="Ej: +54 9 381..."
+              />
+            </div>
+
+            {/* Campo Obra Inicial */}
+            <div className="space-y-1">
+              <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Obra Inicial (Opcional)</Label>
+              <Select
+                value={addForm.obra_id || '_none_'}
+                onValueChange={(val: string) => setAddForm(prev => ({ ...prev, obra_id: val === '_none_' ? '' : val }))}
+              >
+                <SelectTrigger className="rounded-xl border-slate-200 focus:ring-blue-600 font-semibold text-slate-800 bg-white">
+                  <SelectValue placeholder="Sin asignar (Libre)" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-slate-100 bg-white shadow-md">
+                  <SelectItem value="_none_" className="font-semibold text-slate-700">Sin asignar (Libre)</SelectItem>
+                  {obrasOpciones.map(o => (
+                    <SelectItem key={o.id} value={o.id} className="font-semibold text-slate-700">{o.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           <DialogFooter className="bg-slate-50 p-4 border-t border-slate-100 gap-2 sm:gap-0 rounded-b-3xl">
             <DialogClose asChild>
               <Button 
@@ -1019,14 +1202,14 @@ export default function Personal() {
               </Button>
             </DialogClose>
             <Button
-              onClick={handleSaveProfile}
-              disabled={profileUpdating || !profileForm.full_name.trim()}
+              onClick={handleAddEmployee}
+              disabled={addSaving || !addForm.full_name.trim()}
               className="bg-blue-600 text-white hover:bg-blue-700 rounded-xl font-extrabold text-xs px-5 shadow-md shadow-blue-600/10 flex items-center gap-1.5"
             >
-              {profileUpdating ? 'Guardando...' : (
+              {addSaving ? 'Guardando...' : (
                 <>
                   <Check className="h-3.5 w-3.5" />
-                  Guardar Cambios
+                  Agregar Operario
                 </>
               )}
             </Button>
