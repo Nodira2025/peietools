@@ -5,12 +5,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { HardHat, Search, Clock, Camera, Plus, Trash2, Edit2, Check } from 'lucide-react';
+import { HardHat, Search, Clock, Camera, Plus, Trash2, Edit2, Check, Download } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { compressImage } from '../lib/imageUtils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import * as XLSX from 'xlsx';
 
 interface Empleado {
   id: string;
@@ -415,6 +416,28 @@ export default function Personal() {
     });
   }, [historial, dateFilter, specificDate]);
 
+  const exportToExcel = () => {
+    if (filteredEmpleados.length === 0) {
+      toast({ variant: 'destructive', title: 'Sin datos', description: 'No hay personal filtrado para exportar.' });
+      return;
+    }
+
+    const data = filteredEmpleados.map(e => ({
+      'Nombre Completo': e.full_name,
+      'Especialidad': e.specialty || 'Electricista',
+      'WhatsApp': e.whatsapp || 'No registrado',
+      'Estado': e.status,
+      'Obra Asignada': e.obras?.name || 'Sin Asignar',
+      'Coordinador de Obra': e.obras?.encargado_name || 'N/A'
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Personal");
+    XLSX.writeFile(workbook, `Reporte_Personal_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast({ title: 'Éxito', description: 'Listado de personal exportado a Excel correctamente.' });
+  };
+
   return (
     <div className="space-y-5 pb-safe">
       <div className="flex items-center justify-between">
@@ -505,41 +528,55 @@ export default function Personal() {
         </div>
 
         {/* Filtros Dropdowns */}
-        <div className="flex flex-wrap items-center gap-2 pt-1">
-          <select 
-            value={filterObra}
-            onChange={e => setFilterObra(e.target.value)}
-            className="h-9 rounded-xl border border-slate-200 px-3 text-xs bg-white text-slate-700 font-semibold shadow-sm focus:outline-none"
-          >
-            <option value="">Obra: Todas</option>
-            {obrasConPersonal.length > 0 && (
-              <optgroup label="Con Personal">
-                {obrasConPersonal.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-              </optgroup>
-            )}
-            {obrasSinPersonal.length > 0 && (
-              <optgroup label="Sin Personal (Futuras)">
-                {obrasSinPersonal.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-              </optgroup>
-            )}
-          </select>
-
-          <select 
-            value={filterSpecialty}
-            onChange={e => setFilterSpecialty(e.target.value)}
-            className="h-9 rounded-xl border border-slate-200 px-3 text-xs bg-white text-slate-700 font-semibold shadow-sm focus:outline-none"
-          >
-            <option value="">Especialidad: Todas</option>
-            {specialtiesOpciones.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </select>
-
-          {(filterObra || filterSpecialty || search || filterType !== 'all') && (
-            <button 
-              onClick={() => { setFilterObra(''); setFilterSpecialty(''); setSearch(''); setFilterType('all'); }}
-              className="text-xs text-rose-500 font-black hover:underline px-2"
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <select 
+              value={filterObra}
+              onChange={e => setFilterObra(e.target.value)}
+              className="h-9 rounded-xl border border-slate-200 px-3 text-xs bg-white text-slate-700 font-semibold shadow-sm focus:outline-none"
             >
-              × Limpiar
-            </button>
+              <option value="">Obra: Todas</option>
+              {obrasConPersonal.length > 0 && (
+                <optgroup label="Con Personal">
+                  {obrasConPersonal.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                </optgroup>
+              )}
+              {obrasSinPersonal.length > 0 && (
+                <optgroup label="Sin Personal (Futuras)">
+                  {obrasSinPersonal.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                </optgroup>
+              )}
+            </select>
+
+            <select 
+              value={filterSpecialty}
+              onChange={e => setFilterSpecialty(e.target.value)}
+              className="h-9 rounded-xl border border-slate-200 px-3 text-xs bg-white text-slate-700 font-semibold shadow-sm focus:outline-none"
+            >
+              <option value="">Especialidad: Todas</option>
+              {specialtiesOpciones.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+
+            {(filterObra || filterSpecialty || search || filterType !== 'all') && (
+              <button 
+                onClick={() => { setFilterObra(''); setFilterSpecialty(''); setSearch(''); setFilterType('all'); }}
+                className="text-xs text-rose-500 font-black hover:underline px-2"
+              >
+                × Limpiar
+              </button>
+            )}
+          </div>
+
+          {activeTab === 'staff' && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportToExcel}
+              className="h-9 rounded-xl border-slate-200 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 font-semibold shadow-sm flex items-center gap-1.5 ml-auto sm:ml-0"
+            >
+              <Download className="h-4 w-4" />
+              <span>Exportar Excel</span>
+            </Button>
           )}
         </div>
       </div>
