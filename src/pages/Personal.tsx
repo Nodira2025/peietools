@@ -597,7 +597,17 @@ export default function Personal() {
                 {/* Cabecera del Grupo (Obra) */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-2 border-b border-slate-200/50">
                   <div>
-                    <h3 className="font-extrabold text-peie-blue text-sm md:text-base tracking-tight">{group.name}</h3>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-extrabold text-peie-blue text-sm md:text-base tracking-tight">{group.name}</h3>
+                      {group.id && (
+                        <button
+                          onClick={() => navigate('/mis-obras', { state: { selectedObraId: group.id } })}
+                          className="text-[10px] font-bold text-blue-600 hover:underline shrink-0"
+                        >
+                          (Ver Obra)
+                        </button>
+                      )}
+                    </div>
                     {group.encargado_name && (
                       <p className="text-[10px] md:text-xs text-slate-500 font-semibold mt-0.5">
                         Coordinador: <span className="text-peie-blue font-bold">{group.encargado_name}</span>
@@ -677,12 +687,7 @@ export default function Personal() {
                                 variant="ghost" 
                                 size="sm"
                                 className="text-slate-500 hover:text-blue-600 hover:bg-slate-50 border border-slate-100 h-8 px-3 text-[11px] font-bold rounded-lg"
-                                onClick={() => {
-                                  if (emp.obra_id) {
-                                    navigate('/mis-obras');
-                                    toast({ title: `Operario en obra`, description: `${emp.full_name} está trabajando en ${emp.obras?.name}.` });
-                                  }
-                                }}
+                                onClick={() => handleOpenProfile(emp)}
                               >
                                 Ver
                               </Button>

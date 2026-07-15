@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Card, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -42,6 +42,7 @@ interface Empleado {
 
 export default function MisObras() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const { profile } = useAuthStore();
   const isSpecialRole = profile?.role === 'admin' || profile?.role === 'logistica';
@@ -138,6 +139,15 @@ export default function MisObras() {
 
     setObras(filteredByRole);
     setLoading(false);
+
+    // Auto-select obra if navigated from Personal page
+    const selectedId = location.state?.selectedObraId;
+    if (selectedId) {
+      const found = filteredByRole.find(o => o.id === selectedId);
+      if (found) {
+        selectObra(found);
+      }
+    }
   };
 
   const fetchAvances = async (obraId: string) => {
