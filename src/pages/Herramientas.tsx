@@ -212,7 +212,7 @@ export default function Herramientas() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
           <div className="flex items-center gap-2">
-            {selectedCategory && (
+            {(selectedCategory || searchTerm.trim() !== '') && (
               <Button 
                 variant="ghost" 
                 size="sm" 
@@ -223,17 +223,21 @@ export default function Herramientas() {
               </Button>
             )}
             <h1 className="text-2xl font-bold tracking-tight text-peie-blue">
-              {selectedCategory ? `${selectedCategory}` : 'Categorías de Herramientas'}
+              {selectedCategory 
+                ? `${selectedCategory}` 
+                : (searchTerm.trim() !== '' ? 'Resultados de Búsqueda' : 'Categorías de Herramientas')}
             </h1>
           </div>
           <p className="text-sm text-muted-foreground mt-1">
             {selectedCategory 
               ? `${filtered.length} herramientas en esta categoría` 
-              : 'Selecciona una categoría para ver y gestionar sus herramientas'}
+              : (searchTerm.trim() !== '' 
+                  ? `Encontramos ${filtered.length} herramientas coincidentes` 
+                  : 'Selecciona una categoría o buscá para ver y gestionar sus herramientas')}
           </p>
         </div>
         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-          {!selectedCategory && (
+          {!selectedCategory && searchTerm.trim() === '' && (
             <Button 
               variant="outline" 
               onClick={exportAllToExcel}
@@ -253,12 +257,27 @@ export default function Herramientas() {
         </div>
       </div>
 
+      {/* Buscador Global (Solo visible en la vista de categorías) */}
+      {!selectedCategory && !loading && searchTerm.trim() === '' && (
+        <div className="relative w-full max-w-md bg-white rounded-xl shadow-sm border border-slate-200/60 p-0.5 flex items-center">
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input 
+              placeholder="Buscar herramienta en todo el inventario..." 
+              value={searchTerm} 
+              onChange={e => setSearchTerm(e.target.value)} 
+              className="pl-10 h-11 border-0 focus-visible:ring-0 shadow-none text-slate-800 rounded-xl" 
+            />
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="text-center py-16 text-muted-foreground">
           <div className="w-8 h-8 border-4 border-peie-blue/20 border-t-peie-blue rounded-full animate-spin mx-auto mb-3" />
           Cargando inventario...
         </div>
-      ) : !selectedCategory ? (
+      ) : (!selectedCategory && searchTerm.trim() === '') ? (
         /* VISTA DE CATEGORÍAS */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {categoriesList.map((cat) => {
