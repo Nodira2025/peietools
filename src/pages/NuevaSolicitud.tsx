@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Truck, MessageCircle, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Truck, MessageCircle, AlertCircle, Search } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { buildWhatsAppLink, APP_URL } from '../lib/whatsapp';
 import { WhatsAppPreviewModal } from '../components/WhatsAppPreviewModal';
@@ -61,6 +61,36 @@ export default function NuevaSolicitud() {
   const [waPreviewMessage, setWaPreviewMessage] = useState('');
   const [waPreviewRecipientName, setWaPreviewRecipientName] = useState('');
 
+  // Autocomplete state
+  const [toolSearch, setToolSearch] = useState('');
+  const [isToolDropdownOpen, setIsToolDropdownOpen] = useState(false);
+  const [logisticaSearch, setLogisticaSearch] = useState('');
+  const [isLogisticaDropdownOpen, setIsLogisticaDropdownOpen] = useState(false);
+
+  const normalizeString = (str: string): string => {
+    return str
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+  };
+
+  const filteredHerramientas = herramientas.filter(t => {
+    const searchNorm = normalizeString(toolSearch);
+    if (!searchNorm) return true;
+    
+    const nameNorm = normalizeString(t.name);
+    const codeNorm = normalizeString(t.code);
+    return nameNorm.includes(searchNorm) || codeNorm.includes(searchNorm);
+  });
+
+  const filteredLogistica = personalLogistica.filter(p => {
+    const searchNorm = normalizeString(logisticaSearch);
+    if (!searchNorm) return true;
+    
+    const nameNorm = normalizeString(p.full_name);
+    return nameNorm.includes(searchNorm);
+  });
+
   useEffect(() => {
     async function fetchData() {
       // 1. Cargar todas las herramientas
@@ -68,7 +98,17 @@ export default function NuevaSolicitud() {
         .from('herramientas')
         .select('id, name, code, current_obra_id, status, obras(name)')
         .order('name');
-      if (toolsData) setHerramientas(toolsData as unknown as Herramienta[]);
+      if (toolsData) {
+        setHerramientas(toolsData as unknown as Herramienta[]);
+        
+        // Pre-llenar buscador si hay herramienta preseleccionada
+        if (preselectedToolId) {
+          const preTool = toolsData.find(h => h.id === preselectedToolId);
+          if (preTool) {
+            setToolSearch(`${preTool.name} [${preTool.code}]`);
+          }
+        }
+      }
 
       // 2. Cargar Obras destino (solo activas y con encargado asignado)
       const { data: obrasData } = await supabase
@@ -218,28 +258,66 @@ export default function NuevaSolicitud() {
         <CardContent className="px-6 pb-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             
-            <div className="space-y-1.5">
-              <Label htmlFor="tool" className="text-xs font-semibold text-slate-700">Herramienta *</Label>
-              <Select value={selectedToolId} onValueChange={setSelectedToolId} required>
-                <SelectTrigger className="h-11 rounded-xl text-slate-800">
-                  <SelectValue placeholder="Selecciona qué herramienta necesitas" />
-                </SelectTrigger>
-                <SelectContent>
-                  {herramientas.map(t => (
-                    <SelectItem key={t.id} value={t.id}>
-                      <span className="font-mono text-xs text-slate-400 mr-2">[{t.code}]</span> 
-                      <span className="font-medium text-slate-800">{t.name}</span>
-                      <span className="text-[10px] text-slate-400 ml-1">({t.obras?.name || 'Sin obra'})</span>
-                      {t.status !== 'Disponible' && (
-                        <span className="text-[10px] font-semibold text-amber-600 ml-2">({t.status})</span>
+            <div className="space-y-1.5 relative font-sans">
+              <Label htmlFor="toolSearch" className="text-xs font-semibold text-slate-700">Herramienta *</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  id="toolSearch"
+                  placeholder="Escribí para buscar herramienta por nombre o código..."
+                  value={toolSearch}
+                  onChange={(e) => {
+                    setToolSearch(e.target.value);
+                    setSelectedToolId('');
+                    setIsToolDropdownOpen(true);
+                  }}
+                  onFocus={() => setIsToolDropdownOpen(true)}
+                  className="pl-9 h-11 rounded-xl text-slate-800 bg-white"
+                  required
+                />
+                {selectedToolId && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
+                    Seleccionado
+                  </span>
+                )}
+              </div>
+
+              {isToolDropdownOpen && toolSearch.trim().length > 0 && !selectedToolId && (
+                <div className="absolute z-50 w-full max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white divide-y divide-slate-100 mt-1 shadow-lg">
+                  {filteredHerramientas.map(t => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedToolId(t.id);
+                        setToolSearch(`${t.name} [${t.code}]`);
+                        setIsToolDropdownOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-2.5 text-xs hover:bg-slate-50 active:bg-slate-100 transition-colors flex items-center justify-between"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <span className="font-mono text-[10px] text-slate-450 mr-2">[{t.code}]</span>
+                        <span className="font-bold text-slate-800">{t.name}</span>
+                        <span className="text-[10px] text-slate-400 ml-1.5">• {t.obras?.name || 'Sin obra'}</span>
+                      </div>
+                      {t.status !== 'Disponible' ? (
+                        <span className="text-[9px] font-bold bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded border border-amber-100 shrink-0">
+                          {t.status}
+                        </span>
+                      ) : (
+                        <span className="text-[9px] font-bold bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded border border-emerald-100 shrink-0">
+                          Disponible
+                        </span>
                       )}
-                    </SelectItem>
+                    </button>
                   ))}
-                  {herramientas.length === 0 && (
-                    <div className="p-2 text-center text-xs text-slate-400">No hay herramientas registradas</div>
+                  {filteredHerramientas.length === 0 && (
+                    <div className="p-4 text-center text-xs text-slate-400 bg-white">
+                      No se encontraron herramientas
+                    </div>
                   )}
-                </SelectContent>
-              </Select>
+                </div>
+              )}
             </div>
 
             <div className="space-y-1.5">
@@ -279,35 +357,74 @@ export default function NuevaSolicitud() {
             </div>
 
             {/* SELECCIÓN ESPECÍFICA DE EMPLEADO DE LOGÍSTICA PARA EL WA.ME */}
-            <div className="space-y-1.5 bg-peie-blue/5 p-3.5 rounded-xl border border-peie-blue/10">
+            <div className="space-y-1.5 bg-peie-blue/5 p-3.5 rounded-xl border border-peie-blue/10 relative">
               <div className="flex items-center gap-1.5 mb-1">
                 <MessageCircle size={14} className="text-green-600" />
-                <Label htmlFor="logistica" className="text-xs font-bold text-peie-blue uppercase tracking-wide">
+                <Label htmlFor="logisticaSearch" className="text-xs font-bold text-peie-blue uppercase tracking-wide">
                   Despachar mensaje a Logística *
                 </Label>
               </div>
-              <p className="text-[11px] text-slate-600 mb-2.5 leading-snug">
+              <p className="text-[11px] text-slate-650 mb-2.5 leading-snug">
                 Elige de la lista al empleado o administrador encargado para que reciba la orden instantánea en su WhatsApp.
               </p>
 
-              <Select value={selectedLogisticaId} onValueChange={setSelectedLogisticaId} required>
-                <SelectTrigger className="h-11 rounded-xl bg-white border-slate-200 text-slate-800">
-                  <SelectValue placeholder="Selecciona un responsable de logística" />
-                </SelectTrigger>
-                <SelectContent>
-                  {personalLogistica.map(p => (
-                    <SelectItem key={p.id} value={p.id}>
-                      <span className="font-medium text-slate-800">{p.full_name}</span>
-                      <span className="text-[10px] text-slate-400 ml-1.5 capitalize">({p.role})</span>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  id="logisticaSearch"
+                  placeholder="Escribí para buscar responsable de logística..."
+                  value={logisticaSearch}
+                  onChange={(e) => {
+                    setLogisticaSearch(e.target.value);
+                    setSelectedLogisticaId('');
+                    setIsLogisticaDropdownOpen(true);
+                  }}
+                  onFocus={() => setIsLogisticaDropdownOpen(true)}
+                  className="pl-9 h-11 rounded-xl bg-white border-slate-200 text-slate-800 text-sm font-semibold"
+                  required
+                />
+                {selectedLogisticaId && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
+                    Seleccionado
+                  </span>
+                )}
+              </div>
+
+              {isLogisticaDropdownOpen && logisticaSearch.trim().length > 0 && !selectedLogisticaId && (
+                <div className="absolute z-50 left-3.5 right-3.5 max-h-40 overflow-y-auto rounded-xl border border-slate-200 bg-white divide-y divide-slate-100 mt-1 shadow-lg">
+                  {filteredLogistica.map(p => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedLogisticaId(p.id);
+                        setLogisticaSearch(p.full_name);
+                        setIsLogisticaDropdownOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-2.5 text-xs hover:bg-slate-50 active:bg-slate-100 transition-colors flex items-center justify-between"
+                    >
+                      <div>
+                        <span className="font-bold text-slate-800">{p.full_name}</span>
+                        <span className="text-[10px] text-slate-450 ml-1.5 capitalize">({p.role})</span>
+                      </div>
                       {p.whatsapp ? (
-                        <span className="text-[9px] text-emerald-600 ml-1 font-mono">✓ WA</span>
+                        <span className="text-[9px] font-bold bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded border border-emerald-100 shrink-0">
+                          ✓ WA
+                        </span>
                       ) : (
-                        <span className="text-[9px] text-rose-500 ml-1 font-mono">⚠ Sin Tel</span>
+                        <span className="text-[9px] font-bold bg-rose-50 text-rose-500 px-1.5 py-0.5 rounded border border-rose-100 shrink-0">
+                          ⚠ Sin Tel
+                        </span>
                       )}
-                    </SelectItem>
+                    </button>
                   ))}
-                </SelectContent>
-              </Select>
+                  {filteredLogistica.length === 0 && (
+                    <div className="p-3 text-center text-xs text-slate-450 font-medium bg-white">
+                      No se encontraron responsables
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

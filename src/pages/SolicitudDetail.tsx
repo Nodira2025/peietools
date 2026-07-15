@@ -53,9 +53,20 @@ export default function SolicitudDetail() {
     if (data) setEmpleados(data);
   };
 
-  const filteredEmpleados = empleados.filter(e =>
-    e.full_name.toLowerCase().includes(empleadoSearch.toLowerCase())
-  );
+  const normalizeString = (str: string): string => {
+    return str
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+  };
+
+  const filteredEmpleados = empleados.filter(e => {
+    const searchNorm = normalizeString(empleadoSearch);
+    if (!searchNorm) return true;
+    
+    const nameNorm = normalizeString(e.full_name);
+    return nameNorm.includes(searchNorm);
+  });
 
   const fetchSolicitud = async () => {
     setLoading(true);
