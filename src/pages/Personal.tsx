@@ -74,12 +74,14 @@ export default function Personal() {
     whatsapp: string;
     status: 'Trabajando' | 'Libre';
     photo_url: string | null;
+    obra_id: string | null;
   }>({
     full_name: '',
     specialty: '',
     whatsapp: '',
     status: 'Libre',
-    photo_url: null
+    photo_url: null,
+    obra_id: null
   });
   const [profileUpdating, setProfileUpdating] = useState(false);
   const profilePhotoInputRef = useRef<HTMLInputElement>(null);
@@ -101,7 +103,8 @@ export default function Personal() {
       specialty: emp.specialty || '',
       whatsapp: emp.whatsapp || '',
       status: emp.status === 'Disponible' || emp.status === 'Libre' ? 'Libre' : 'Trabajando',
-      photo_url: emp.photo_url
+      photo_url: emp.photo_url,
+      obra_id: emp.obra_id || null
     });
     setIsProfileOpen(true);
   };
@@ -118,23 +121,46 @@ export default function Personal() {
   };
 
   const handleSaveProfile = async () => {
-    if (!selectedEmpForProfile) return;
+    if (!selectedEmpForProfile || !profileForm.full_name.trim() || !profile) return;
     setProfileUpdating(true);
     try {
+      const computedStatus = profileForm.obra_id ? 'Trabajando' : 'Libre';
+
       const { error } = await supabase
         .from('empleados')
         .update({
-          full_name: profileForm.full_name,
-          specialty: profileForm.specialty,
-          whatsapp: profileForm.whatsapp || null,
-          status: profileForm.status,
-          photo_url: profileForm.photo_url
+          full_name: profileForm.full_name.trim(),
+          specialty: profileForm.specialty.trim() || 'Electricista',
+          whatsapp: profileForm.whatsapp.trim() || null,
+          status: computedStatus,
+          photo_url: profileForm.photo_url,
+          obra_id: profileForm.obra_id || null
         })
         .eq('id', selectedEmpForProfile.id);
 
       if (error) {
         toast({ variant: 'destructive', title: 'Error', description: error.message });
       } else {
+        // Log transfer if obra changed
+        if (selectedEmpForProfile.obra_id !== profileForm.obra_id) {
+          if (profileForm.obra_id) {
+            const { error: transferError } = await supabase
+              .from('traslados_personal')
+              .insert([{
+                empleado_id: selectedEmpForProfile.id,
+                source_obra_id: selectedEmpForProfile.obra_id || null,
+                target_obra_id: profileForm.obra_id,
+                requester_id: profile.id,
+                status: 'Confirmado',
+                confirmed_by: profile.id,
+                confirmed_at: new Date().toISOString()
+              }]);
+            if (transferError) {
+              console.error('Error logging transfer:', transferError);
+            }
+          }
+        }
+
         toast({ title: 'Perfil actualizado', description: 'Los datos del empleado fueron guardados.' });
         setIsProfileOpen(false);
         fetchData();
@@ -1058,33 +1084,33 @@ export default function Personal() {
               />
             </div>
 
-            {/* Campo Estado */}
+            {/* Obra Asignada */}
             <div className="space-y-1">
-              <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Estado de Disponibilidad</Label>
+              <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Obra Asignada</Label>
               <Select
-                value={profileForm.status}
-                onValueChange={(val: any) => setProfileForm(prev => ({ ...prev, status: val }))}
+                value={profileForm.obra_id || '_none_'}
+                onValueChange={(val: string) => {
+                  const targetId = val === '_none_' ? null : val;
+                  setProfileForm(prev => ({ 
+                    ...prev, 
+                    obra_id: targetId,
+                    status: targetId ? 'Trabajando' : 'Libre'
+                  }));
+                }}
               >
                 <SelectTrigger className="rounded-xl border-slate-200 focus:ring-blue-600 font-semibold text-slate-800 bg-white">
-                  <SelectValue placeholder="Seleccione un estado" />
+                  <SelectValue placeholder="Sin asignar (Libre)" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl border-slate-100 bg-white shadow-md">
-                  <SelectItem value="Libre" className="font-semibold text-slate-700">Libre</SelectItem>
-                  <SelectItem value="Trabajando" className="font-semibold text-slate-700">Trabajando</SelectItem>
+                  <SelectItem value="_none_" className="font-semibold text-slate-700">Sin asignar (Libre)</SelectItem>
+                  {obrasOpciones.map(o => (
+                    <SelectItem key={o.id} value={o.id} className="font-semibold text-slate-700">
+                      {o.name} {o.encargado_name ? `(${o.encargado_name})` : ''}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
-
-            {/* Obra Actual (Lectura) */}
-            {selectedEmpForProfile?.obras && (
-              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Obra Asignada Actualmente</p>
-                <p className="text-xs font-extrabold text-peie-blue">{selectedEmpForProfile.obras.name}</p>
-                {selectedEmpForProfile.obras.encargado_name && (
-                  <p className="text-[9px] text-slate-500 font-medium">Coordinador: {selectedEmpForProfile.obras.encargado_name}</p>
-                )}
-              </div>
-            )}
           </div>
 
           <DialogFooter className="bg-slate-50 p-4 border-t border-slate-100 gap-2 sm:gap-0 rounded-b-3xl flex flex-row items-center justify-between">
