@@ -20,7 +20,8 @@ import {
   LayoutGrid,
   List,
   Download,
-  Truck
+  Truck,
+  Camera
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
@@ -248,6 +249,9 @@ export default function Herramientas() {
           )}
           <Button variant="outline" className="flex-1 sm:flex-none h-11 rounded-xl" onClick={() => navigate('/herramientas/scanner')}>
             <QrCode className="mr-2 h-4 w-4" /> QR
+          </Button>
+          <Button variant="outline" className="flex-1 sm:flex-none h-11 rounded-xl" onClick={() => navigate('/herramientas/busqueda-visual')}>
+            <Camera className="mr-2 h-4 w-4" /> Buscar con Foto
           </Button>
           {isAdmin && (
             <Button className="bg-peie-blue hover:bg-peie-blue/90 flex-1 sm:flex-none h-11 rounded-xl" onClick={() => navigate('/herramientas/nueva')}>

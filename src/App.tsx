@@ -16,6 +16,7 @@ import Herramientas from './pages/Herramientas';
 import NuevaHerramienta from './pages/NuevaHerramienta';
 import HerramientaDetail from './pages/HerramientaDetail';
 import QRScanner from './pages/QRScanner';
+import BusquedaVisual from './pages/BusquedaVisual';
 import Solicitudes from './pages/Solicitudes';
 import NuevaSolicitud from './pages/NuevaSolicitud';
 import SolicitudDetail from './pages/SolicitudDetail';
@@ -62,6 +63,7 @@ export default function App() {
           <Route path="/herramientas" element={<Herramientas />} />
           <Route path="/herramientas/nueva" element={<NuevaHerramienta />} />
           <Route path="/herramientas/scanner" element={<QRScanner />} />
+          <Route path="/herramientas/busqueda-visual" element={<BusquedaVisual />} />
           <Route path="/herramientas/:id" element={<HerramientaDetail />} />
           
           <Route path="/pedidos-herramientas" element={<Solicitudes />} />
