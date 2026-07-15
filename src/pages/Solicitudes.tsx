@@ -438,7 +438,7 @@ export default function Solicitudes() {
                     variant="outline" 
                     size="sm" 
                     className="flex-1 rounded-xl h-10 border-slate-200/80 text-slate-700 hover:bg-slate-50 font-bold text-xs shadow-sm transition-all duration-200 active:scale-95"
-                    onClick={() => navigate(solicitud.type === 'herramienta' ? '/solicitudes/' + solicitud.id : '/personal/traslados/' + solicitud.id)}
+                    onClick={() => navigate(solicitud.type === 'herramienta' ? '/solicitudes/' + solicitud.id : '/personal/traslados/' + solicitud.id, { state: { from: location.pathname } })}
                   >
                     Ver Detalles
                   </Button>

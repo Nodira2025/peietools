@@ -200,7 +200,7 @@ export default function Notificaciones() {
               <Card 
                 key={s.id} 
                 className="group border border-slate-100 hover:border-peie-blue/10 hover:shadow-md transition-all duration-200 rounded-2xl overflow-hidden cursor-pointer"
-                onClick={() => navigate(`/solicitudes/${s.id}`)}
+                onClick={() => navigate(`/solicitudes/${s.id}`, { state: { from: '/notificaciones' } })}
               >
                 <CardContent className="p-4 flex gap-4 items-center">
                   <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-peie-blue/5 group-hover:text-peie-blue shrink-0 transition-colors">
@@ -252,7 +252,7 @@ export default function Notificaciones() {
               <Card 
                 key={p.id} 
                 className="group border border-slate-100 hover:border-peie-blue/10 hover:shadow-md transition-all duration-200 rounded-2xl overflow-hidden cursor-pointer"
-                onClick={() => navigate(`/personal/traslados/${p.id}`)}
+                onClick={() => navigate(`/personal/traslados/${p.id}`, { state: { from: '/notificaciones' } })}
               >
                 <CardContent className="p-4 flex gap-4 items-center">
                   <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-peie-blue/5 group-hover:text-peie-blue shrink-0 transition-colors">

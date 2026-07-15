@@ -22,7 +22,7 @@ import {
   Download,
   Truck
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import FilterBar from '../components/FilterBar';
 import * as XLSX from 'xlsx';
@@ -41,17 +41,18 @@ interface Herramienta {
 }
 
 export default function Herramientas() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [herramientas, setHerramientas] = useState<Herramienta[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterObra, setFilterObra] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
-  const [filterEncargado, setFilterEncargado] = useState('');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(location.state?.category ?? null);
+  const [searchTerm, setSearchTerm] = useState(location.state?.searchTerm ?? '');
+  const [filterObra, setFilterObra] = useState(location.state?.filterObra ?? '');
+  const [filterStatus, setFilterStatus] = useState(location.state?.filterStatus ?? '');
+  const [filterEncargado, setFilterEncargado] = useState(location.state?.filterEncargado ?? '');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(location.state?.viewMode ?? 'grid');
 
   const { toast } = useToast();
-  const navigate = useNavigate();
   const { profile } = useAuthStore();
   const isAdmin = profile?.role === 'admin' || profile?.role === 'logistica';
 
@@ -395,7 +396,7 @@ export default function Herramientas() {
                   <Card 
                     key={h.id} 
                     className={`group relative overflow-hidden transition-all duration-200 cursor-pointer flex flex-col justify-between hover:shadow-lg rounded-2xl border ${styles.border}`} 
-                    onClick={() => navigate('/herramientas/' + h.id)}
+                    onClick={() => navigate('/herramientas/' + h.id, { state: { from: '/herramientas', category: selectedCategory, searchTerm, filterObra, filterStatus, filterEncargado, viewMode } })}
                   >
                     <div>
                       {/* Imagen de cabecera */}
@@ -462,7 +463,7 @@ export default function Herramientas() {
                 return (
                   <Card 
                     key={h.id}
-                    onClick={() => navigate('/herramientas/' + h.id)}
+                    onClick={() => navigate('/herramientas/' + h.id, { state: { from: '/herramientas', category: selectedCategory, searchTerm, filterObra, filterStatus, filterEncargado, viewMode } })}
                     className={`group relative overflow-hidden transition-all duration-200 cursor-pointer p-4 border rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 hover:shadow-md ${styles.border}`}
                   >
                     <div className="flex items-center gap-4 min-w-0">

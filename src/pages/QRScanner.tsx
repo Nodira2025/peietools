@@ -34,7 +34,17 @@ export default function QRScanner() {
   return (
     <div className="space-y-6 max-w-md mx-auto">
       <div className="flex items-center mb-4">
-        <Button variant="ghost" onClick={() => navigate('/herramientas')} className="p-0 hover:bg-transparent">
+        <Button 
+          variant="ghost" 
+          onClick={() => {
+            if (window.history.length > 1) {
+              navigate(-1);
+            } else {
+              navigate('/herramientas');
+            }
+          }} 
+          className="p-0 hover:bg-transparent"
+        >
           <ArrowLeft className="mr-2 h-4 w-4" /> Volver
         </Button>
       </div>

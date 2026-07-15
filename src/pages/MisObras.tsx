@@ -289,7 +289,7 @@ export default function MisObras() {
                 <Card 
                   key={h.id} 
                   className="cursor-pointer hover:shadow-md active:scale-[0.98] transition-all rounded-2xl overflow-hidden border border-slate-100"
-                  onClick={() => navigate('/herramientas/' + h.id)}
+                  onClick={() => navigate('/herramientas/' + h.id, { state: { from: '/mis-obras' } })}
                 >
                   <CardContent className="p-0 flex items-center justify-between">
                     <div className="flex items-center gap-3">

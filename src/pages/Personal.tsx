@@ -459,7 +459,7 @@ export default function Personal() {
                   </p>
                 </div>
                 <Button 
-                  onClick={() => navigate(`/personal/traslados/${t.id}`)}
+                  onClick={() => navigate(`/personal/traslados/${t.id}`, { state: { from: '/personal' } })}
                   size="sm"
                   className="bg-orange-500 hover:bg-orange-600 text-white"
                 >
@@ -711,7 +711,7 @@ export default function Personal() {
           {/* Listado de Movimientos Filtrados */}
           <div className="space-y-3">
             {filteredHistorial.map(h => (
-              <Card key={h.id} className="rounded-xl border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200" onClick={() => navigate(`/personal/traslados/${h.id}`)}>
+              <Card key={h.id} className="rounded-xl border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200" onClick={() => navigate(`/personal/traslados/${h.id}`, { state: { from: '/personal?tab=history' } })}>
                 <CardContent className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50/50 transition-colors">
                   <div className="space-y-1">
                     <p className="text-sm font-extrabold text-slate-800">{h.empleados?.full_name}</p>

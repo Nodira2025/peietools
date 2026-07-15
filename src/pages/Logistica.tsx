@@ -427,7 +427,7 @@ export default function Logistica() {
                   <Card 
                     key={s.id} 
                     className={`${style.bg} border-2 rounded-2xl cursor-pointer active:scale-[0.98] transition-transform shadow-sm hover:shadow-md`}
-                    onClick={() => navigate(s.type === 'herramienta' ? '/solicitudes/' + s.id : '/personal/traslados/' + s.id)}
+                    onClick={() => navigate(s.type === 'herramienta' ? '/solicitudes/' + s.id : '/personal/traslados/' + s.id, { state: { from: '/logistica' } })}
                   >
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between mb-3">
@@ -468,7 +468,7 @@ export default function Logistica() {
                   <Card 
                     key={s.id} 
                     className={`${style.bg} border rounded-2xl cursor-pointer active:scale-[0.98] transition-transform`}
-                    onClick={() => navigate(s.type === 'herramienta' ? '/solicitudes/' + s.id : '/personal/traslados/' + s.id)}
+                    onClick={() => navigate(s.type === 'herramienta' ? '/solicitudes/' + s.id : '/personal/traslados/' + s.id, { state: { from: '/logistica' } })}
                   >
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">

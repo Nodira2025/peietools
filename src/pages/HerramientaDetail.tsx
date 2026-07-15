@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,6 +35,7 @@ interface Herramienta {
 export default function HerramientaDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const { profile } = useAuthStore();
   const [herramienta, setHerramienta] = useState<Herramienta | null>(null);
@@ -254,7 +255,17 @@ export default function HerramientaDetail() {
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-safe">
       <div className="flex items-center justify-between mb-4">
-        <Button variant="ghost" onClick={() => navigate('/herramientas')} className="p-0 hover:bg-transparent">
+        <Button 
+          variant="ghost" 
+          onClick={() => {
+            if (location.state?.from) {
+              navigate(location.state.from, { state: location.state });
+            } else {
+              navigate('/herramientas');
+            }
+          }} 
+          className="p-0 hover:bg-transparent"
+        >
           <ArrowLeft className="mr-2 h-4 w-4" /> Volver
         </Button>
         {canEdit && (
