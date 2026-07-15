@@ -585,128 +585,216 @@ export default function Personal() {
         <div className="text-center py-12 text-muted-foreground">Cargando personal...</div>
       ) : activeTab === 'staff' ? (
         <div className="space-y-6">
-          {sortedObraKeys.map(obraKey => {
-            const group = groupedByObra[obraKey];
-            const theme = getObraTheme(group.name);
-            
-            return (
-              <div 
-                key={obraKey} 
-                className={`p-4 rounded-2xl border shadow-sm space-y-3 ${theme.border} ${theme.bg}`}
-              >
-                {/* Cabecera del Grupo (Obra) */}
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-2 border-b border-slate-200/50">
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-extrabold text-peie-blue text-sm md:text-base tracking-tight">{group.name}</h3>
-                      {group.id && (
-                        <button
-                          onClick={() => navigate('/mis-obras', { state: { selectedObraId: group.id } })}
-                          className="text-[10px] font-bold text-blue-600 hover:underline shrink-0"
-                        >
-                          (Ver Obra)
-                        </button>
-                      )}
-                    </div>
-                    {group.encargado_name && (
-                      <p className="text-[10px] md:text-xs text-slate-500 font-semibold mt-0.5">
-                        Coordinador: <span className="text-peie-blue font-bold">{group.encargado_name}</span>
-                      </p>
-                    )}
-                  </div>
-                  <span className={`text-[10px] md:text-xs font-bold px-3 py-1 rounded-full border shadow-sm ${theme.badge}`}>
-                    {group.list.length} {group.list.length === 1 ? 'operario' : 'operarios'}
-                  </span>
-                </div>
-
-                {/* Grilla de Operarios en la Obra */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {group.list.map(emp => {
-                    const isLibre = emp.status === 'Libre' || !emp.obra_id;
-                    const badgeStyle = isLibre 
-                      ? 'bg-green-50 text-green-600 border-green-150' 
-                      : 'bg-blue-50 text-blue-600 border-blue-150';
-
-                    return (
-                      <Card key={emp.id} className="overflow-hidden rounded-xl border-slate-100 hover:shadow-md transition-all duration-200 bg-white">
-                        <CardContent className="p-3 flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-3 min-w-0 flex-1">
-                            {/* Avatar */}
-                            <div className="relative shrink-0">
-                              <div className="w-10 h-10 rounded-full overflow-hidden bg-blue-50 border border-slate-100 flex items-center justify-center">
-                                {emp.photo_url ? (
-                                  <img src={emp.photo_url} alt={emp.full_name} className="w-full h-full object-cover" />
-                                ) : (
-                                  <HardHat className="h-5 w-5 text-blue-300" />
-                                )}
-                              </div>
-                              {isAdmin && (
-                                <button 
-                                  onClick={() => { setSelectedEmpId(emp.id); fileInputRef.current?.click(); }}
-                                  className="absolute -bottom-1 -right-1 bg-blue-600 text-white rounded-full p-1 shadow hover:bg-blue-700 border border-white"
-                                >
-                                  <Camera className="h-2.5 w-2.5" />
-                                </button>
-                              )}
-                            </div>
-
-                            {/* Detalles */}
-                            <div className="min-w-0 space-y-0.5">
-                              <p 
-                                className="font-extrabold text-xs text-[#031530] truncate cursor-pointer hover:underline hover:text-blue-600 transition-colors"
-                                onClick={() => handleOpenProfile(emp)}
-                                title="Ver y editar perfil"
-                              >
-                                {emp.full_name}
-                              </p>
-                              <p className="text-[9px] text-slate-450 font-bold uppercase tracking-wide">
-                                {emp.specialty || 'Electricista'}
-                              </p>
-                              
-                              <div className="flex items-center gap-1.5 mt-1">
-                                <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full border shrink-0 ${badgeStyle}`}>
-                                  {isLibre ? 'Libre' : 'En Obra'}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Botón de acción */}
-                          <div className="shrink-0">
-                            {isLibre ? (
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                className="text-blue-600 border-blue-200 hover:bg-blue-50/50 h-8 px-3 text-[11px] font-black rounded-lg"
-                                onClick={() => navigate(`/personal/trasladar/${emp.id}`)}
-                              >
-                                Asignar
-                              </Button>
-                            ) : (
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                className="text-slate-500 hover:text-blue-600 hover:bg-slate-50 border border-slate-100 h-8 px-3 text-[11px] font-bold rounded-lg"
-                                onClick={() => handleOpenProfile(emp)}
-                              >
-                                Ver
-                              </Button>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-          
-          {filteredEmpleados.length === 0 && (
+          {filteredEmpleados.length === 0 ? (
             <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-200">
               <HardHat className="mx-auto h-12 w-12 text-slate-350 mb-2" />
-              <p className="text-sm font-bold text-slate-500">No hay operarios en esta categoría</p>
-              <p className="text-xs text-slate-400 mt-1">Intente remover o cambiar los filtros de búsqueda.</p>
+              <p className="text-sm font-bold text-slate-500">No encontramos personal</p>
+              <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
+                Prueba cambiando los filtros de obra o especialidad.
+              </p>
+            </div>
+          ) : filterType === 'busy' ? (
+            /* AGRUPADOS POR OBRA */
+            sortedObraKeys.map(obraKey => {
+              const group = groupedByObra[obraKey];
+              const theme = getObraTheme(group.name);
+              
+              return (
+                <div 
+                  key={obraKey} 
+                  className={`p-4 rounded-2xl border shadow-sm space-y-3 ${theme.border} ${theme.bg}`}
+                >
+                  {/* Cabecera del Grupo (Obra) */}
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-2 border-b border-slate-200/50">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-extrabold text-peie-blue text-sm md:text-base tracking-tight">{group.name}</h3>
+                        {group.id && (
+                          <button
+                            onClick={() => navigate('/mis-obras', { state: { selectedObraId: group.id } })}
+                            className="text-[10px] font-bold text-blue-600 hover:underline shrink-0"
+                          >
+                            (Ver Obra)
+                          </button>
+                        )}
+                      </div>
+                      {group.encargado_name && (
+                        <p className="text-[10px] md:text-xs text-slate-500 font-semibold mt-0.5">
+                          Coordinador: <span className="text-peie-blue font-bold">{group.encargado_name}</span>
+                        </p>
+                      )}
+                    </div>
+                    <span className={`text-[10px] md:text-xs font-bold px-3 py-1 rounded-full border shadow-sm ${theme.badge}`}>
+                      {group.list.length} {group.list.length === 1 ? 'operario' : 'operarios'}
+                    </span>
+                  </div>
+
+                  {/* Grilla de Operarios en la Obra */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {group.list.map(emp => {
+                      const isLibre = emp.status === 'Libre' || !emp.obra_id;
+                      const badgeStyle = isLibre 
+                        ? 'bg-green-50 text-green-600 border-green-150' 
+                        : 'bg-blue-50 text-blue-600 border-blue-150';
+
+                      return (
+                        <Card key={emp.id} className="overflow-hidden rounded-xl border-slate-100 hover:shadow-md transition-all duration-200 bg-white">
+                          <CardContent className="p-3 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              {/* Avatar */}
+                              <div className="relative shrink-0">
+                                <div className="w-10 h-10 rounded-full overflow-hidden bg-blue-50 border border-slate-100 flex items-center justify-center">
+                                  {emp.photo_url ? (
+                                    <img src={emp.photo_url} alt={emp.full_name} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <HardHat className="h-5 w-5 text-blue-300" />
+                                  )}
+                                </div>
+                                {isAdmin && (
+                                  <button 
+                                    onClick={() => { setSelectedEmpId(emp.id); fileInputRef.current?.click(); }}
+                                    className="absolute -bottom-1 -right-1 bg-blue-600 text-white rounded-full p-1 shadow hover:bg-blue-700 border border-white"
+                                  >
+                                    <Camera className="h-2.5 w-2.5" />
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* Detalles */}
+                              <div className="min-w-0 space-y-0.5">
+                                <p 
+                                  className="font-extrabold text-xs text-[#031530] truncate cursor-pointer hover:underline hover:text-blue-600 transition-colors"
+                                  onClick={() => handleOpenProfile(emp)}
+                                  title="Ver y editar perfil"
+                                >
+                                  {emp.full_name}
+                                </p>
+                                <p className="text-[9px] text-slate-450 font-bold uppercase tracking-wide">
+                                  {emp.specialty || 'Electricista'}
+                                </p>
+                                
+                                <div className="flex items-center gap-1.5 mt-1">
+                                  <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full border shrink-0 ${badgeStyle}`}>
+                                    {isLibre ? 'Libre' : 'En Obra'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Botón de acción */}
+                            <div className="shrink-0">
+                              {isLibre ? (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  className="text-blue-600 border-blue-200 hover:bg-blue-50/50 h-8 px-3 text-[11px] font-black rounded-lg"
+                                  onClick={() => navigate(`/personal/trasladar/${emp.id}`)}
+                                >
+                                  Asignar
+                                </Button>
+                              ) : (
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  className="text-slate-500 hover:text-blue-600 hover:bg-slate-50 border border-slate-100 h-8 px-3 text-[11px] font-bold rounded-lg"
+                                  onClick={() => handleOpenProfile(emp)}
+                                >
+                                  Ver
+                                </Button>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            /* NOMINA COMPLETA / LISTA PLANA (ALFABETICO) */
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {filteredEmpleados.map(emp => {
+                const isLibre = emp.status === 'Libre' || !emp.obra_id;
+                const badgeStyle = isLibre 
+                  ? 'bg-green-50 text-green-600 border-green-150' 
+                  : 'bg-blue-50 text-blue-600 border-blue-150';
+
+                return (
+                  <Card key={emp.id} className="overflow-hidden rounded-xl border-slate-100 hover:shadow-md transition-all duration-200 bg-white">
+                    <CardContent className="p-3 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        {/* Avatar */}
+                        <div className="relative shrink-0">
+                          <div className="w-10 h-10 rounded-full overflow-hidden bg-blue-50 border border-slate-100 flex items-center justify-center">
+                            {emp.photo_url ? (
+                              <img src={emp.photo_url} alt={emp.full_name} className="w-full h-full object-cover" />
+                            ) : (
+                              <HardHat className="h-5 w-5 text-blue-300" />
+                            )}
+                          </div>
+                          {isAdmin && (
+                            <button 
+                              onClick={() => { setSelectedEmpId(emp.id); fileInputRef.current?.click(); }}
+                              className="absolute -bottom-1 -right-1 bg-blue-600 text-white rounded-full p-1 shadow hover:bg-blue-700 border border-white"
+                            >
+                              <Camera className="h-2.5 w-2.5" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Detalles */}
+                        <div className="min-w-0 space-y-0.5">
+                          <p 
+                            className="font-extrabold text-xs text-[#031530] truncate cursor-pointer hover:underline hover:text-blue-600 transition-colors"
+                            onClick={() => handleOpenProfile(emp)}
+                            title="Ver y editar perfil"
+                          >
+                            {emp.full_name}
+                          </p>
+                          <p className="text-[9px] text-slate-450 font-bold uppercase tracking-wide">
+                            {emp.specialty || 'Electricista'}
+                          </p>
+                          
+                          <div className="flex items-center gap-1.5 mt-1 min-w-0">
+                            <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full border shrink-0 ${badgeStyle}`}>
+                              {isLibre ? 'Libre' : 'En Obra'}
+                            </span>
+                            {!isLibre && emp.obras?.name && (
+                              <span className="text-[9px] font-bold text-slate-500 truncate" title={emp.obras.name}>
+                                • {emp.obras.name}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Botón de acción */}
+                      <div className="shrink-0">
+                        {isLibre ? (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            className="text-blue-600 border-blue-200 hover:bg-blue-50/50 h-8 px-3 text-[11px] font-black rounded-lg"
+                            onClick={() => navigate(`/personal/trasladar/${emp.id}`)}
+                          >
+                            Asignar
+                          </Button>
+                        ) : (
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="text-slate-500 hover:text-blue-600 hover:bg-slate-50 border border-slate-100 h-8 px-3 text-[11px] font-bold rounded-lg"
+                            onClick={() => handleOpenProfile(emp)}
+                          >
+                            Ver
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </div>
