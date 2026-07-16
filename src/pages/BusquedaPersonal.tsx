@@ -239,7 +239,7 @@ export default function BusquedaPersonal() {
         }
       } else if (command.includes('perfil') || command.includes('ver') || command.includes('ficha')) {
         stopSpeaking();
-        navigate('/personal');
+        navigate(`/personal?empId=${activeEmployee?.id}`);
       } else {
         guideSpeak('No entendí. Decí MOVER, WHATSAPP o PERFIL.');
       }
@@ -813,7 +813,7 @@ export default function BusquedaPersonal() {
 
                 <button
                   type="button"
-                  onClick={() => navigate('/personal')}
+                  onClick={() => navigate(`/personal?empId=${activeEmployee.id}`)}
                   className="w-full flex items-center gap-4 p-5 rounded-2xl bg-white border-2 border-slate-200 text-slate-800 active:scale-[0.97] transition-all"
                 >
                   <div className="w-14 h-14 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">

@@ -322,6 +322,26 @@ export default function Personal() {
     }
 
     setLoading(false);
+
+    // Auto-open profile if empId is present in URL query params
+    const searchParams = new URLSearchParams(window.location.search);
+    const empIdParam = searchParams.get('empId');
+    if (empIdParam && empData) {
+      const emp = empData.find((e: any) => e.id === empIdParam);
+      if (emp) {
+        const empMapped = {
+          id: emp.id,
+          full_name: emp.full_name,
+          obra_id: emp.obra_id,
+          status: emp.status ? (emp.status === 'Disponible' || emp.status === 'Libre' ? 'Libre' : 'Trabajando') : (emp.obra_id ? 'Trabajando' : 'Libre'),
+          specialty: emp.specialty || 'Electricista',
+          photo_url: emp.photo_url,
+          whatsapp: emp.whatsapp || null,
+          obras: Array.isArray(emp.obras) ? emp.obras[0] : emp.obras
+        };
+        handleOpenProfile(empMapped as Empleado);
+      }
+    }
   };
 
   // const handleRelease = async (id: string) => {
