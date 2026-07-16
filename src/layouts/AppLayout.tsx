@@ -76,7 +76,7 @@ export default function AppLayout() {
         ]);
 
         const isAdmin = profile.role?.toLowerCase() === 'admin';
-        const userFullName = profile.full_name?.toLowerCase().trim() || '';
+        const userFullName = (profile.full_name || '').toLowerCase().trim();
 
         const filteredTools = (toolsData || []).filter((s: any) => {
           if (isAdmin) return true;

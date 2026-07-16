@@ -120,7 +120,7 @@ export default function Dashboard() {
         if (allEmpsError) throw allEmpsError;
 
         const isAdmin = profile?.role?.toLowerCase() === 'admin';
-        const userFullName = profile?.full_name?.toLowerCase().trim() || '';
+        const userFullName = (profile?.full_name || '').toLowerCase().trim();
 
         // Filter pending tools
         const filteredPendingTools = (toolsPendingData || []).filter((s: any) => {

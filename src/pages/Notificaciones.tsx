@@ -166,7 +166,7 @@ export default function Notificaciones() {
       if (personalError) throw personalError;
 
       const isAdmin = profile.role?.toLowerCase() === 'admin';
-      const userFullName = profile.full_name?.toLowerCase().trim() || '';
+      const userFullName = (profile.full_name || '').toLowerCase().trim();
 
       // 3. Filtrar de forma privada por participación del usuario
       const filteredTools = (toolsData || []).filter((s: any) => {
