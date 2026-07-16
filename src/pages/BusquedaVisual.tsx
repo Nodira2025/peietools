@@ -42,7 +42,7 @@ interface Herramienta {
   status: string;
   category: string | null;
   photo_url?: string | null;
-  obra_id?: string | null;
+  current_obra_id?: string | null;
   obras?: { name: string } | null;
 }
 
@@ -355,7 +355,7 @@ export default function BusquedaVisual() {
 
   const handleSelectObra = (obra: Obra) => {
     setSelectedObra(obra);
-    const filtered = allTools.filter(t => t.obra_id === obra.id);
+    const filtered = allTools.filter(t => t.current_obra_id === obra.id);
     setToolsInObra(filtered);
     goToStep('tools_in_obra');
   };
