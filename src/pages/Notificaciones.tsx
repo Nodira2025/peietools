@@ -180,9 +180,9 @@ export default function Notificaciones() {
         if (isAdmin) return true;
 
         const isRequester = t.requester_id === profile.id;
-        const isSourceManager = t.source_obra?.encargado_name && 
+        const isSourceManager = typeof t.source_obra?.encargado_name === 'string' && 
           t.source_obra.encargado_name.toLowerCase().trim() === userFullName;
-        const isTargetManager = t.target_obra?.encargado_name && 
+        const isTargetManager = typeof t.target_obra?.encargado_name === 'string' && 
           t.target_obra.encargado_name.toLowerCase().trim() === userFullName;
         
         const isSourceObra = profile.obra_id === t.source_obra_id;

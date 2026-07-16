@@ -237,10 +237,10 @@ export default function TrasladoPersonalDetail() {
   if (!traslado) return null;
 
   const userRole = profile?.role?.toLowerCase();
-  const isSourceEncargado = !!(traslado.source_obra?.encargado_name && profile?.full_name && 
+  const isSourceEncargado = !!(typeof traslado.source_obra?.encargado_name === 'string' && typeof profile?.full_name === 'string' && 
     profile.full_name.toLowerCase().trim() === traslado.source_obra.encargado_name.toLowerCase().trim());
   
-  const isTargetEncargado = !!(traslado.target_obra?.encargado_name && profile?.full_name && 
+  const isTargetEncargado = !!(typeof traslado.target_obra?.encargado_name === 'string' && typeof profile?.full_name === 'string' && 
     profile.full_name.toLowerCase().trim() === traslado.target_obra.encargado_name.toLowerCase().trim());
 
   const canConfirm = traslado.status === 'Pendiente' && (
