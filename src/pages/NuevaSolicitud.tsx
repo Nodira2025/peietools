@@ -142,7 +142,7 @@ export default function NuevaSolicitud() {
         .eq('active', true)
         .order('name');
       if (obrasData) {
-        const validObras = obrasData.filter(o => o.encargado_name && o.encargado_name.trim() !== '');
+        const validObras = obrasData.filter(o => typeof o.encargado_name === 'string' && o.encargado_name.trim() !== '');
         setObras(validObras);
       }
 
@@ -216,7 +216,8 @@ export default function NuevaSolicitud() {
     rec.onerror = () => setIsScreenListening(false);
 
     rec.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript.toLowerCase().trim();
+      const rawText = event.results?.[0]?.[0]?.transcript;
+      const transcript = typeof rawText === 'string' ? rawText.toLowerCase().trim() : '';
       processVoiceCommand(transcript);
     };
 
@@ -359,7 +360,7 @@ export default function NuevaSolicitud() {
       assigned_to: selectedLogisticaId,
       priority,
       status: 'Pendiente',
-      comments: comments.trim() || null,
+      comments: typeof comments === 'string' ? comments.trim() || null : null,
       security_code: securityCode
     }]).select().single();
 
@@ -392,7 +393,7 @@ export default function NuevaSolicitud() {
         '- *Destino:* ' + targetObra.name,
         '- *Prioridad:* ' + priority,
         '',
-        '*Notas:* ' + (comments.trim() || 'Sin especificaciones'),
+        '*Notas:* ' + (typeof comments === 'string' ? comments.trim() || 'Sin especificaciones' : 'Sin especificaciones'),
         '',
         'Aprobar o gestionar el envio desde aca:',
         APP_URL + '/solicitudes/' + newSolicitud.id
@@ -600,7 +601,7 @@ export default function NuevaSolicitud() {
                     onChange={(e) => setComments(e.target.value)}
                     className="h-11 rounded-xl bg-slate-50/50 flex-1"
                   />
-                  <VoiceInputButton onTranscript={(text) => setComments(prev => (prev + ' ' + text).trim())} className="h-11 w-11 shrink-0" />
+                  <VoiceInputButton onTranscript={(text) => setComments(prev => (typeof prev === 'string' ? (prev + ' ' + (text || '')).trim() : (text || '').trim()))} className="h-11 w-11 shrink-0" />
                 </div>
               </div>
 
@@ -756,7 +757,7 @@ export default function NuevaSolicitud() {
                 <div className="space-y-4">
                   <div className="flex flex-col items-center gap-2">
                     <VoiceInputButton
-                      onTranscript={(text) => setComments(prev => (prev + ' ' + text).trim())}
+                      onTranscript={(text) => setComments(prev => (typeof prev === 'string' ? (prev + ' ' + (text || '')).trim() : (text || '').trim()))}
                       className="!w-16 !h-16 !rounded-full shadow-lg"
                     />
                     <p className="text-xs text-slate-400 font-medium">Dictar comentarios con voz</p>
@@ -798,7 +799,7 @@ export default function NuevaSolicitud() {
                     <p>📍 <strong className="text-slate-500">Destino:</strong> {targetObraObject.name}</p>
                     <p>👤 <strong className="text-slate-500">Encargado:</strong> {logisticaUserObject.full_name}</p>
                     <p>🔔 <strong className="text-slate-500">Prioridad:</strong> <span className={priority === 'Urgente' ? 'text-rose-600 font-bold' : 'text-slate-800'}>{priority}</span></p>
-                    {comments.trim() && <p>💬 <strong className="text-slate-500">Nota:</strong> "{comments}"</p>}
+                    {(typeof comments === 'string' && comments.trim()) ? <p>💬 <strong className="text-slate-500">Nota:</strong> "{comments}"</p> : null}
                   </div>
                 </div>
 
