@@ -185,3 +185,148 @@ Ejemplos de interpretación:
     throw error;
   }
 }
+
+export interface AnalyzedEmployee {
+  nombre_sugerido: string;
+  specialty: string;
+  descripcion_breve: string;
+}
+
+/**
+ * Envía una imagen de un operario a la API de OpenRouter para reconocerlo o identificar su especialidad/vestimenta.
+ */
+export async function analyzeEmployeeImage(base64Image: string): Promise<AnalyzedEmployee> {
+  let apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+  if (!apiKey) {
+    apiKey = localStorage.getItem('VITE_OPENROUTER_API_KEY') || '';
+  }
+  
+  if (!apiKey) throw new Error('CONFIG_REQUIRED');
+
+  const base64Data = base64Image.includes('base64,') 
+    ? base64Image.split('base64,')[1] 
+    : base64Image;
+
+  let mimeType = 'image/jpeg';
+  const mimeMatch = base64Image.match(/^data:([^;]+);/);
+  if (mimeMatch) mimeType = mimeMatch[1];
+
+  const prompt = `Analizá esta imagen de un operario u obrero en una obra de construcción y devolvé un objeto JSON con las siguientes propiedades. No agregues markdown adicional ni etiquetas de código (como \`\`\`json), devolvé estrictamente el string JSON estructurado:
+{
+  "nombre_sugerido": "Nombre de la persona si su casco/ropa tiene un nombre escrito, sino dejá vacío",
+  "specialty": "Especialidad sugerida según su equipo/vestimenta (ej: Electricista, Soldador, Capataz, Albañil, Seguridad, Elementos de seguridad, Pintor, Plomero, etc.)",
+  "descripcion_breve": "Descripción técnica muy corta de su apariencia física o vestimenta de trabajo para diferenciarlo"
+}
+
+Si no podés identificar una propiedad, dejala en blanco ("").`;
+
+  try {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'HTTP-Referer': 'https://peietools.com',
+        'X-Title': 'PEIE Tools'
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Data}` } }
+            ]
+          }
+        ],
+        response_format: { type: 'json_object' }
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || `Error de API: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) throw new Error('Respuesta vacía');
+
+    try {
+      return JSON.parse(content.trim()) as AnalyzedEmployee;
+    } catch {
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) return JSON.parse(jsonMatch[0]) as AnalyzedEmployee;
+      throw new Error('Respuesta sin formato JSON válido');
+    }
+  } catch (error: any) {
+    console.error('[OpenRouter] Error en analyzeEmployeeImage:', error);
+    throw error;
+  }
+}
+
+/**
+ * Interpreta texto libre del usuario y devuelve términos de búsqueda estructurados para encontrar un empleado.
+ */
+export async function interpretEmployeeInput(userText: string): Promise<{ terminos: string[]; nombre: string; especialidad: string }> {
+  let apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+  if (!apiKey) {
+    apiKey = localStorage.getItem('VITE_OPENROUTER_API_KEY') || '';
+  }
+  if (!apiKey) throw new Error('CONFIG_REQUIRED');
+
+  const prompt = `Sos un asistente de logística en una obra. Un usuario te describe a un empleado o lo busca por apodo, nombre parcial, especialidad u obra. Tu trabajo es interpretar la consulta.
+
+Texto del usuario: "${userText}"
+
+Devolvé estrictamente un JSON (sin markdown) con:
+{
+  "terminos": ["palabras", "clave", "para", "buscar"],
+  "nombre": "nombre o apellido interpretado",
+  "especialidad": "especialidad interpretada"
+}
+
+Ejemplos:
+- "busco a juan el chispita" → nombre: "juan", especialidad: "Electricista"
+- "el electricista de torre duo" → nombre: "", especialidad: "Electricista"
+- "gomez de seguridad" → nombre: "gomez", especialidad: "Seguridad"`;
+
+  try {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'HTTP-Referer': 'https://peietools.com',
+        'X-Title': 'PEIE Tools'
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [{ role: 'user', content: prompt }],
+        response_format: { type: 'json_object' }
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || `Error API: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) throw new Error('Respuesta vacía');
+
+    try {
+      return JSON.parse(content.trim());
+    } catch {
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) return JSON.parse(jsonMatch[0]);
+      throw new Error('Respuesta sin formato JSON válido');
+    }
+  } catch (error: any) {
+    console.error('[OpenRouter] Error en interpretEmployeeInput:', error);
+    throw error;
+  }
+}
+
