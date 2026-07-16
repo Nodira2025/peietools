@@ -279,6 +279,7 @@ export default function SolicitudDetail() {
   const handleDelete = async () => {
     if (!window.confirm('¿Estás seguro de que deseas eliminar este movimiento permanentemente? Esta acción no se puede deshacer.')) return;
     try {
+      // 1. Revertir el estado de la herramienta si es necesario
       if (solicitud.herramienta_id) {
         const { data: hData } = await supabase.from('herramientas').select('current_obra_id').eq('id', solicitud.herramienta_id).single();
         await supabase
@@ -287,6 +288,18 @@ export default function SolicitudDetail() {
           .eq('id', solicitud.herramienta_id);
       }
 
+      // 2. Eliminar primero los movimientos relacionados para evitar violar la Foreign Key
+      const { error: movError } = await supabase
+        .from('movimientos')
+        .delete()
+        .eq('solicitud_id', id);
+
+      if (movError) {
+        console.error('Error al eliminar movimientos relacionados:', movError);
+        // Continuamos de todas formas, el error de FK saltará si realmente falló el borrado de hijos
+      }
+
+      // 3. Eliminar la solicitud
       const { error } = await supabase
         .from('solicitudes')
         .delete()
