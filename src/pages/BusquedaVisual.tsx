@@ -77,9 +77,7 @@ export default function BusquedaVisual() {
 
   // Wizard state
   const [step, setStep] = useState<WizardStep>('welcome');
-  const [voiceOn, setVoiceOn] = useState(() => {
-    return typeof window !== 'undefined' && window.innerWidth < 768;
-  });
+  const [voiceOn, setVoiceOn] = useState(false);
 
   // Photo flow
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
@@ -220,6 +218,14 @@ export default function BusquedaVisual() {
       if (obrasRes.data) setObras(obrasRes.data);
     }
     loadData();
+    
+    // Forzar desactivación por defecto al ingresar
+    setVoiceEnabled(false);
+    stopSpeaking();
+    
+    return () => {
+      stopSpeaking();
+    };
   }, []);
 
   // ─── Voice Guide ─────────────────────────────────────────────────────────
