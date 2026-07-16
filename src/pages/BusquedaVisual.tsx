@@ -95,6 +95,109 @@ export default function BusquedaVisual() {
   // Final selection
   const [activeTool, setActiveTool] = useState<Herramienta | null>(null);
 
+  // Voice Command States
+  const [isScreenListening, setIsScreenListening] = useState(false);
+  const [voiceCommandTranscript, setVoiceCommandTranscript] = useState('');
+
+  const listenForScreenCommand = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast({ title: "Comandos por voz no soportados", description: "Tu dispositivo no soporta esta función." });
+      return;
+    }
+
+    stopSpeaking();
+
+    const rec = new SpeechRecognition();
+    rec.lang = 'es-AR';
+    rec.continuous = false;
+    rec.interimResults = false;
+
+    rec.onstart = () => {
+      setIsScreenListening(true);
+      setVoiceCommandTranscript('');
+    };
+
+    rec.onend = () => {
+      setIsScreenListening(false);
+    };
+
+    rec.onerror = (e: any) => {
+      console.error('[VoiceCommand] Error:', e.error);
+      setIsScreenListening(false);
+      if (e.error !== 'no-speech') {
+        guideSpeak('No te escuché bien. Tocá de nuevo para hablar.');
+      }
+    };
+
+    rec.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript.toLowerCase().trim();
+      setVoiceCommandTranscript(transcript);
+      processVoiceCommand(transcript);
+    };
+
+    try {
+      rec.start();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const processVoiceCommand = (command: string) => {
+    console.log('[VoiceCommand] Procesando:', command, 'en paso:', step);
+
+    if (step === 'welcome') {
+      if (command.includes('foto') || command.includes('cámara') || command.includes('camara') || command.includes('imagen')) {
+        goToStep('photo_upload');
+      } else if (command.includes('obra') || command.includes('lugar') || command.includes('construcción')) {
+        goToStep('select_obra');
+      } else if (command.includes('voz') || command.includes('hablar') || command.includes('describir')) {
+        goToStep('voice_describe');
+      } else {
+        guideSpeak('No entendí. Decí FOTO, OBRA o VOZ.');
+      }
+    }
+
+    else if (step === 'confirm_tool') {
+      if (command.includes('sí') || command.includes('si') || command.includes('correcto') || command.includes('verde') || command.includes('ok')) {
+        handleConfirmTool();
+      } else if (command.includes('no') || command.includes('rojo') || command.includes('incorrecto') || command.includes('atrás') || command.includes('atras')) {
+        handleRejectTool();
+      } else {
+        guideSpeak('No entendí. Decí SÍ o NO.');
+      }
+    }
+
+    else if (step === 'select_action') {
+      if (command.includes('mover') || command.includes('traslado') || command.includes('llevar') || command.includes('obra') || command.includes('azul')) {
+        stopSpeaking();
+        navigate('/solicitudes/nueva', { state: { herramientaId: activeTool?.id } });
+      } else if (command.includes('rota') || command.includes('falla') || command.includes('roto') || command.includes('dañado') || command.includes('amarillo')) {
+        stopSpeaking();
+        navigate('/ordenes/nueva', { state: { herramientaId: activeTool?.id } });
+      } else if (command.includes('ficha') || command.includes('ver') || command.includes('info')) {
+        stopSpeaking();
+        navigate(`/herramientas/${activeTool?.id}`);
+      } else {
+        guideSpeak('No entendí. Decí MOVER, ROTA o FICHA.');
+      }
+    }
+  };
+
+  const handleScreenClick = (e: React.MouseEvent) => {
+    if (isScreenListening || step === 'photo_loading' || step === 'voice_loading') return;
+
+    const target = e.target as HTMLElement;
+    const isInteractive = target.closest('button') || target.closest('a') || target.closest('input') || target.closest('label');
+    
+    if (isInteractive) return;
+
+    const voiceActiveSteps: WizardStep[] = ['welcome', 'confirm_tool', 'select_action'];
+    if (voiceActiveSteps.includes(step)) {
+      listenForScreenCommand();
+    }
+  };
+
   // ─── Data Loading ────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -348,7 +451,7 @@ export default function BusquedaVisual() {
   // ─── Render ──────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-4 max-w-xl mx-auto pb-safe">
+    <div onClick={handleScreenClick} className="space-y-4 max-w-xl mx-auto pb-safe min-h-[85vh] cursor-pointer">
       {/* Top bar */}
       <div className="flex items-center justify-between">
         <Button variant="ghost" onClick={() => { stopSpeaking(); navigate('/herramientas'); }} className="p-0 hover:bg-transparent text-peie-blue text-xs">
@@ -810,6 +913,38 @@ export default function BusquedaVisual() {
 
         </CardContent>
       </Card>
+
+      {/* Indicador de Control de Voz de pantalla completa */}
+      {!isScreenListening && ['welcome', 'confirm_tool', 'select_action'].includes(step) && (
+        <div className="text-center p-3 bg-peie-blue/5 rounded-2xl border border-peie-blue/10 animate-pulse">
+          <p className="text-xs text-peie-blue font-bold flex items-center justify-center gap-1.5">
+            <Mic size={14} /> Tocá la pantalla libre y decí tu opción en voz alta
+          </p>
+        </div>
+      )}
+
+      {/* Overlay de Escucha de Comandos por Voz */}
+      {isScreenListening && (
+        <div className="fixed inset-0 bg-peie-blue/95 z-50 flex flex-col items-center justify-center p-6 text-white">
+          <div className="w-24 h-24 rounded-full bg-white/10 flex items-center justify-center animate-ping absolute" />
+          <div className="w-20 h-20 rounded-full bg-white text-peie-blue flex items-center justify-center relative shadow-lg">
+            <Mic size={36} className="animate-pulse" />
+          </div>
+          <h3 className="text-2xl font-black mt-8 text-center uppercase tracking-wider">Escuchando...</h3>
+          <p className="text-sm mt-3 text-slate-200 font-semibold text-center max-w-xs">
+            {step === 'welcome' && 'Decí: FOTO, OBRA o VOZ'}
+            {step === 'confirm_tool' && 'Decí: SÍ o NO'}
+            {step === 'select_action' && 'Decí: MOVER, ROTA o FICHA'}
+          </p>
+          <Button 
+            onClick={() => setIsScreenListening(false)}
+            variant="outline" 
+            className="mt-12 border-white/30 text-white hover:bg-white/10 bg-transparent rounded-xl"
+          >
+            Cancelar
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
