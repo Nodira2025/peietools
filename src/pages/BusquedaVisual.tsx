@@ -77,7 +77,9 @@ export default function BusquedaVisual() {
 
   // Wizard state
   const [step, setStep] = useState<WizardStep>('welcome');
-  const [voiceOn, setVoiceOn] = useState(true);
+  const [voiceOn, setVoiceOn] = useState(() => {
+    return typeof window !== 'undefined' && window.innerWidth < 768;
+  });
 
   // Photo flow
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
@@ -186,6 +188,9 @@ export default function BusquedaVisual() {
 
   const handleScreenClick = (e: React.MouseEvent) => {
     if (isScreenListening || step === 'photo_loading' || step === 'voice_loading') return;
+
+    // Solo habilitar comandos por gestos táctiles en celulares
+    if (typeof window !== 'undefined' && window.innerWidth >= 768) return;
 
     const target = e.target as HTMLElement;
     const isInteractive = target.closest('button') || target.closest('a') || target.closest('input') || target.closest('label');
@@ -914,8 +919,8 @@ export default function BusquedaVisual() {
         </CardContent>
       </Card>
 
-      {/* Indicador de Control de Voz de pantalla completa */}
-      {!isScreenListening && ['welcome', 'confirm_tool', 'select_action'].includes(step) && (
+      {/* Indicador de Control de Voz de pantalla completa (solo en móviles y si la voz está activada) */}
+      {!isScreenListening && voiceOn && typeof window !== 'undefined' && window.innerWidth < 768 && ['welcome', 'confirm_tool', 'select_action'].includes(step) && (
         <div className="text-center p-3 bg-peie-blue/5 rounded-2xl border border-peie-blue/10 animate-pulse">
           <p className="text-xs text-peie-blue font-bold flex items-center justify-center gap-1.5">
             <Mic size={14} /> Tocá la pantalla libre y decí tu opción en voz alta
