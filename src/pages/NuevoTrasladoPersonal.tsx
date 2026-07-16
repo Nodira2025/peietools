@@ -98,7 +98,7 @@ export default function NuevoTrasladoPersonal() {
     const isAdminOrLogistica = profile?.role === 'admin' || profile?.role === 'logistica';
     if (!isAdminOrLogistica && profile) {
       filteredObrasData = (obrasData || []).filter(o => 
-        (o.encargado_name && profile.full_name && o.encargado_name.toLowerCase().trim() === profile.full_name.toLowerCase().trim()) ||
+        (typeof o.encargado_name === 'string' && typeof profile.full_name === 'string' && o.encargado_name.toLowerCase().trim() === profile.full_name.toLowerCase().trim()) ||
         o.id === profile.obra_id
       );
     }
