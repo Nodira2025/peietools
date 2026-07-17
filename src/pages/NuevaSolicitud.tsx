@@ -22,7 +22,9 @@ import {
   VolumeX, 
   Mic, 
   MapPin, 
-  AlertTriangle 
+  AlertTriangle,
+  ChevronRight,
+  Wrench
 } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { buildWhatsAppLink, APP_URL } from '../lib/whatsapp';
@@ -55,6 +57,7 @@ interface PersonalLogistica {
 }
 
 type WizardStep = 
+  | 'select_tool'      // "¿Qué herramienta querés trasladar?"
   | 'select_obra'      // "¿Hacia dónde debe enviarse?"
   | 'select_logistica' // "¿Quién lo transporta?"
   | 'select_priority'  // "¿Qué tan urgente es?"
@@ -87,7 +90,7 @@ export default function NuevaSolicitud() {
 
   // Layout View Mode (Form vs Wizard)
   const [isMobile, setIsMobile] = useState(false);
-  const [wizardStep, setWizardStep] = useState<WizardStep>('select_obra');
+  const [wizardStep, setWizardStep] = useState<WizardStep>('select_tool');
   const [voiceOn, setVoiceOn] = useState(false); // Desactivada por defecto
 
   // WhatsApp Preview state
@@ -131,7 +134,10 @@ export default function NuevaSolicitud() {
           const preTool = toolsData.find(h => h.id === preselectedToolId);
           if (preTool) {
             setToolSearch(`${preTool.name} [${preTool.code}]`);
+            setWizardStep('select_obra');
           }
+        } else {
+          setWizardStep('select_tool');
         }
       }
 
@@ -184,6 +190,7 @@ export default function NuevaSolicitud() {
   useEffect(() => {
     if (!isMobile) return;
     const messages: Record<WizardStep, string> = {
+      select_tool: '¿Qué herramienta deseás trasladar? Buscala por su nombre o código en la lista.',
       select_obra: '¿Hacia qué obra debe enviarse la herramienta? Seleccioná la obra de destino.',
       select_logistica: '¿Quién es el encargado de logística que transportará la herramienta?',
       select_priority: '¿Qué tan urgente es el traslado? Elegí prioridad baja, normal o urgente.',
@@ -627,9 +634,63 @@ export default function NuevaSolicitud() {
           <div className="h-1.5 bg-gradient-to-r from-peie-blue via-peie-light to-peie-blue" />
           <CardContent className="px-5 py-6 space-y-5">
 
+            {/* STEP 0: SELECT TOOL */}
+            {wizardStep === 'select_tool' && (
+              <div className="space-y-5">
+                <BackButton onBack={() => navigate(-1)} />
+                <StepHeader 
+                  title="¿Qué herramienta deseás trasladar?" 
+                  subtitle="Buscá y seleccioná de la lista"
+                />
+
+                <div className="space-y-3">
+                  <div className="relative">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
+                    <Input
+                      placeholder="Buscar por nombre o código..."
+                      value={toolSearch}
+                      onChange={(e) => {
+                        setToolSearch(e.target.value);
+                        setSelectedToolId('');
+                      }}
+                      className="h-12 pl-10 rounded-2xl border-slate-200 focus-visible:ring-peie-blue bg-slate-50/50 text-sm font-semibold"
+                    />
+                  </div>
+
+                  <div className="space-y-2.5 max-h-[45vh] overflow-y-auto pr-1">
+                    {filteredHerramientas.slice(0, 15).map(t => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedToolId(t.id);
+                          setToolSearch(`${t.name} [${t.code}]`);
+                          goToWizardStep('select_obra');
+                        }}
+                        className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl border-2 border-slate-200 bg-white text-left active:scale-[0.97] transition-all hover:border-peie-blue"
+                      >
+                        <Wrench size={20} className="text-peie-blue shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-slate-700 truncate">{t.name}</p>
+                          <p className="text-xs text-slate-400 font-bold">Código: {t.code} • Ubicación: {t.obras?.name || 'Base Desconocida'}</p>
+                        </div>
+                        <ChevronRight size={18} className="text-slate-300 shrink-0" />
+                      </button>
+                    ))}
+                    {filteredHerramientas.length === 0 && (
+                      <div className="text-center py-8 text-slate-400 font-semibold text-sm">
+                        No se encontraron herramientas.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* STEP 1: SELECT OBRA */}
             {wizardStep === 'select_obra' && (
               <div className="space-y-5">
+                <BackButton onBack={() => goToWizardStep('select_tool')} />
                 <StepHeader 
                   title="¿Hacia dónde debe enviarse?" 
                   subtitle="Seleccioná la obra de destino"
