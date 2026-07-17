@@ -10,10 +10,13 @@
     <div id="root"><div style="min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui"><div style="text-align:center"><div style="width:2.5rem;height:2.5rem;border:3px solid #dbeafe;border-top-color:#3b82f6;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto"></div><p style="margin-top:0.75rem;font-size:0.75rem;color:#3b82f6;font-weight:600">Cargando PEIE Tools...</p></div></div></div>
     <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
     <script>
-      window.onerror=function(msg,src,line,col,err){
+      function __showErr(msg){
         var r=document.getElementById('root');
-        if(r)r.innerHTML='<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui;padding:2rem"><div style="background:#fff;border-radius:1rem;padding:2rem;max-width:480px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,.08);text-align:center"><div style="font-size:3rem;margin-bottom:1rem">⚠️</div><h1 style="font-size:1.25rem;font-weight:700;color:#1e293b;margin-bottom:.5rem">Algo salió mal</h1><p style="font-size:.875rem;color:#64748b;margin-bottom:1rem">Ocurrió un error inesperado.</p><button onclick="location.reload()" style="background:#3b82f6;color:#fff;border:none;border-radius:.75rem;padding:.75rem 1.5rem;font-size:.875rem;font-weight:600;cursor:pointer">Recargar</button><details style="text-align:left;margin-top:1rem"><summary style="cursor:pointer;font-size:.75rem;color:#94a3b8;font-weight:600">Detalles</summary><pre style="background:#f1f5f9;border-radius:.5rem;padding:.75rem;font-size:.65rem;color:#ef4444;overflow:auto;max-height:200px;margin-top:.5rem;white-space:pre-wrap;word-break:break-all">'+msg+'\n\nSource: '+src+':'+line+':'+col+'</pre></details></div></div>';
-      };
+        if(!r)return;
+        r.innerHTML='<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui;padding:2rem"><div style="background:#fff;border-radius:1rem;padding:2rem;max-width:480px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,.08);text-align:center"><div style="font-size:3rem;margin-bottom:1rem">⚠️</div><h1 style="font-size:1.25rem;font-weight:700;color:#1e293b;margin-bottom:.5rem">Algo salió mal</h1><p style="font-size:.875rem;color:#64748b;margin-bottom:1rem">Ocurrió un error inesperado.</p><button onclick="location.reload()" style="background:#3b82f6;color:#fff;border:none;border-radius:.75rem;padding:.75rem 1.5rem;font-size:.875rem;font-weight:600;cursor:pointer">Recargar</button><details style="text-align:left;margin-top:1rem"><summary style="cursor:pointer;font-size:.75rem;color:#94a3b8;font-weight:600">Detalles</summary><pre style="background:#f1f5f9;border-radius:.5rem;padding:.75rem;font-size:.65rem;color:#ef4444;overflow:auto;max-height:200px;margin-top:.5rem;white-space:pre-wrap;word-break:break-all">'+msg+'</pre></details></div></div>';
+      }
+      window.addEventListener('error',function(e){__showErr(e.message+'\n\nFile: '+(e.filename||'?')+':'+(e.lineno||'?')+':'+(e.colno||'?'));});
+      window.addEventListener('unhandledrejection',function(e){__showErr('Unhandled Promise: '+(e.reason&&e.reason.message||e.reason||'Unknown'));});
     </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
