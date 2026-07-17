@@ -10,6 +10,29 @@
     <div id="root"><div style="min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui"><div style="text-align:center"><div style="width:2.5rem;height:2.5rem;border:3px solid #dbeafe;border-top-color:#3b82f6;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto"></div><p style="margin-top:0.75rem;font-size:0.75rem;color:#3b82f6;font-weight:600">Cargando PEIE Tools...</p></div></div></div>
     <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
     <script>
+      // Force SW cache refresh on deploy - bump this version with each critical deploy
+      (function(){
+        var CACHE_V = 'v2025-07-17-a';
+        var KEY = 'peie_cache_v';
+        var stored = localStorage.getItem(KEY);
+        if (stored !== CACHE_V) {
+          localStorage.setItem(KEY, CACHE_V);
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(regs) {
+              var p = regs.map(function(r) { return r.unregister(); });
+              return Promise.all(p);
+            }).then(function() {
+              return caches.keys();
+            }).then(function(names) {
+              return Promise.all(names.map(function(n) { return caches.delete(n); }));
+            }).then(function() {
+              if (stored !== null) { location.reload(); }
+            }).catch(function() {});
+          }
+        }
+      })();
+    </script>
+    <script>
       function __showErr(msg){
         var r=document.getElementById('root');
         if(!r)return;
