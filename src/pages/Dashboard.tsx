@@ -418,6 +418,23 @@ export default function Dashboard() {
           </div>
         </Card>
 
+        {/* Escanear QR (Acceso Prominente Móvil) */}
+        <div 
+          onClick={() => navigate('/herramientas/scanner')}
+          className="bg-gradient-to-r from-emerald-600 to-teal-500 text-white rounded-[24px] p-4 shadow-[0_4px_20px_rgba(16,185,129,0.12)] hover:shadow-[0_4px_20px_rgba(16,185,129,0.2)] flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all duration-200"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-white shrink-0">
+              <QrCode size={24} className="stroke-[2.5]" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-sm font-black uppercase tracking-wider leading-none">Escanear Código QR</h3>
+              <p className="text-[10px] text-slate-100 font-bold leading-tight">Identificá o trasladá una herramienta al instante.</p>
+            </div>
+          </div>
+          <ChevronRight size={18} className="text-white shrink-0" />
+        </div>
+
         {/* Buscador Visual Prioritario (Solo Móvil) */}
         <div 
           onClick={() => navigate('/herramientas/busqueda-visual')}
@@ -500,6 +517,45 @@ export default function Dashboard() {
             </div>
             <span className="text-[8px] font-black text-slate-400 mt-1.5 uppercase tracking-tight leading-tight">Logíst. pend.</span>
             <span className="text-sm font-black text-purple-600 mt-0.5">{counts.activeMovements}</span>
+          </div>
+        </div>
+
+        {/* Asistentes de Alta (Solo Móvil) */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-center gap-4 my-1">
+            <div className="h-[1px] bg-slate-200 flex-1" />
+            <span className="text-[10px] font-black text-peie-blue uppercase tracking-widest whitespace-nowrap">Asistentes de Alta</span>
+            <div className="h-[1px] bg-slate-200 flex-1" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {/* Alta Herramienta Asistida */}
+            <div 
+              onClick={() => navigate('/herramientas/nueva')}
+              className="bg-[#F3F6FD] border border-[#E2EAFD] rounded-[24px] p-4 flex flex-col justify-between cursor-pointer active:scale-[0.97] transition-all duration-200 min-h-[114px] shadow-sm shadow-[#081a63]/2"
+            >
+              <div className="w-10 h-10 rounded-2xl bg-peie-blue text-white flex items-center justify-center shadow-md shadow-peie-blue/15">
+                <Plus size={20} className="stroke-[3]" />
+              </div>
+              <div className="space-y-0.5">
+                <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-wide">Alta Herramienta</h4>
+                <p className="text-[8px] text-slate-400 font-bold leading-tight">Asistente paso a paso</p>
+              </div>
+            </div>
+
+            {/* Alta Personal Asistida */}
+            <div 
+              onClick={() => navigate('/personal/nuevo-asistido')}
+              className="bg-[#FAF7FE] border border-[#F2EAFF] rounded-[24px] p-4 flex flex-col justify-between cursor-pointer active:scale-[0.97] transition-all duration-200 min-h-[114px] shadow-sm shadow-violet-600/2"
+            >
+              <div className="w-10 h-10 rounded-2xl bg-violet-600 text-white flex items-center justify-center shadow-md shadow-violet-600/15">
+                <User size={20} className="stroke-[3]" />
+              </div>
+              <div className="space-y-0.5">
+                <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-wide">Alta Personal</h4>
+                <p className="text-[8px] text-slate-400 font-bold leading-tight">Asistente paso a paso</p>
+              </div>
+            </div>
           </div>
         </div>
 

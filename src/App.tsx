@@ -31,6 +31,7 @@ import TrasladoPersonalDetail from './pages/TrasladoPersonalDetail';
 import Ordenes from './pages/Ordenes';
 import NuevaOrden from './pages/NuevaOrden';
 import OrdenDetail from './pages/OrdenDetail';
+import NuevoPersonalAsistido from './pages/NuevoPersonalAsistido';
 import Notificaciones from './pages/Notificaciones';
 import SeguimientoTraslado from './pages/SeguimientoTraslado';
 
@@ -82,6 +83,7 @@ export default function App() {
           <Route path="/obras" element={<Obras />} />
           <Route path="/mis-obras" element={<MisObras />} />
           <Route path="/personal" element={<Personal />} />
+          <Route path="/personal/nuevo-asistido" element={<NuevoPersonalAsistido />} />
           <Route path="/personal/busqueda-visual" element={<BusquedaPersonal />} />
           <Route path="/personal/trasladar/:id" element={<NuevoTrasladoPersonal />} />
           <Route path="/personal/traslados/:id" element={<TrasladoPersonalDetail />} />

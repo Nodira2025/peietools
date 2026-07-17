@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Plus, Sparkles, Camera, Upload, Trash2 } from 'lucide-react';
+import { ArrowLeft, Plus, Sparkles, Camera, Upload, Trash2, QrCode, ChevronRight } from 'lucide-react';
+import { useZxing } from 'react-zxing';
 import { useAuthStore } from '../store/auth';
 import { Textarea } from '@/components/ui/textarea';
 import { compressImage } from '../lib/imageUtils';
@@ -40,6 +41,29 @@ export default function NuevaHerramienta() {
   const [aiLoading, setAiLoading] = useState(false);
   const [uploadedPhotoName, setUploadedPhotoName] = useState('');
 
+  // Mobile Wizard state
+  const [isMobile, setIsMobile] = useState(false);
+  const [wizardStep, setWizardStep] = useState<'name' | 'code' | 'details' | 'obra' | 'photo' | 'confirm'>('name');
+  const [showScannerInWizard, setShowScannerInWizard] = useState(false);
+
+  const { ref: wizardScannerRef } = useZxing({
+    paused: !showScannerInWizard,
+    onResult(result: any) {
+      const text = result.getText();
+      let cleanCode = text;
+      try {
+        if (text.includes('/herramientas/')) {
+          const parts = text.split('/');
+          cleanCode = parts[parts.length - 1];
+        }
+      } catch {}
+      setCode(cleanCode.toUpperCase());
+      setShowScannerInWizard(false);
+      toast({ title: 'QR Escaneado', description: `Código capturado: ${cleanCode}` });
+      setWizardStep('details');
+    },
+  });
+
   // Solo Admin y Logística pueden crear herramientas
   const isAuthorized = profile?.role === 'admin' || profile?.role === 'logistica';
 
@@ -49,6 +73,13 @@ export default function NuevaHerramienta() {
       if (data) setObras(data);
     }
     fetchObras();
+
+    const checkSize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkSize();
+    window.addEventListener('resize', checkSize);
+    return () => window.removeEventListener('resize', checkSize);
   }, []);
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -216,6 +247,372 @@ Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Elementos de segur
         <h3 className="text-xl font-bold text-rose-600">Acceso Restringido</h3>
         <p className="text-sm text-slate-500 mt-2">Solo el personal de Administración o Logística puede ingresar nuevos productos.</p>
         <Button className="mt-4 bg-peie-blue text-white" onClick={() => navigate('/herramientas')}>Volver al Catálogo</Button>
+      </div>
+    );
+  }
+
+  const handleMobileSubmit = async () => {
+    await handleSubmit({ preventDefault: () => {} } as any);
+  };
+
+  const selectedObraObject = obras.find(o => o.id === currentObraId);
+
+  if (isMobile) {
+    return (
+      <div className="space-y-4 max-w-xl mx-auto pb-safe min-h-[85vh]">
+        {/* Top Header Bar */}
+        <div className="flex items-center justify-between">
+          <Button variant="ghost" onClick={() => navigate(-1)} className="p-0 hover:bg-transparent text-peie-blue text-xs font-bold">
+            <ArrowLeft className="mr-1 h-4 w-4" /> Volver
+          </Button>
+          <span className="text-[10px] bg-peie-blue/5 text-peie-blue px-2.5 py-1 rounded-full font-bold">
+            Paso {wizardStep === 'name' ? '1' : wizardStep === 'code' ? '2' : wizardStep === 'details' ? '3' : wizardStep === 'obra' ? '4' : wizardStep === 'photo' ? '5' : '6'} de 6
+          </span>
+        </div>
+
+        <Card className="shadow-xl border-0 ring-1 ring-peie-blue/5 overflow-hidden rounded-[24px]">
+          <div className="h-1.5 bg-gradient-to-r from-peie-blue via-peie-light to-peie-blue" />
+          <CardContent className="px-5 py-6 space-y-5">
+
+            {/* STEP 1: ENTER NAME */}
+            {wizardStep === 'name' && (
+              <div className="space-y-5">
+                <StepHeader 
+                  title="¿Cómo se llama la herramienta?" 
+                  subtitle="Ingresá su nombre de catálogo"
+                />
+                <div className="space-y-3">
+                  <div className="relative flex gap-2">
+                    <Input
+                      placeholder="Ej: Taladro Percutor, Amoladora..."
+                      value={name}
+                      onChange={e => setName(e.target.value)}
+                      className="h-14 rounded-2xl border-slate-200 focus-visible:ring-peie-blue text-base font-semibold flex-1"
+                    />
+                    <VoiceInputButton onTranscript={(text) => setName(text)} className="h-14 w-14 shrink-0 rounded-2xl bg-slate-100 text-slate-600" />
+                  </div>
+                  <Button
+                    onClick={() => setWizardStep('code')}
+                    disabled={!name.trim()}
+                    className="w-full h-14 bg-peie-blue hover:bg-peie-blue/90 text-white font-black rounded-2xl text-base shadow-lg shadow-peie-blue/10 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                  >
+                    Continuar <ChevronRight size={18} />
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 2: ENTER CODE / SCAN QR */}
+            {wizardStep === 'code' && (
+              <div className="space-y-5">
+                <BackButton onBack={() => setWizardStep('name')} />
+                <StepHeader 
+                  title="¿Cuál es su código (etiqueta QR)?" 
+                  subtitle="Identificador de barra o pegatina QR de control"
+                />
+
+                <div className="space-y-3">
+                  {showScannerInWizard ? (
+                    <div className="space-y-4">
+                      <div className="w-full aspect-square rounded-2xl overflow-hidden bg-black flex items-center justify-center relative border border-slate-200">
+                        <video ref={wizardScannerRef} className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 border-2 border-white/30 m-12 rounded-xl pointer-events-none"></div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setShowScannerInWizard(false)}
+                        className="w-full h-12 rounded-xl border-slate-200 font-bold"
+                      >
+                        Cancelar Escaneo
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="relative">
+                        <Input
+                          placeholder="Ej: TAL-005, AMO-012..."
+                          value={code}
+                          onChange={e => setCode(e.target.value)}
+                          className="h-14 rounded-2xl border-slate-200 focus-visible:ring-peie-blue text-base font-mono uppercase font-black"
+                        />
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          onClick={() => setWizardStep('details')}
+                          disabled={!code.trim()}
+                          className="flex-1 h-14 bg-peie-blue hover:bg-peie-blue/90 text-white font-black rounded-2xl text-base shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                        >
+                          Continuar <ChevronRight size={18} />
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => setShowScannerInWizard(true)}
+                          className="h-14 w-14 shrink-0 rounded-2xl bg-emerald-50 text-emerald-700 border-2 border-emerald-200 hover:bg-emerald-100 flex items-center justify-center"
+                          title="Escanear QR de Etiqueta"
+                        >
+                          <QrCode size={24} className="stroke-[2.5]" />
+                        </Button>
+                      </div>
+                      <p className="text-[10px] text-slate-400 font-bold leading-tight px-1 text-center">
+                        Podés escribir el código o presionar el botón del código QR para escanearlo con la cámara.
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* STEP 3: DETAILS */}
+            {wizardStep === 'details' && (
+              <div className="space-y-5">
+                <BackButton onBack={() => setWizardStep('code')} />
+                <StepHeader 
+                  title="Detalles de la herramienta" 
+                  subtitle="Ingresá marca, modelo y categoría"
+                />
+
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Marca</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Ej: Bosch, DeWalt..."
+                        value={brand}
+                        onChange={e => setBrand(e.target.value)}
+                        className="h-12 rounded-xl border-slate-200 text-sm font-semibold"
+                      />
+                      <VoiceInputButton onTranscript={text => setBrand(text)} className="h-12 w-12 shrink-0 rounded-xl" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Modelo</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Ej: DCD778..."
+                        value={model}
+                        onChange={e => setModel(e.target.value)}
+                        className="h-12 rounded-xl border-slate-200 text-sm font-semibold"
+                      />
+                      <VoiceInputButton onTranscript={text => setModel(text)} className="h-12 w-12 shrink-0 rounded-xl" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Categoría *</Label>
+                    <Select value={category} onValueChange={setCategory}>
+                      <SelectTrigger className="h-12 rounded-xl border-slate-200 font-semibold text-slate-800">
+                        <SelectValue placeholder="Categoría" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl">
+                        {['Escaleras', 'Amoladoras', 'Taladros', 'Elementos de seguridad', 'Instrumentos de medición', 'Vehículos', 'Otros'].map(cat => (
+                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <Button
+                    onClick={() => setWizardStep('obra')}
+                    className="w-full h-14 bg-peie-blue hover:bg-peie-blue/90 text-white font-black rounded-2xl text-base shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                  >
+                    Continuar <ChevronRight size={18} />
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 4: SELECT OBRA */}
+            {wizardStep === 'obra' && (
+              <div className="space-y-5">
+                <BackButton onBack={() => setWizardStep('details')} />
+                <StepHeader 
+                  title="¿Dónde se ubica físicamente?" 
+                  subtitle="Seleccioná la obra o base inicial"
+                />
+
+                <div className="space-y-2.5 max-h-[45vh] overflow-y-auto pr-1">
+                  {obras.map(o => (
+                    <button
+                      key={o.id}
+                      type="button"
+                      onClick={() => {
+                        setCurrentObraId(o.id);
+                        setWizardStep('photo');
+                      }}
+                      className={`w-full flex items-center gap-3 px-5 py-4 rounded-2xl border-2 text-left text-base font-bold active:scale-[0.97] transition-all ${
+                        currentObraId === o.id
+                          ? 'border-peie-blue bg-blue-50 text-peie-blue'
+                          : 'border-slate-200 bg-white text-slate-600'
+                      }`}
+                    >
+                      <Building size={20} className={currentObraId === o.id ? 'text-peie-blue' : 'text-slate-400'} />
+                      {o.name}
+                      <ChevronRight size={18} className="text-slate-300 ml-auto" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* STEP 5: PHOTO */}
+            {wizardStep === 'photo' && (
+              <div className="space-y-5">
+                <BackButton onBack={() => setWizardStep('obra')} />
+                <StepHeader 
+                  title="¿Querés agregar una foto?" 
+                  subtitle="Sacale una foto de control (opcional)"
+                />
+
+                <div className="space-y-4">
+                  {photoUrl ? (
+                    <div className="relative w-full aspect-square max-w-xs mx-auto rounded-3xl overflow-hidden border-2 border-slate-200">
+                      <img src={photoUrl} alt="Vista previa" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setPhotoUrl(null)}
+                        className="absolute top-3 right-3 bg-rose-600 text-white rounded-xl p-2.5 shadow-md"
+                      >
+                        <Trash2 size={20} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-3">
+                      <input
+                        type="file"
+                        id="mobile-photo-camera"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            try {
+                              const compressed = await compressImage(file);
+                              setPhotoUrl(compressed);
+                            } catch {
+                              toast({ variant: 'destructive', title: 'Error', description: 'No se pudo procesar la imagen.' });
+                            }
+                          }
+                        }}
+                      />
+                      <input
+                        type="file"
+                        id="mobile-photo-gallery"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            try {
+                              const compressed = await compressImage(file);
+                              setPhotoUrl(compressed);
+                            } catch {
+                              toast({ variant: 'destructive', title: 'Error', description: 'No se pudo procesar la imagen.' });
+                            }
+                          }
+                        }}
+                      />
+                      <Label
+                        htmlFor="mobile-photo-camera"
+                        className="flex flex-col items-center justify-center gap-2 h-32 rounded-2xl border-2 border-slate-200 border-dashed bg-white text-sm text-slate-600 font-bold active:scale-[0.98] transition-all cursor-pointer"
+                      >
+                        <Camera size={32} className="text-peie-blue" />
+                        Sacar Foto (Cámara)
+                      </Label>
+                      <Label
+                        htmlFor="mobile-photo-gallery"
+                        className="flex flex-col items-center justify-center gap-2 h-20 rounded-2xl border-2 border-slate-200 border-dashed bg-white text-xs text-slate-500 font-bold active:scale-[0.98] transition-all cursor-pointer"
+                      >
+                        <Upload size={20} className="text-slate-400" />
+                        Subir desde Galería
+                      </Label>
+                    </div>
+                  )}
+
+                  <Button
+                    onClick={() => setWizardStep('confirm')}
+                    className="w-full h-14 bg-peie-blue hover:bg-peie-blue/90 text-white font-black rounded-2xl text-base shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                  >
+                    Continuar <ChevronRight size={18} />
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 6: CONFIRM */}
+            {wizardStep === 'confirm' && (
+              <div className="space-y-5">
+                <BackButton onBack={() => setWizardStep('photo')} />
+                <StepHeader 
+                  title="Confirmar Alta de Herramienta" 
+                  subtitle="Revisá que toda la información esté en orden"
+                />
+
+                <div className="bg-slate-50 border border-slate-200 rounded-3xl p-5 space-y-3.5">
+                  <div className="flex gap-4 items-center">
+                    {photoUrl && (
+                      <div className="w-16 h-16 rounded-2xl overflow-hidden shrink-0 border border-slate-200 bg-white">
+                        <img src={photoUrl} alt="Herramienta" className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Herramienta</span>
+                      <p className="text-base font-black text-slate-800 truncate">{name}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 border-t border-slate-200 pt-3.5">
+                    <div>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Código Interno</span>
+                      <p className="text-sm font-black text-slate-700 font-mono">{code.toUpperCase()}</p>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Categoría</span>
+                      <p className="text-sm font-bold text-slate-700">{category}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 border-t border-slate-200 pt-3.5">
+                    <div>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Marca / Modelo</span>
+                      <p className="text-xs font-bold text-slate-600 truncate">{brand || 'No esp.'} • {model || 'No esp.'}</p>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Ubicación Inicial</span>
+                      <p className="text-xs font-bold text-slate-600 truncate">{selectedObraObject?.name || 'No esp.'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={handleMobileSubmit}
+                    disabled={loading}
+                    className="flex flex-col items-center justify-center gap-2 h-24 rounded-2xl bg-emerald-500 text-white font-black text-lg active:scale-[0.95] transition-all shadow-lg disabled:opacity-50"
+                  >
+                    <Check size={32} />
+                    REGISTRAR
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWizardStep('name')}
+                    disabled={loading}
+                    className="flex flex-col items-center justify-center gap-2 h-24 rounded-2xl bg-rose-500 text-white font-black text-lg active:scale-[0.95] transition-all shadow-lg disabled:opacity-50"
+                  >
+                    <X size={32} />
+                    CANCELAR
+                  </button>
+                </div>
+              </div>
+            )}
+
+          </CardContent>
+        </Card>
       </div>
     );
   }
