@@ -22,7 +22,8 @@ import {
   Info,
   ChevronDown,
   Camera,
-  Plus
+  Plus,
+  User
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { 
