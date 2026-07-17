@@ -870,7 +870,7 @@ export default function NuevaSolicitud() {
           stopSpeaking();
           navigate('/pedidos-herramientas');
         }}
-        phoneNumber={waPreviewPhone}
+        phone={waPreviewPhone}
         message={waPreviewMessage}
         recipientName={waPreviewRecipientName}
       />

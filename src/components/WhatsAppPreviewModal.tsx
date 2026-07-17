@@ -22,12 +22,12 @@ export function WhatsAppPreviewModal({
   onConfirm,
   recipientName
 }: WhatsAppPreviewModalProps) {
-  const [editedPhone, setEditedPhone] = useState(phone);
-  const [editedMessage, setEditedMessage] = useState(message);
+  const [editedPhone, setEditedPhone] = useState(phone || '');
+  const [editedMessage, setEditedMessage] = useState(message || '');
 
   useEffect(() => {
-    setEditedPhone(phone);
-    setEditedMessage(message);
+    setEditedPhone(phone || '');
+    setEditedMessage(message || '');
   }, [phone, message]);
 
   const handleSend = () => {
@@ -92,7 +92,7 @@ export function WhatsAppPreviewModal({
           </DialogClose>
           <Button
             onClick={handleSend}
-            disabled={!editedPhone.trim() || !editedMessage.trim()}
+            disabled={!(editedPhone || '').trim() || !(editedMessage || '').trim()}
             className="bg-emerald-600 text-white hover:bg-emerald-700 rounded-xl font-extrabold text-xs px-5 shadow-md shadow-emerald-600/10 flex items-center gap-1.5"
           >
             <CheckCircle className="h-3.5 w-3.5" />
