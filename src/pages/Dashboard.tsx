@@ -21,7 +21,8 @@ import {
   LogOut,
   Info,
   ChevronDown,
-  Camera
+  Camera,
+  Plus
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { 
