@@ -157,7 +157,7 @@ export default function NuevaSolicitud() {
         .from('profiles')
         .select('id, full_name, whatsapp, role')
         .eq('active', true)
-        .in('role', ['logistica', 'admin'])
+        .eq('role', 'logistica')
         .order('full_name');
       if (logisticaData) setPersonalLogistica(logisticaData as PersonalLogistica[]);
     }
