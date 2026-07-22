@@ -107,6 +107,8 @@ export default function NuevaSolicitud() {
 
   // Screen voice listening state
   const [isScreenListening, setIsScreenListening] = useState(false);
+  const [showCatalog, setShowCatalog] = useState(false);
+
 
   // ─── Check Device Size ───────────────────────────────────────────────────
 
@@ -331,49 +333,55 @@ export default function NuevaSolicitud() {
   const executeSubmit = async () => {
     if (!profile) return;
 
-    if (!selectedToolId || !targetObraId || !selectedLogisticaId) {
+    const isFreeText = !selectedToolId && toolSearch.trim().length > 0;
+
+    if ((!selectedToolId && !isFreeText) || !targetObraId) {
       toast({ 
         variant: 'destructive', 
         title: 'Faltan datos', 
-        description: 'Debes completar todos los pasos del traslado.' 
+        description: 'Debés ingresar o dictar la herramienta y la obra de destino.' 
       });
       return;
     }
 
-    const tool = herramientas.find(h => h.id === selectedToolId);
-    const logisticaUser = personalLogistica.find(p => p.id === selectedLogisticaId);
+    const tool = selectedToolId ? herramientas.find(h => h.id === selectedToolId) : null;
+    const logisticaUser = selectedLogisticaId 
+      ? personalLogistica.find(p => p.id === selectedLogisticaId) 
+      : (personalLogistica[0] || null);
     const targetObra = obras.find(o => o.id === targetObraId);
 
-    if (!tool || !logisticaUser || !targetObra) return;
-
-    if (!logisticaUser.whatsapp) {
-      toast({ 
-        variant: 'destructive', 
-        title: 'Contacto Incompleto', 
-        description: `${logisticaUser.full_name} no tiene WhatsApp configurado.` 
-      });
+    if (!targetObra) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Seleccioná una obra de destino válida.' });
       return;
     }
 
     setLoading(true);
     const securityCode = Math.floor(100000 + Math.random() * 900000).toString();
 
+    const toolDescription = tool 
+      ? `${tool.name} [${tool.code}]` 
+      : toolSearch.trim();
+
+    const finalComments = isFreeText
+      ? `Pedido libre: ${toolSearch.trim()}${comments.trim() ? ` | Observaciones: ${comments.trim()}` : ''}`
+      : (comments.trim() || null);
+
     // 1. Guardar la solicitud
     const { data: newSolicitud, error } = await supabase.from('solicitudes').insert([{
       requester_id: profile.id,
-      herramienta_id: selectedToolId,
-      source_obra_id: tool.current_obra_id,
+      herramienta_id: tool ? tool.id : null,
+      source_obra_id: tool ? tool.current_obra_id : null,
       target_obra_id: targetObraId,
-      assigned_to: selectedLogisticaId,
+      assigned_to: logisticaUser?.id || null,
       priority,
       status: 'Pendiente',
-      comments: typeof comments === 'string' ? comments.trim() || null : null,
+      comments: finalComments,
       security_code: securityCode
     }]).select().single();
 
-    if (newSolicitud) {
+    if (newSolicitud && tool) {
       await supabase.from('movimientos').insert([{
-        herramienta_id: selectedToolId,
+        herramienta_id: tool.id,
         solicitud_id: newSolicitud.id,
         user_id: profile.id,
         action: 'Generó solicitud de traslado',
@@ -388,28 +396,32 @@ export default function NuevaSolicitud() {
     } else {
       toast({ title: '¡Solicitud Generada!', description: 'Notificando a logística por WhatsApp...' });
       
+      const logName = logisticaUser ? logisticaUser.full_name.split(' ')[0] : 'Logística';
       const waMessage = [
         '*NUEVA SOLICITUD DE TRASLADO*',
         '',
-        'Hola *' + logisticaUser.full_name.split(' ')[0] + '*, tenes un nuevo pedido de logistica:',
+        `Hola *${logName}*, tenés un nuevo pedido de logística:`,
         '',
-        '- *Solicita:* ' + profile.full_name + ' (' + profile.role + ')',
-        '- *Herramienta:* ' + tool.name,
-        '- *Codigo:* ' + tool.code,
-        '- *Origen:* ' + (tool.obras?.name || 'Base Desconocida'),
-        '- *Destino:* ' + targetObra.name,
-        '- *Prioridad:* ' + priority,
+        `- *Solicita:* ${profile.full_name} (${profile.role || 'Solicitante'})`,
+        `- *Herramienta:* ${toolDescription}`,
+        tool ? `- *Origen actual:* ${tool.obras?.name || 'Base Central'}` : '- *Origen:* A determinar por Logística',
+        `- *Destino:* ${targetObra.name}`,
+        `- *Prioridad:* ${priority}`,
         '',
-        '*Notas:* ' + (typeof comments === 'string' ? comments.trim() || 'Sin especificaciones' : 'Sin especificaciones'),
+        `*Notas:* ${finalComments || 'Sin especificaciones'}`,
         '',
-        'Aprobar o gestionar el envio desde aca:',
-        APP_URL + '/solicitudes/' + newSolicitud.id
+        'Aprobar o gestionar el envío desde acá:',
+        `${APP_URL}/solicitudes/${newSolicitud.id}`
       ].join('\n');
 
-      setWaPreviewPhone(logisticaUser.whatsapp!);
-      setWaPreviewMessage(waMessage);
-      setWaPreviewRecipientName(logisticaUser.full_name);
-      setWaPreviewOpen(true);
+      if (logisticaUser?.whatsapp) {
+        setWaPreviewPhone(logisticaUser.whatsapp);
+        setWaPreviewMessage(waMessage);
+        setWaPreviewRecipientName(logisticaUser.full_name);
+        setWaPreviewOpen(true);
+      } else {
+        navigate('/solicitudes/' + newSolicitud.id);
+      }
     }
   };
 
@@ -639,51 +651,131 @@ export default function NuevaSolicitud() {
               <div className="space-y-5">
                 <BackButton onBack={() => navigate(-1)} />
                 <StepHeader 
-                  title="¿Qué herramienta deseás trasladar?" 
-                  subtitle="Buscá y seleccioná de la lista"
+                  title="¿Qué herramienta necesitás?" 
+                  subtitle="Dictá con voz o escribí el nombre"
                 />
 
-                <div className="space-y-3">
-                  <div className="relative">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
-                    <Input
-                      placeholder="Buscar por nombre o código..."
-                      value={toolSearch}
-                      onChange={(e) => {
-                        setToolSearch(e.target.value);
-                        setSelectedToolId('');
-                      }}
-                      className="h-12 pl-10 rounded-2xl border-slate-200 focus-visible:ring-peie-blue bg-slate-50/50 text-sm font-semibold"
-                    />
-                  </div>
-
-                  <div className="space-y-2.5 max-h-[45vh] overflow-y-auto pr-1">
-                    {filteredHerramientas.slice(0, 15).map(t => (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedToolId(t.id);
-                          setToolSearch(`${t.name} [${t.code}]`);
-                          goToWizardStep('select_obra');
-                        }}
-                        className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl border-2 border-slate-200 bg-white text-left active:scale-[0.97] transition-all hover:border-peie-blue"
-                      >
-                        <Wrench size={20} className="text-peie-blue shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-bold text-slate-700 truncate">{t.name}</p>
-                          <p className="text-xs text-slate-400 font-bold">Código: {t.code} • Ubicación: {t.obras?.name || 'Base Desconocida'}</p>
-                        </div>
-                        <ChevronRight size={18} className="text-slate-300 shrink-0" />
-                      </button>
-                    ))}
-                    {filteredHerramientas.length === 0 && (
-                      <div className="text-center py-8 text-slate-400 font-semibold text-sm">
-                        No se encontraron herramientas.
+                {!showCatalog ? (
+                  <div className="space-y-4">
+                    {/* Entradas rápidas por dictado o texto */}
+                    <div className="space-y-3">
+                      <div className="relative flex gap-2">
+                        <Input
+                          placeholder="Ej: Amoladora 7 pulgadas, Taladro..."
+                          value={toolSearch}
+                          onChange={(e) => {
+                            setToolSearch(e.target.value);
+                            setSelectedToolId('');
+                          }}
+                          className="h-14 rounded-2xl border-slate-200 focus-visible:ring-peie-blue text-base font-semibold flex-1 shadow-sm"
+                        />
+                        <VoiceInputButton 
+                          onTranscript={(text) => {
+                            setToolSearch(text);
+                            setSelectedToolId('');
+                          }} 
+                          className="h-14 w-14 shrink-0 rounded-2xl bg-slate-100 text-slate-600 shadow-sm" 
+                        />
                       </div>
-                    )}
+
+                      {/* Atajos rápidos de herramientas habituales */}
+                      <div className="space-y-1.5 pt-1">
+                        <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Atajos rápidos:</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {['Amoladora', 'Taladro', 'Escalera', 'Rotomartillo', 'Garrafa', 'Andamio', 'Pinza'].map((tag) => (
+                            <button
+                              key={tag}
+                              type="button"
+                              onClick={() => {
+                                setToolSearch(tag);
+                                setSelectedToolId('');
+                              }}
+                              className={`text-xs px-3 py-1.5 rounded-xl font-bold transition-all ${
+                                toolSearch.toLowerCase().includes(tag.toLowerCase())
+                                  ? 'bg-peie-blue text-white shadow-sm'
+                                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                              }`}
+                            >
+                              {tag}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <Button
+                        onClick={() => goToWizardStep('select_obra')}
+                        disabled={!toolSearch.trim()}
+                        className="w-full h-14 bg-peie-blue hover:bg-peie-blue/90 text-white font-black rounded-2xl text-base shadow-lg shadow-peie-blue/10 active:scale-[0.98] transition-all flex items-center justify-center gap-2 mt-3"
+                      >
+                        Continuar a Obra Destino <ChevronRight size={18} />
+                      </Button>
+
+                      <div className="pt-2 text-center">
+                        <button
+                          type="button"
+                          onClick={() => setShowCatalog(true)}
+                          className="text-xs text-peie-blue font-bold hover:underline"
+                        >
+                          🔍 O elegí una herramienta específica del catálogo
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  /* Catálogo desplegable con búsqueda */
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-500">Catálogo de Herramientas</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowCatalog(false)}
+                        className="text-xs text-peie-blue font-bold hover:underline"
+                      >
+                        ← Volver a dictado libre
+                      </button>
+                    </div>
+
+                    <div className="relative">
+                      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
+                      <Input
+                        placeholder="Buscar por código o nombre..."
+                        value={toolSearch}
+                        onChange={(e) => {
+                          setToolSearch(e.target.value);
+                          setSelectedToolId('');
+                        }}
+                        className="h-12 pl-10 rounded-2xl border-slate-200 focus-visible:ring-peie-blue bg-slate-50/50 text-sm font-semibold"
+                      />
+                    </div>
+
+                    <div className="space-y-2.5 max-h-[45vh] overflow-y-auto pr-1">
+                      {filteredHerramientas.slice(0, 15).map(t => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedToolId(t.id);
+                            setToolSearch(`${t.name} [${t.code}]`);
+                            goToWizardStep('select_obra');
+                          }}
+                          className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl border-2 border-slate-200 bg-white text-left active:scale-[0.97] transition-all hover:border-peie-blue"
+                        >
+                          <Wrench size={20} className="text-peie-blue shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-slate-700 truncate">{t.name}</p>
+                            <p className="text-xs text-slate-400 font-bold">Código: {t.code} • Ubicación: {t.obras?.name || 'Base Desconocida'}</p>
+                          </div>
+                          <ChevronRight size={18} className="text-slate-300 shrink-0" />
+                        </button>
+                      ))}
+                      {filteredHerramientas.length === 0 && (
+                        <div className="text-center py-8 text-slate-400 font-semibold text-sm">
+                          No se encontraron herramientas.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

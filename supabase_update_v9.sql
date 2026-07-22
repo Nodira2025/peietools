@@ -1,6 +1,6 @@
 -- =========================================================================
 -- PEIE TOOLS - MIGRACIÓN DE ACTUALIZACIÓN V9
--- CREAR NUEVAS UBICACIONES (OBRAS/DEPÓSITOS): DEPÓSITO DE LA EMPRESA Y CAMIONETA
+-- CREAR NUEVAS UBICACIONES (OBRAS/DEPÓSITOS) Y PERMITIR PEDIDOS ABIERTOS POR VOZ/TEXTO
 -- Ejecutar este script en el SQL Editor de Supabase
 -- =========================================================================
 
@@ -17,3 +17,6 @@ SELECT 'CAMIONETA', 'Vehículo de traslado / Camioneta de herramientas, Tucumán
 WHERE NOT EXISTS (
   SELECT 1 FROM public.obras WHERE name = 'CAMIONETA' OR code = 'CAM-01'
 );
+
+-- 3. Permitir solicitudes de herramientas por texto/dictado libre (herramienta_id opcional)
+ALTER TABLE public.solicitudes ALTER COLUMN herramienta_id DROP NOT NULL;

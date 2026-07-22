@@ -169,8 +169,8 @@ export default function SolicitudDetail() {
           'Hola *' + solicitud.profiles.full_name.split(' ')[0] + '*!',
           'Tu solicitud de traslado fue autorizada por Logistica:',
           '',
-          '- *Equipo:* ' + solicitud.herramientas.name,
-          '- *Codigo:* ' + solicitud.herramientas.code,
+          '- *Equipo:* ' + (solicitud.herramientas?.name || solicitud.comments || 'Herramienta solicitada'),
+          '- *Codigo:* ' + (solicitud.herramientas?.code || 'LIBRE'),
           '- *Responsable:* ' + profile.full_name,
           '- *Destino:* ' + solicitud.target_obra.name,
           '',
@@ -194,8 +194,8 @@ export default function SolicitudDetail() {
           '',
           `*${profile.full_name}* confirmo la recepcion de:`,
           '',
-          '- *Equipo:* ' + solicitud.herramientas.name,
-          '- *Codigo:* ' + solicitud.herramientas.code,
+          '- *Equipo:* ' + (solicitud.herramientas?.name || solicitud.comments || 'Herramienta solicitada'),
+          '- *Codigo:* ' + (solicitud.herramientas?.code || 'LIBRE'),
           '- *Destino:* ' + solicitud.target_obra.name,
           '- *Recibio:* ' + finalRecipient,
           '',
@@ -346,10 +346,10 @@ export default function SolicitudDetail() {
           <div className="flex justify-between items-start">
             <div>
               <CardTitle className="text-xl font-bold text-peie-blue">
-                {solicitud.herramientas.name}
+                {solicitud.herramientas?.name || solicitud.comments || 'Herramienta solicitada'}
               </CardTitle>
               <CardDescription className="text-sm font-mono mt-1 bg-slate-100 w-max px-2 py-1 rounded">
-                {solicitud.herramientas.code}
+                {solicitud.herramientas?.code || 'PEDIDO LIBRE'}
               </CardDescription>
             </div>
             {getStatusBadge(solicitud.status)}
@@ -360,7 +360,7 @@ export default function SolicitudDetail() {
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-red-50 p-3 rounded-xl border border-red-100">
               <p className="text-[10px] font-bold text-red-400 uppercase tracking-wider">Origen</p>
-              <p className="font-semibold text-red-700 text-sm mt-0.5">{solicitud.herramientas.obras?.name || 'Desconocida'}</p>
+              <p className="font-semibold text-red-700 text-sm mt-0.5">{solicitud.herramientas?.obras?.name || 'A determinar por Logística'}</p>
             </div>
             <div className="bg-green-50 p-3 rounded-xl border border-green-100">
               <p className="text-[10px] font-bold text-green-400 uppercase tracking-wider">Destino</p>
@@ -729,13 +729,13 @@ export default function SolicitudDetail() {
                   <div className="space-y-3 text-sm">
                     <div className="flex justify-between">
                       <span className="text-slate-400 text-xs">Herramienta</span>
-                      <span className="font-bold text-slate-800">{solicitud.herramientas.name}</span>
+                      <span className="font-bold text-slate-800">{solicitud.herramientas?.name || solicitud.comments || 'Herramienta solicitada'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400 text-xs">Codigo</span>
-                      <span className="font-mono text-slate-700">{solicitud.herramientas.code}</span>
+                      <span className="font-mono text-slate-700">{solicitud.herramientas?.code || 'PEDIDO LIBRE'}</span>
                     </div>
-                    {solicitud.herramientas.brand && (
+                    {solicitud.herramientas?.brand && (
                       <div className="flex justify-between">
                         <span className="text-slate-400 text-xs">Marca / Modelo</span>
                         <span className="text-slate-700">{solicitud.herramientas.brand} {solicitud.herramientas.model || ''}</span>
@@ -746,7 +746,7 @@ export default function SolicitudDetail() {
                     
                     <div className="flex justify-between">
                       <span className="text-slate-400 text-xs">Origen</span>
-                      <span className="text-red-600 font-medium">{solicitud.herramientas.obras?.name || '-'}</span>
+                      <span className="text-red-600 font-medium">{solicitud.herramientas?.obras?.name || 'A determinar por Logística'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400 text-xs">Destino</span>

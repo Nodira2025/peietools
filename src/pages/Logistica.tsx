@@ -183,7 +183,7 @@ export default function Logistica() {
       const { data: toolsData, error: toolsError } = await supabase
         .from('solicitudes')
         .select(`
-          id, status, priority, created_at,
+          id, status, priority, created_at, comments,
           herramientas!solicitudes_herramienta_id_fkey(name, code, obras!herramientas_current_obra_id_fkey(name)),
           target_obra:obras!solicitudes_target_obra_id_fkey(name),
           profiles!solicitudes_requester_id_fkey(full_name)
@@ -208,18 +208,22 @@ export default function Logistica() {
 
       // 3. Unified
       const unified: LogisticaItem[] = [
-        ...(toolsData || []).map((s: any) => ({
-          id: s.id,
-          type: 'herramienta' as const,
-          status: s.status,
-          priority: s.priority,
-          created_at: s.created_at,
-          item_name: s.herramientas?.name,
-          item_code: s.herramientas?.code,
-          source_name: s.herramientas?.obras?.name || '?',
-          target_name: s.target_obra?.name,
-          requester_name: s.profiles?.full_name
-        })),
+        ...(toolsData || []).map((s: any) => {
+          const isFree = !s.herramientas;
+          const cleanComment = s.comments ? s.comments.replace(/^Pedido libre:\s*/i, '').trim() : '';
+          return {
+            id: s.id,
+            type: 'herramienta' as const,
+            status: s.status,
+            priority: s.priority,
+            created_at: s.created_at,
+            item_name: s.herramientas?.name || cleanComment || 'Herramienta solicitada',
+            item_code: s.herramientas?.code || 'LIBRE',
+            source_name: s.herramientas?.obras?.name || 'A determinar por Logística',
+            target_name: s.target_obra?.name,
+            requester_name: s.profiles?.full_name
+          };
+        }),
         ...(personalData || []).map((s: any) => ({
           id: s.id,
           type: 'personal' as const,
