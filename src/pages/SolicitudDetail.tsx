@@ -364,13 +364,13 @@ export default function SolicitudDetail() {
             </div>
             <div className="bg-green-50 p-3 rounded-xl border border-green-100">
               <p className="text-[10px] font-bold text-green-400 uppercase tracking-wider">Destino</p>
-              <p className="font-semibold text-green-700 text-sm mt-0.5">{solicitud.target_obra.name}</p>
+              <p className="font-semibold text-green-700 text-sm mt-0.5">{solicitud.target_obra?.name || 'Obra Destino'}</p>
             </div>
           </div>
 
           {/* Detalles */}
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2 text-sm">
-            <p><strong className="text-slate-500">Solicitante:</strong> <span className="text-slate-800 font-medium">{solicitud.profiles.full_name}</span></p>
+            <p><strong className="text-slate-500">Solicitante:</strong> <span className="text-slate-800 font-medium">{solicitud.profiles?.full_name || 'Solicitante'}</span></p>
             <p><strong className="text-slate-500">Prioridad:</strong> <span className="text-slate-800 font-medium">{solicitud.priority}</span></p>
             <p><strong className="text-slate-500">Fecha:</strong> <span className="text-slate-800 font-medium">{new Date(solicitud.created_at).toLocaleString()}</span></p>
             {solicitud.assigned && <p><strong className="text-slate-500">Responsable:</strong> <span className="text-slate-800 font-medium">{solicitud.assigned.full_name}</span></p>}
@@ -652,19 +652,18 @@ export default function SolicitudDetail() {
                 <Button 
                   variant="outline"
                   onClick={() => {
-                    const logisticaPhone = solicitud.assigned?.whatsapp;
-                    if (!logisticaPhone) {
-                      toast({ variant: 'destructive', title: 'Sin contacto', description: 'El responsable no tiene WhatsApp configurado.' });
-                      return;
-                    }
+                    const logisticaPhone = solicitud.assigned?.whatsapp || '5493814015738';
+                    const toolName = solicitud.herramientas?.name || (solicitud.comments ? solicitud.comments.replace(/^Pedido libre:\s*/i, '').trim() : 'Herramienta solicitada');
+                    const toolCode = solicitud.herramientas?.code || 'PEDIDO LIBRE';
+
                     const msg = [
                       '*REPORTE DE PROBLEMA*',
                       '',
                       '*' + (profile?.full_name || 'Encargado') + '* reporta un inconveniente con el pedido:',
                       '',
-                      '- *Herramienta:* ' + solicitud.herramientas.name,
-                      '- *Codigo:* ' + solicitud.herramientas.code,
-                      '- *Estado actual:* ' + solicitud.status,
+                      '- *Herramienta:* ' + toolName,
+                      '- *Codigo:* ' + toolCode,
+                      '- *Estado actual:* ' + (solicitud.status || 'Pendiente'),
                       '',
                       'Por favor revisar lo antes posible.',
                       '',
@@ -673,7 +672,7 @@ export default function SolicitudDetail() {
                     ].join('\n');
                     setWaPreviewPhone(logisticaPhone);
                     setWaPreviewMessage(msg);
-                    setWaPreviewRecipientName(solicitud.assigned?.full_name || 'Logística');
+                    setWaPreviewRecipientName(solicitud.assigned?.full_name || 'Logística / Soporte');
                     setWaPreviewOpen(true);
                   }}
                   className="w-full h-12 rounded-xl text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 text-sm font-semibold"
@@ -757,7 +756,7 @@ export default function SolicitudDetail() {
                     
                     <div className="flex justify-between">
                       <span className="text-slate-400 text-xs">Solicitante</span>
-                      <span className="font-medium text-slate-800">{solicitud.profiles.full_name}</span>
+                      <span className="font-medium text-slate-800">{solicitud.profiles?.full_name || 'Solicitante'}</span>
                     </div>
                     {solicitud.assigned && (
                       <div className="flex justify-between">
@@ -793,7 +792,7 @@ export default function SolicitudDetail() {
                     <div className="text-center">
                       <div className="h-8 border-b border-slate-300 mb-1" />
                       <p className="text-[10px] text-slate-400 font-medium">Recibio (Encargado)</p>
-                      <p className="text-[11px] font-semibold text-slate-600">{solicitud.profiles.full_name}</p>
+                      <p className="text-[11px] font-semibold text-slate-600">{solicitud.profiles?.full_name || '-'}</p>
                     </div>
                   </div>
                 </div>

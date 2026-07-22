@@ -190,33 +190,41 @@ CREATE POLICY "Herramientas update by anyone" ON public.herramientas FOR UPDATE 
 DROP POLICY IF EXISTS "Herramientas insert by admins" ON public.herramientas;
 CREATE POLICY "Herramientas insert by admins" ON public.herramientas FOR INSERT WITH CHECK (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND (role = 'admin' OR role = 'compras')));
 
--- Solicitudes: Anyone can view and insert, anyone can update
+-- Solicitudes: Anyone can view and insert, anyone can update/delete
 DROP POLICY IF EXISTS "Solicitudes viewable by everyone" ON public.solicitudes;
 CREATE POLICY "Solicitudes viewable by everyone" ON public.solicitudes FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Anyone can insert solicitudes" ON public.solicitudes;
 CREATE POLICY "Anyone can insert solicitudes" ON public.solicitudes FOR INSERT WITH CHECK (auth.uid() = requester_id);
 DROP POLICY IF EXISTS "Anyone can update solicitudes" ON public.solicitudes;
 CREATE POLICY "Anyone can update solicitudes" ON public.solicitudes FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Anyone can delete solicitudes" ON public.solicitudes;
+CREATE POLICY "Anyone can delete solicitudes" ON public.solicitudes FOR DELETE USING (true);
 
--- Solicitudes de Compras: Anyone can view, insert, and update
+-- Solicitudes de Compras: Anyone can view, insert, update, and delete
 DROP POLICY IF EXISTS "SolicitudesCompras viewable by everyone" ON public.solicitudes_compras;
 CREATE POLICY "SolicitudesCompras viewable by everyone" ON public.solicitudes_compras FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Anyone can insert solicitudes_compras" ON public.solicitudes_compras;
 CREATE POLICY "Anyone can insert solicitudes_compras" ON public.solicitudes_compras FOR INSERT WITH CHECK (auth.uid() = requester_id);
 DROP POLICY IF EXISTS "Anyone can update solicitudes_compras" ON public.solicitudes_compras;
 CREATE POLICY "Anyone can update solicitudes_compras" ON public.solicitudes_compras FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Anyone can delete solicitudes_compras" ON public.solicitudes_compras;
+CREATE POLICY "Anyone can delete solicitudes_compras" ON public.solicitudes_compras FOR DELETE USING (true);
 
--- Movimientos: Anyone can view, user can insert
+-- Movimientos: Anyone can view, user can insert, anyone can delete
 DROP POLICY IF EXISTS "Movimientos viewable by everyone" ON public.movimientos;
 CREATE POLICY "Movimientos viewable by everyone" ON public.movimientos FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Anyone can insert movimientos" ON public.movimientos;
 CREATE POLICY "Anyone can insert movimientos" ON public.movimientos FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Anyone can delete movimientos" ON public.movimientos;
+CREATE POLICY "Anyone can delete movimientos" ON public.movimientos FOR DELETE USING (true);
 
--- Traslados de Personal: Anyone can read, anyone can write
+-- Traslados de Personal: Anyone can read, write, delete
 DROP POLICY IF EXISTS "traslados_personal_read" ON public.traslados_personal;
 CREATE POLICY "traslados_personal_read" ON public.traslados_personal FOR SELECT USING (true);
 DROP POLICY IF EXISTS "traslados_personal_write" ON public.traslados_personal;
 CREATE POLICY "traslados_personal_write" ON public.traslados_personal FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Anyone can delete traslados_personal" ON public.traslados_personal;
+CREATE POLICY "Anyone can delete traslados_personal" ON public.traslados_personal FOR DELETE USING (true);
 
 -- =========================================================================
 -- PERMISOS Y CONCESIÓN DE GRANTS (CRÍTICO PARA LA API DE SUPABASE)

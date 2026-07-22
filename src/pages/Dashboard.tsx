@@ -1018,7 +1018,7 @@ export default function Dashboard() {
 
                 {/* WhatsApp Support */}
                 <a 
-                  href="https://wa.me/"
+                  href="https://wa.me/5493814015738?text=Hola,%20necesito%20soporte%20desde%20PEIE%20Tools"
                   target="_blank"
                   rel="noreferrer"
                   className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 transition-all cursor-pointer group"
