@@ -789,10 +789,10 @@ export default function NuevaSolicitud() {
                 />
 
                 {/* Preselected tool name */}
-                {toolSelectedObject && (
+                {(toolSelectedObject || toolSearch.trim()) && (
                   <div className="bg-slate-50 rounded-xl p-3 border text-center">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase">Herramienta</span>
-                    <p className="text-sm font-black text-slate-700">{toolSelectedObject.name} [{toolSelectedObject.code}]</p>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase">Herramienta Pedida</span>
+                    <p className="text-sm font-black text-slate-700">{toolSelectedObject ? `${toolSelectedObject.name} [${toolSelectedObject.code}]` : toolSearch.trim()}</p>
                   </div>
                 )}
 
@@ -935,7 +935,7 @@ export default function NuevaSolicitud() {
             )}
 
             {/* STEP 5: CONFIRM REQUEST */}
-            {wizardStep === 'confirm_request' && toolSelectedObject && targetObraObject && logisticaUserObject && (
+            {wizardStep === 'confirm_request' && (
               <div className="space-y-5">
                 <StepHeader title="¿Confirmás la solicitud?" />
 
@@ -947,10 +947,10 @@ export default function NuevaSolicitud() {
                   </div>
 
                   <div className="space-y-2 text-sm text-slate-700 font-medium">
-                    <p>📦 <strong className="text-slate-500">Herramienta:</strong> {toolSelectedObject.name}</p>
-                    <p>🚩 <strong className="text-slate-500">Origen:</strong> {toolSelectedObject.obras?.name || 'Base Desconocida'}</p>
-                    <p>📍 <strong className="text-slate-500">Destino:</strong> {targetObraObject.name}</p>
-                    <p>👤 <strong className="text-slate-500">Encargado:</strong> {logisticaUserObject.full_name}</p>
+                    <p>📦 <strong className="text-slate-500">Herramienta:</strong> {toolSelectedObject ? `${toolSelectedObject.name} [${toolSelectedObject.code}]` : (toolSearch.trim() || 'Herramienta solicitada')}</p>
+                    <p>🚩 <strong className="text-slate-500">Origen:</strong> {toolSelectedObject?.obras?.name || 'A determinar por Logística'}</p>
+                    <p>📍 <strong className="text-slate-500">Destino:</strong> {targetObraObject?.name || 'No seleccionada'}</p>
+                    <p>👤 <strong className="text-slate-500">Encargado Logística:</strong> {logisticaUserObject?.full_name || personalLogistica[0]?.full_name || 'Asignación automática'}</p>
                     <p>🔔 <strong className="text-slate-500">Prioridad:</strong> <span className={priority === 'Urgente' ? 'text-rose-600 font-bold' : 'text-slate-800'}>{priority}</span></p>
                     {(typeof comments === 'string' && comments.trim()) ? <p>💬 <strong className="text-slate-500">Nota:</strong> "{comments}"</p> : null}
                   </div>
