@@ -413,51 +413,7 @@ export default function BusquedaVisual() {
     goToStep('select_obra');
   };
 
-  // ─── Reusable UI Components ──────────────────────────────────────────────
-
-  const ToolCard = ({ tool, onSelect }: { tool: Herramienta; onSelect: () => void }) => (
-    <button
-      type="button"
-      onClick={onSelect}
-      className="w-full flex items-center gap-3 p-4 rounded-2xl border-2 border-slate-200 bg-white text-left transition-all active:scale-[0.97] active:border-peie-blue hover:border-blue-300 hover:shadow-md"
-    >
-      {tool.photo_url ? (
-        <img src={tool.photo_url} alt={tool.name} className="w-16 h-16 object-cover rounded-xl border border-slate-100 shrink-0" />
-      ) : (
-        <div className="w-16 h-16 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 shrink-0">
-          <Wrench size={24} />
-        </div>
-      )}
-      <div className="flex-1 min-w-0">
-        <p className="text-base font-bold text-slate-800 truncate">{tool.name}</p>
-        <p className="text-xs text-slate-500 truncate">
-          {tool.brand || 'Sin marca'} {tool.model ? `· ${tool.model}` : ''}
-        </p>
-        <div className="flex items-center gap-1 mt-1">
-          <MapPin size={12} className="text-peie-blue shrink-0" />
-          <span className="text-xs font-bold text-peie-blue truncate">{tool.obras?.name || 'Base Central'}</span>
-        </div>
-      </div>
-      <ChevronRight size={20} className="text-slate-300 shrink-0" />
-    </button>
-  );
-
-  const StepHeader = ({ title, subtitle }: { title: string; subtitle?: string }) => (
-    <div className="text-center space-y-2 py-2">
-      <h2 className="text-xl font-black text-slate-800 leading-tight">{title}</h2>
-      {subtitle && <p className="text-sm text-slate-500 font-medium">{subtitle}</p>}
-    </div>
-  );
-
-  const BackButton = ({ onBack }: { onBack: () => void }) => (
-    <button
-      type="button"
-      onClick={() => { stopSpeaking(); onBack(); }}
-      className="flex items-center gap-1 text-xs font-bold text-slate-400 hover:text-peie-blue transition-colors py-2"
-    >
-      <ArrowLeft size={14} /> Volver
-    </button>
-  );
+  // ─── Render ──────────────────────────────────────────────────────────────
 
   // ─── Render ──────────────────────────────────────────────────────────────
 
@@ -957,5 +913,57 @@ export default function BusquedaVisual() {
         </div>
       )}
     </div>
+  );
+}
+
+// ─── Module-scoped Subcomponents ──────────────────────────────────────────
+
+function ToolCard({ tool, onSelect }: { tool: Herramienta; onSelect: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className="w-full flex items-center gap-3 p-4 rounded-2xl border-2 border-slate-200 bg-white text-left transition-all active:scale-[0.97] active:border-peie-blue hover:border-blue-300 hover:shadow-md"
+    >
+      {tool.photo_url ? (
+        <img src={tool.photo_url} alt={tool.name} className="w-16 h-16 object-cover rounded-xl border border-slate-100 shrink-0" />
+      ) : (
+        <div className="w-16 h-16 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 shrink-0">
+          <Wrench size={24} />
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <p className="text-base font-bold text-slate-800 truncate">{tool.name}</p>
+        <p className="text-xs text-slate-500 truncate">
+          {tool.brand || 'Sin marca'} {tool.model ? `· ${tool.model}` : ''}
+        </p>
+        <div className="flex items-center gap-1 mt-1">
+          <MapPin size={12} className="text-peie-blue shrink-0" />
+          <span className="text-xs font-bold text-peie-blue truncate">{tool.obras?.name || 'Base Central'}</span>
+        </div>
+      </div>
+      <ChevronRight size={20} className="text-slate-300 shrink-0" />
+    </button>
+  );
+}
+
+function StepHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+  return (
+    <div className="text-center space-y-2 py-2">
+      <h2 className="text-xl font-black text-slate-800 leading-tight">{title}</h2>
+      {subtitle && <p className="text-sm text-slate-500 font-medium">{subtitle}</p>}
+    </div>
+  );
+}
+
+function BackButton({ onBack }: { onBack: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => { stopSpeaking(); onBack(); }}
+      className="flex items-center gap-1 text-xs font-bold text-slate-400 hover:text-peie-blue transition-colors py-2"
+    >
+      <ArrowLeft size={14} /> Volver
+    </button>
   );
 }
