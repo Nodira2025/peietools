@@ -530,9 +530,12 @@ export default function NuevoTrasladoPersonal() {
 
 // ─── Auxiliary Components ────────────────────────────────────────────────────
 
-const StepHeader = ({ title, subtitle }: { title: string; subtitle?: string }) => (
-  <div className="text-center space-y-2 py-2">
-    <h2 className="text-xl font-black text-slate-800 leading-tight">{title}</h2>
-    {subtitle && <p className="text-sm text-slate-500 font-medium">{subtitle}</p>}
-  </div>
-);
+function StepHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+  return (
+    <div className="text-center space-y-2 py-2">
+      <h2 className="text-xl font-black text-slate-800 leading-tight">{title}</h2>
+      {subtitle && <p className="text-sm text-slate-500 font-medium">{subtitle}</p>}
+    </div>
+  );
+}
+

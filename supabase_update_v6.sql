@@ -59,6 +59,8 @@ INSERT INTO public.obras (name, address, active, encargado_name) VALUES ('CLINIC
 INSERT INTO public.obras (name, address, active, encargado_name) VALUES ('COLETTI - WALDHAUS', 'COLETTI - WALDHAUS, Tucumán', true, NULL);
 INSERT INTO public.obras (name, address, active, encargado_name) VALUES ('COUNTRY CANTARES', 'COUNTRY CANTARES, Tucumán', true, 'Franco Lobo');
 INSERT INTO public.obras (name, address, active, encargado_name) VALUES ('DEPOSITO PEIE', 'DEPOSITO PEIE, Tucumán', true, NULL);
+INSERT INTO public.obras (name, address, active, encargado_name, code) VALUES ('DEPÓSITO DE LA EMPRESA', 'Depósito General de la Empresa, Tucumán', true, NULL, 'DEP-EMP');
+INSERT INTO public.obras (name, address, active, encargado_name, code) VALUES ('CAMIONETA', 'Vehículo de traslado / Camioneta de herramientas, Tucumán', true, NULL, 'CAM-01');
 INSERT INTO public.obras (name, address, active, encargado_name) VALUES ('DOMUS', 'DOMUS, Tucumán', true, 'Franco Lobo');
 INSERT INTO public.obras (name, address, active, encargado_name) VALUES ('LA RIOJA 846', 'LA RIOJA 846, Tucumán', true, NULL);
 INSERT INTO public.obras (name, address, active, encargado_name) VALUES ('LIVE', 'LIVE, Tucumán', true, NULL);

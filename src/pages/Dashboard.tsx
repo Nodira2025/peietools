@@ -420,6 +420,34 @@ export default function Dashboard() {
           </div>
         </Card>
 
+        {/* Acceso Principal: Pedir Herramienta (Móvil) */}
+        <div 
+          onClick={() => navigate('/solicitudes/nueva')}
+          className="bg-gradient-to-r from-peie-blue via-blue-700 to-indigo-800 text-white rounded-[24px] p-4.5 shadow-[0_6px_24px_rgba(8,26,99,0.22)] hover:shadow-[0_8px_30px_rgba(8,26,99,0.3)] flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all duration-200 border border-white/10 relative overflow-hidden group"
+        >
+          <div className="absolute -right-6 -bottom-6 w-28 h-28 bg-white/10 rounded-full blur-xl pointer-events-none group-hover:scale-125 transition-transform" />
+          
+          <div className="flex items-center gap-3.5 relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0 shadow-inner border border-white/20">
+              <Wrench size={24} className="stroke-[2.5]" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-black uppercase tracking-wider leading-none text-white">Pedir Herramienta</h3>
+                <span className="bg-amber-400 text-slate-950 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tight shadow-sm">
+                  Solicitar
+                </span>
+              </div>
+              <p className="text-[10px] text-blue-100 font-bold leading-tight">
+                Solicitá las herramientas que necesitás para tu obra en 1 minuto.
+              </p>
+            </div>
+          </div>
+          <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center shrink-0 ml-2 relative z-10">
+            <ChevronRight size={18} className="text-white" />
+          </div>
+        </div>
+
         {/* Escanear QR (Acceso Prominente Móvil) */}
         <div 
           onClick={() => navigate('/herramientas/scanner')}

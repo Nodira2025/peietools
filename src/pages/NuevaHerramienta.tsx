@@ -930,3 +930,28 @@ Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Elementos de segur
     </div>
   );
 }
+
+// ─── Auxiliary Components ────────────────────────────────────────────────────
+
+function StepHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+  return (
+    <div className="text-center space-y-2 py-2">
+      <h2 className="text-xl font-black text-slate-800 leading-tight">{title}</h2>
+      {subtitle && <p className="text-sm text-slate-500 font-medium">{subtitle}</p>}
+    </div>
+  );
+}
+
+function BackButton({ onBack }: { onBack: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onBack}
+      className="flex items-center gap-1 text-xs font-bold text-slate-400 hover:text-peie-blue transition-colors py-2"
+    >
+      <ArrowLeft size={14} /> Volver
+    </button>
+  );
+}
+
+

@@ -412,19 +412,24 @@ export default function NuevoPersonalAsistido() {
 
 // ─── Auxiliary UI Components ──────────────────────────────────────────────────
 
-const StepHeader = ({ title, subtitle }: { title: string; subtitle?: string }) => (
-  <div className="text-center space-y-2 py-1">
-    <h2 className="text-xl font-black text-slate-800 leading-tight">{title}</h2>
-    {subtitle && <p className="text-sm text-slate-500 font-medium">{subtitle}</p>}
-  </div>
-);
+function StepHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+  return (
+    <div className="text-center space-y-2 py-1">
+      <h2 className="text-xl font-black text-slate-800 leading-tight">{title}</h2>
+      {subtitle && <p className="text-sm text-slate-500 font-medium">{subtitle}</p>}
+    </div>
+  );
+}
 
-const BackButton = ({ onBack }: { onBack: () => void }) => (
-  <button
-    type="button"
-    onClick={() => { stopSpeaking(); onBack(); }}
-    className="flex items-center gap-1 text-xs font-bold text-slate-400 hover:text-violet-600 transition-colors py-1.5"
-  >
-    <ArrowLeft size={14} /> Volver
-  </button>
-);
+function BackButton({ onBack }: { onBack: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => { stopSpeaking(); onBack(); }}
+      className="flex items-center gap-1 text-xs font-bold text-slate-400 hover:text-violet-600 transition-colors py-1.5"
+    >
+      <ArrowLeft size={14} /> Volver
+    </button>
+  );
+}
+
