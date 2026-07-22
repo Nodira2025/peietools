@@ -377,6 +377,10 @@ export default function Dashboard() {
   };
 
   const userName = profile?.full_name?.split(' ')[0] || 'Usuario';
+  const userRole = profile?.role?.toLowerCase();
+  const isAdmin = userRole === 'admin';
+  const isLogistica = userRole === 'logistica';
+  const isCoordinador = !isAdmin && !isLogistica;
 
   if (loading) {
     return (
@@ -420,123 +424,203 @@ export default function Dashboard() {
           </div>
         </Card>
 
-        {/* Acceso Principal: Pedir Herramienta (Móvil) */}
-        <div 
-          onClick={() => navigate('/solicitudes/nueva')}
-          className="bg-gradient-to-r from-peie-blue via-blue-700 to-indigo-800 text-white rounded-[24px] p-4.5 shadow-[0_6px_24px_rgba(8,26,99,0.22)] hover:shadow-[0_8px_30px_rgba(8,26,99,0.3)] flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all duration-200 border border-white/10 relative overflow-hidden group"
-        >
-          <div className="absolute -right-6 -bottom-6 w-28 h-28 bg-white/10 rounded-full blur-xl pointer-events-none group-hover:scale-125 transition-transform" />
-          
-          <div className="flex items-center gap-3.5 relative z-10">
-            <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0 shadow-inner border border-white/20">
-              <Wrench size={24} className="stroke-[2.5]" />
-            </div>
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-black uppercase tracking-wider leading-none text-white">Pedir Herramienta</h3>
-                <span className="bg-amber-400 text-slate-950 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tight shadow-sm">
-                  Solicitar
-                </span>
+        {/* 🚚 VISTA PARA LOGÍSTICA: TARJETA GIGANTE DE "PEDIDOS DE HERRAMIENTAS" PRIMERO */}
+        {isLogistica && (
+          <div 
+            onClick={() => navigate('/logistica')}
+            className="bg-gradient-to-br from-amber-500 via-orange-600 to-red-700 text-white rounded-[28px] p-6 shadow-[0_10px_30px_rgba(234,88,12,0.3)] hover:shadow-[0_12px_36px_rgba(234,88,12,0.4)] flex flex-col justify-between cursor-pointer active:scale-[0.98] transition-all duration-200 border border-white/20 relative overflow-hidden group space-y-4"
+          >
+            <div className="absolute -right-8 -bottom-8 w-36 h-36 bg-white/10 rounded-full blur-2xl pointer-events-none group-hover:scale-125 transition-transform" />
+            
+            <div className="flex items-start justify-between relative z-10">
+              <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0 shadow-lg border border-white/20">
+                <Truck size={30} className="stroke-[2.5]" />
               </div>
-              <p className="text-[10px] text-blue-100 font-bold leading-tight">
-                Solicitá las herramientas que necesitás para tu obra en 1 minuto.
+              <span className="bg-white text-orange-700 text-xs font-black px-3 py-1.5 rounded-full uppercase tracking-wider shadow-md flex items-center gap-1">
+                <Bell size={12} className="animate-bounce" /> {counts.pendingTools} Pendientes
+              </span>
+            </div>
+
+            <div className="space-y-1.5 relative z-10">
+              <h3 className="text-xl font-black uppercase tracking-tight leading-tight text-white">
+                Pedidos de Herramientas
+              </h3>
+              <p className="text-xs text-orange-100 font-semibold leading-relaxed">
+                Revisá, asigná chofer y gestioná los traslados de herramientas entre obras.
               </p>
             </div>
-          </div>
-          <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center shrink-0 ml-2 relative z-10">
-            <ChevronRight size={18} className="text-white" />
-          </div>
-        </div>
 
-        {/* Escanear QR (Acceso Prominente Móvil) */}
-        <div 
-          onClick={() => navigate('/herramientas/scanner')}
-          className="bg-gradient-to-r from-emerald-600 to-teal-500 text-white rounded-[24px] p-4 shadow-[0_4px_20px_rgba(16,185,129,0.12)] hover:shadow-[0_4px_20px_rgba(16,185,129,0.2)] flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all duration-200"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-white shrink-0">
-              <QrCode size={24} className="stroke-[2.5]" />
-            </div>
-            <div className="space-y-1">
-              <h3 className="text-sm font-black uppercase tracking-wider leading-none">Escanear Código QR</h3>
-              <p className="text-[10px] text-slate-100 font-bold leading-tight">Identificá o trasladá una herramienta al instante.</p>
-            </div>
-          </div>
-          <ChevronRight size={18} className="text-white shrink-0" />
-        </div>
-
-        {/* Buscador Visual Prioritario (Solo Móvil) */}
-        <div 
-          onClick={() => navigate('/herramientas/busqueda-visual')}
-          className="bg-gradient-to-r from-peie-blue to-peie-light text-white rounded-[24px] p-4 shadow-[0_4px_20px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_20px_rgba(0,0,0,0.08)] flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all duration-200"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-white shrink-0">
-              <Camera size={24} className="stroke-[2.5]" />
-            </div>
-            <div className="space-y-1">
-              <h3 className="text-sm font-black uppercase tracking-wider leading-none">Buscar Herramienta</h3>
-              <p className="text-[10px] text-slate-100 font-bold leading-tight">Identificá, trasladá o reportá fallas de herramientas al instante.</p>
-            </div>
-          </div>
-          <ChevronRight size={18} className="text-white shrink-0" />
-        </div>
-
-        {/* Buscador de Personal Prioritario (Solo Móvil) */}
-        <div 
-          onClick={() => navigate('/personal/busqueda-visual')}
-          className="bg-gradient-to-r from-violet-600 to-indigo-500 text-white rounded-[24px] p-4 shadow-[0_4px_20px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_20px_rgba(0,0,0,0.08)] flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all duration-200"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-white shrink-0">
-              <Users size={24} className="stroke-[2.5]" />
-            </div>
-            <div className="space-y-1">
-              <h3 className="text-sm font-black uppercase tracking-wider leading-none">Buscar Personal</h3>
-              <p className="text-[10px] text-slate-100 font-bold leading-tight">Identificá, trasladá o contactá al personal de obra al instante.</p>
-            </div>
-          </div>
-          <ChevronRight size={18} className="text-white shrink-0" />
-        </div>
-
-        {/* Asistentes de Alta (Solo Móvil) */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-center gap-4 my-1">
-            <div className="h-[1px] bg-slate-200 flex-1" />
-            <span className="text-[10px] font-black text-peie-blue uppercase tracking-widest whitespace-nowrap">Asistentes de Alta</span>
-            <div className="h-[1px] bg-slate-200 flex-1" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            {/* Alta Herramienta Asistida */}
-            <div 
-              onClick={() => navigate('/herramientas/nueva')}
-              className="bg-[#F3F6FD] border border-[#E2EAFD] rounded-[24px] p-4 flex flex-col justify-between cursor-pointer active:scale-[0.97] transition-all duration-200 min-h-[114px] shadow-sm shadow-[#081a63]/2"
+            <Button
+              type="button"
+              className="w-full h-12 bg-white hover:bg-slate-100 text-orange-700 font-black rounded-2xl text-sm shadow-md flex items-center justify-center gap-2 mt-1"
             >
-              <div className="w-10 h-10 rounded-2xl bg-peie-blue text-white flex items-center justify-center shadow-md shadow-peie-blue/15">
-                <Plus size={20} className="stroke-[3]" />
+              <Truck size={18} /> Ver Pedidos de Herramientas <ChevronRight size={18} />
+            </Button>
+          </div>
+        )}
+
+        {/* 🏗️ VISTA PARA COORDINADORES / ENCARGADOS DE OBRA: TARJETA HERO GIGANTE "PEDIR HERRAMIENTA" */}
+        {isCoordinador && (
+          <div 
+            onClick={() => navigate('/solicitudes/nueva')}
+            className="bg-gradient-to-br from-peie-blue via-blue-700 to-indigo-900 text-white rounded-[28px] p-6 shadow-[0_10px_32px_rgba(8,26,99,0.35)] hover:shadow-[0_14px_40px_rgba(8,26,99,0.45)] flex flex-col justify-between cursor-pointer active:scale-[0.98] transition-all duration-200 border-2 border-white/20 relative overflow-hidden group space-y-5"
+          >
+            <div className="absolute -right-8 -bottom-8 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none group-hover:scale-125 transition-transform" />
+            
+            <div className="flex items-start justify-between relative z-10">
+              <div className="w-16 h-16 rounded-2xl bg-white/25 backdrop-blur-md flex items-center justify-center text-white shrink-0 shadow-lg border border-white/30">
+                <Wrench size={34} className="stroke-[2.5]" />
               </div>
-              <div className="space-y-0.5">
-                <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-wide">Alta Herramienta</h4>
-                <p className="text-[8px] text-slate-400 font-bold leading-tight">Asistente paso a paso</p>
-              </div>
+              <span className="bg-amber-400 text-slate-950 text-xs font-black px-3.5 py-1.5 rounded-full uppercase tracking-wider shadow-md">
+                Pedir en 1 Clic
+              </span>
             </div>
 
-            {/* Alta Personal Asistida */}
-            <div 
-              onClick={() => navigate('/personal/nuevo-asistido')}
-              className="bg-[#FAF7FE] border border-[#F2EAFF] rounded-[24px] p-4 flex flex-col justify-between cursor-pointer active:scale-[0.97] transition-all duration-200 min-h-[114px] shadow-sm shadow-violet-600/2"
+            <div className="space-y-2 relative z-10">
+              <h3 className="text-2xl font-black uppercase tracking-tight leading-tight text-white">
+                ¿Qué herramienta necesitás en tu obra?
+              </h3>
+              <p className="text-xs text-blue-100 font-semibold leading-relaxed">
+                Dictá con voz o escribí el nombre de la herramienta. Logística gestiona el traslado.
+              </p>
+            </div>
+
+            <Button
+              type="button"
+              className="w-full h-14 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black rounded-2xl text-base shadow-xl flex items-center justify-center gap-2.5 mt-2 active:scale-[0.97] transition-all"
             >
-              <div className="w-10 h-10 rounded-2xl bg-violet-600 text-white flex items-center justify-center shadow-md shadow-violet-600/15">
-                <User size={20} className="stroke-[3]" />
+              <Wrench size={22} className="stroke-[3]" /> ¡PEDIR HERRAMIENTA AHORA! <ChevronRight size={20} />
+            </Button>
+          </div>
+        )}
+
+        {/* 👑 VISTA PARA ADMINS (SI NO ES COORDINADOR NI LOGÍSTICA) */}
+        {isAdmin && (
+          <div 
+            onClick={() => navigate('/solicitudes/nueva')}
+            className="bg-gradient-to-r from-peie-blue via-blue-700 to-indigo-800 text-white rounded-[24px] p-5 shadow-[0_6px_24px_rgba(8,26,99,0.22)] hover:shadow-[0_8px_30px_rgba(8,26,99,0.3)] flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all duration-200 border border-white/10 relative overflow-hidden group"
+          >
+            <div className="absolute -right-6 -bottom-6 w-28 h-28 bg-white/10 rounded-full blur-xl pointer-events-none group-hover:scale-125 transition-transform" />
+            
+            <div className="flex items-center gap-3.5 relative z-10">
+              <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0 shadow-inner border border-white/20">
+                <Wrench size={24} className="stroke-[2.5]" />
               </div>
-              <div className="space-y-0.5">
-                <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-wide">Alta Personal</h4>
-                <p className="text-[8px] text-slate-400 font-bold leading-tight">Asistente paso a paso</p>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-black uppercase tracking-wider leading-none text-white">Pedir Herramienta</h3>
+                  <span className="bg-amber-400 text-slate-950 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tight shadow-sm">
+                    Solicitar
+                  </span>
+                </div>
+                <p className="text-[10px] text-blue-100 font-bold leading-tight">
+                  Solicitá las herramientas que necesitás para tu obra en 1 minuto.
+                </p>
+              </div>
+            </div>
+            <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center shrink-0 ml-2 relative z-10">
+              <ChevronRight size={18} className="text-white" />
+            </div>
+          </div>
+        )}
+
+        {/* Tarjeta secundaria para mis pedidos (Coordinadores) */}
+        {isCoordinador && (
+          <div 
+            onClick={() => navigate('/solicitudes')}
+            className="bg-white border border-slate-200 rounded-[24px] p-4 shadow-sm hover:shadow-md flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-slate-100 text-peie-blue flex items-center justify-center shrink-0">
+                <FileText size={20} />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-800">Ver Mis Pedidos Solicitados</h4>
+                <p className="text-[10px] text-slate-400 font-semibold">Consultá el estado del traslado de tus herramientas</p>
+              </div>
+            </div>
+            <ChevronRight size={16} className="text-slate-400" />
+          </div>
+        )}
+
+        {/* Acceso a Escanear QR (Admins y Logística) */}
+        {(isAdmin || isLogistica) && (
+          <div 
+            onClick={() => navigate('/herramientas/scanner')}
+            className="bg-gradient-to-r from-emerald-600 to-teal-500 text-white rounded-[24px] p-4 shadow-[0_4px_20px_rgba(16,185,129,0.12)] hover:shadow-[0_4px_20px_rgba(16,185,129,0.2)] flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all duration-200"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-white shrink-0">
+                <QrCode size={24} className="stroke-[2.5]" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-sm font-black uppercase tracking-wider leading-none">Escanear Código QR</h3>
+                <p className="text-[10px] text-slate-100 font-bold leading-tight">Identificá o trasladá una herramienta al instante.</p>
+              </div>
+            </div>
+            <ChevronRight size={18} className="text-white shrink-0" />
+          </div>
+        )}
+
+        {/* Buscador Visual (Admins y Logística) */}
+        {(isAdmin || isLogistica) && (
+          <div 
+            onClick={() => navigate('/herramientas/busqueda-visual')}
+            className="bg-gradient-to-r from-peie-blue to-peie-light text-white rounded-[24px] p-4 shadow-[0_4px_20px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_20px_rgba(0,0,0,0.08)] flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all duration-200"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-white shrink-0">
+                <Camera size={24} className="stroke-[2.5]" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-sm font-black uppercase tracking-wider leading-none">Buscar Herramienta</h3>
+                <p className="text-[10px] text-slate-100 font-bold leading-tight">Identificá, trasladá o reportá fallas de herramientas al instante.</p>
+              </div>
+            </div>
+            <ChevronRight size={18} className="text-white shrink-0" />
+          </div>
+        )}
+
+        {/* Asistentes de Alta (Solo Admins) */}
+        {isAdmin && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-center gap-4 my-1">
+              <div className="h-[1px] bg-slate-200 flex-1" />
+              <span className="text-[10px] font-black text-peie-blue uppercase tracking-widest whitespace-nowrap">Asistentes de Alta</span>
+              <div className="h-[1px] bg-slate-200 flex-1" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {/* Alta Herramienta Asistida */}
+              <div 
+                onClick={() => navigate('/herramientas/nueva')}
+                className="bg-[#F3F6FD] border border-[#E2EAFD] rounded-[24px] p-4 flex flex-col justify-between cursor-pointer active:scale-[0.97] transition-all duration-200 min-h-[114px] shadow-sm shadow-[#081a63]/2"
+              >
+                <div className="w-10 h-10 rounded-2xl bg-peie-blue text-white flex items-center justify-center shadow-md shadow-peie-blue/15">
+                  <Plus size={20} className="stroke-[3]" />
+                </div>
+                <div className="space-y-0.5">
+                  <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-wide">Alta Herramienta</h4>
+                  <p className="text-[8px] text-slate-400 font-bold leading-tight">Asistente paso a paso</p>
+                </div>
+              </div>
+
+              {/* Alta Personal Asistida */}
+              <div 
+                onClick={() => navigate('/personal/nuevo-asistido')}
+                className="bg-[#FAF7FE] border border-[#F2EAFF] rounded-[24px] p-4 flex flex-col justify-between cursor-pointer active:scale-[0.97] transition-all duration-200 min-h-[114px] shadow-sm shadow-violet-600/2"
+              >
+                <div className="w-10 h-10 rounded-2xl bg-violet-600 text-white flex items-center justify-center shadow-md shadow-violet-600/15">
+                  <User size={20} className="stroke-[3]" />
+                </div>
+                <div className="space-y-0.5">
+                  <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-wide">Alta Personal</h4>
+                  <p className="text-[8px] text-slate-400 font-bold leading-tight">Asistente paso a paso</p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
       </div>
 
