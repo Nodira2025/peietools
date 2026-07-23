@@ -125,20 +125,34 @@ export default function NuevaSolicitud() {
 
   useEffect(() => {
     async function fetchData() {
-      // 1. Cargar todas las herramientas
+      // Cargar caché local en 0ms
+      const cached = localStorage.getItem('peie_cache_herramientas');
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setHerramientas(parsed);
+          }
+        } catch (e) {
+          console.error('Error al leer caché', e);
+        }
+      }
+
+      // 1. Cargar todas las herramientas en segundo plano
       const { data: toolsData } = await supabase
         .from('herramientas')
         .select('id, name, code, current_obra_id, status, obras(name)')
         .order('name');
       if (toolsData) {
         setHerramientas(toolsData as unknown as Herramienta[]);
+        localStorage.setItem('peie_cache_herramientas', JSON.stringify(toolsData));
         if (preselectedToolId) {
           const preTool = toolsData.find(h => h.id === preselectedToolId);
           if (preTool) {
             setToolSearch(`${preTool.name} [${preTool.code}]`);
             setWizardStep('select_obra');
           }
-        } else {
+        } else if (!wizardStep) {
           setWizardStep('select_tool');
         }
       }

@@ -59,10 +59,26 @@ export default function Herramientas() {
 
   const fetchHerramientas = async () => {
     try {
-      setLoading(true);
+      // 1. Cargar datos del almacenamiento local en 0ms (Stale-While-Revalidate)
+      const cached = localStorage.getItem('peie_cache_herramientas');
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setHerramientas(parsed);
+            setLoading(false); // Carga instantánea si hay caché
+          }
+        } catch (e) {
+          console.error('Error al leer caché de herramientas', e);
+        }
+      } else {
+        setLoading(true);
+      }
+
+      // 2. Revalidar con Supabase en segundo plano
       const { data, error } = await supabase
         .from('herramientas')
-        .select('*, obras(name, encargado_name)')
+        .select('id, code, name, brand, model, status, category, current_obra_id, photo_url, obras(name, encargado_name)')
         .order('name');
       if (error) throw error;
 
@@ -70,9 +86,14 @@ export default function Herramientas() {
         ...h,
         obras: Array.isArray(h.obras) ? h.obras[0] : h.obras
       }));
+
       setHerramientas(normalizedData);
+      // Guardar en caché para la próxima apertura instantánea
+      localStorage.setItem('peie_cache_herramientas', JSON.stringify(normalizedData));
     } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar las herramientas' });
+      if (herramientas.length === 0) {
+        toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar las herramientas' });
+      }
       console.error(error);
     } finally {
       setLoading(false);
