@@ -23,7 +23,8 @@ import {
   ChevronDown,
   Camera,
   Plus,
-  User
+  User,
+  DollarSign
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { 
@@ -543,19 +544,19 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Acceso a Escanear QR (Admins y Logística) */}
+        {/* Acceso a Registrar Gasto de Logística (Admins y Logística) */}
         {(isAdmin || isLogistica) && (
           <div 
-            onClick={() => navigate('/herramientas/scanner')}
+            onClick={() => navigate('/logistica')}
             className="bg-gradient-to-r from-emerald-600 to-teal-500 text-white rounded-[24px] p-4 shadow-[0_4px_20px_rgba(16,185,129,0.12)] hover:shadow-[0_4px_20px_rgba(16,185,129,0.2)] flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all duration-200"
           >
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-white shrink-0">
-                <QrCode size={24} className="stroke-[2.5]" />
+                <DollarSign size={24} className="stroke-[2.5]" />
               </div>
               <div className="space-y-1">
-                <h3 className="text-sm font-black uppercase tracking-wider leading-none">Escanear Código QR</h3>
-                <p className="text-[10px] text-slate-100 font-bold leading-tight">Identificá o trasladá una herramienta al instante.</p>
+                <h3 className="text-sm font-black uppercase tracking-wider leading-none">Registrar Gasto</h3>
+                <p className="text-[10px] text-slate-100 font-bold leading-tight">Comprobantes y rendición con cuenta corriente por WhatsApp.</p>
               </div>
             </div>
             <ChevronRight size={18} className="text-white shrink-0" />
