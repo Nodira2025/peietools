@@ -51,7 +51,7 @@ export default function Herramientas() {
   const [filterObra, setFilterObra] = useState(location.state?.filterObra ?? '');
   const [filterStatus, setFilterStatus] = useState(location.state?.filterStatus ?? '');
   const [filterEncargado, setFilterEncargado] = useState(location.state?.filterEncargado ?? '');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>(location.state?.viewMode ?? 'grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'grouped'>(location.state?.viewMode ?? 'grid');
 
   const { toast } = useToast();
   const { profile } = useAuthStore();
@@ -372,6 +372,15 @@ export default function Herramientas() {
               <div className="flex items-center border border-slate-200 rounded-xl p-1 bg-slate-50 shrink-0">
                 <button
                   type="button"
+                  onClick={() => setViewMode('grouped')}
+                  className={`p-1.5 rounded-lg transition-all flex items-center gap-1 text-xs font-bold ${viewMode === 'grouped' ? 'bg-peie-blue text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  title="Vista Agrupada por Familia/Modelo"
+                >
+                  <Layers className="h-4 w-4" />
+                  <span className="hidden sm:inline">Agrupado</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => setViewMode('grid')}
                   className={`p-1.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white text-peie-blue shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                   title="Vista Grilla"
@@ -432,7 +441,83 @@ export default function Herramientas() {
           />
 
           {/* Listado condicional según viewMode */}
-          {viewMode === 'grid' ? (
+          {viewMode === 'grouped' ? (
+            <div className="space-y-4">
+              {/* Agrupación inteligente por nombre/modelo estandarizado */}
+              {Object.entries(
+                filtered.reduce((acc: Record<string, Herramienta[]>, h) => {
+                  const key = h.name.trim();
+                  if (!acc[key]) acc[key] = [];
+                  acc[key].push(h);
+                  return acc;
+                }, {})
+              ).map(([modelName, groupItems]) => {
+                const availables = groupItems.filter(i => i.status === 'Disponible');
+                const inUse = groupItems.filter(i => i.status === 'En uso');
+                const inTransit = groupItems.filter(i => i.status === 'En traslado');
+                const mainCategory = groupItems[0]?.category;
+
+                return (
+                  <Card key={modelName} className="rounded-2xl border border-slate-200 p-4 space-y-3 bg-white shadow-sm hover:shadow-md transition-all">
+                    <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 pb-2 border-b border-slate-100">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 shrink-0">
+                          {getCategoryIcon(mainCategory)}
+                        </div>
+                        <div>
+                          <h3 className="text-base font-bold text-slate-800 leading-snug">{modelName}</h3>
+                          <p className="text-xs text-slate-400 font-semibold">
+                            Total: {groupItems.length} unidad{groupItems.length > 1 ? 'es' : ''} en la empresa
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs bg-green-50 text-green-700 px-2.5 py-1 rounded-full font-bold border border-green-200/60">
+                          🟢 {availables.length} Disponibles
+                        </span>
+                        {inUse.length > 0 && (
+                          <span className="text-xs bg-orange-50 text-orange-700 px-2.5 py-1 rounded-full font-bold border border-orange-200/60">
+                            🔴 {inUse.length} En uso
+                          </span>
+                        )}
+                        {inTransit.length > 0 && (
+                          <span className="text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full font-bold border border-blue-200/60">
+                            🚚 {inTransit.length} En viaje
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Desglose de unidades físicas */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 pt-1">
+                      {groupItems.map((unit) => {
+                        const styles = getStatusStyle(unit.status);
+                        return (
+                          <div
+                            key={unit.id}
+                            onClick={() => navigate('/herramientas/' + unit.id)}
+                            className={`p-3 rounded-xl border ${styles.border} bg-slate-50/60 hover:bg-white transition-all cursor-pointer flex items-center justify-between gap-2`}
+                          >
+                            <div className="min-w-0">
+                              <span className="text-[10px] font-mono bg-white text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 font-bold">
+                                {unit.code}
+                              </span>
+                              <p className="text-xs font-bold text-slate-700 truncate mt-1">
+                                {unit.obras?.name || 'Base Central'}
+                              </p>
+                            </div>
+                            <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${styles.badge}`}>
+                              {unit.status}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6">
               {filtered.map((h) => {
                 const styles = getStatusStyle(h.status);
