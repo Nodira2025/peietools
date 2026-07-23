@@ -547,7 +547,7 @@ export default function Dashboard() {
         {/* Acceso a Registrar Gasto de Logística (Admins y Logística) */}
         {(isAdmin || isLogistica) && (
           <div 
-            onClick={() => navigate('/logistica')}
+            onClick={() => navigate('/logistica?nuevoGasto=true')}
             className="bg-gradient-to-r from-emerald-600 to-teal-500 text-white rounded-[24px] p-4 shadow-[0_4px_20px_rgba(16,185,129,0.12)] hover:shadow-[0_4px_20px_rgba(16,185,129,0.2)] flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all duration-200"
           >
             <div className="flex items-center gap-3">

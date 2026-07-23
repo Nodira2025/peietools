@@ -58,6 +58,11 @@ export default function Logistica() {
     fetchFilterOptions();
     fetchActiveObras();
     fetchEmpleados();
+
+    const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.get('nuevoGasto') === 'true') {
+      setIsGastoOpen(true);
+    }
   }, []);
 
   const fetchActiveObras = async () => {
