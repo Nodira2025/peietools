@@ -277,7 +277,41 @@ export default function Herramientas() {
       return 'Taladro Percutor 13mm';
     }
 
-    return clean;
+    // 4. Andamios y Estructuras (Categoría Otros / General)
+    if (lower.includes('andamio') || lower.includes('cuerpo')) {
+      if (lower.includes('tablon') || lower.includes('tablón')) return 'Tablón para Andamio';
+      if (lower.includes('rueda') || lower.includes('garrucha')) return 'Rueda para Andamio';
+      return 'Cuerpo de Andamio Tubular';
+    }
+
+    // 5. Pistolas de Calor y Térmicas
+    if (lower.includes('pistola') && (lower.includes('calor') || lower.includes('termica') || lower.includes('térmica'))) {
+      return 'Pistola de Calor';
+    }
+
+    // 6. Alargues / Extensiones Eléctricas
+    if (lower.includes('alargue') || lower.includes('extension') || lower.includes('extensión') || lower.includes('cable prolongador')) {
+      return 'Alargue / Extensión Eléctrica';
+    }
+
+    // 7. Soldadoras y Corte
+    if (lower.includes('soldadora') || lower.includes('inverter') || lower.includes('mma')) {
+      return 'Soldadora Inverter';
+    }
+
+    // 8. Garrafas y Sopletes
+    if (lower.includes('garrafa') || lower.includes('soplete')) {
+      return 'Garrafa / Soplete de Obra';
+    }
+
+    // 9. Compresores e Hidrolavadoras
+    if (lower.includes('compresor')) return 'Compresor de Aire';
+    if (lower.includes('hidrolavadora')) return 'Hidrolavadora Industrial';
+
+    // 10. Normalización general de plurales / espacios
+    return clean
+      .replace(/\s+/g, ' ')
+      .replace(/s$/i, ''); // Remueve 's' final para unificar singular/plural
   };
 
   return (
