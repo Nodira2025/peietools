@@ -145,7 +145,11 @@ export default function NuevaSolicitud() {
         .order('name');
       if (toolsData) {
         setHerramientas(toolsData as unknown as Herramienta[]);
-        localStorage.setItem('peie_cache_herramientas', JSON.stringify(toolsData));
+        try {
+          localStorage.setItem('peie_cache_herramientas', JSON.stringify(toolsData));
+        } catch (storageError) {
+          console.warn('QuotaExceededError ignorado en NuevaSolicitud', storageError);
+        }
         if (preselectedToolId) {
           const preTool = toolsData.find(h => h.id === preselectedToolId);
           if (preTool) {

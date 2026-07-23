@@ -88,8 +88,25 @@ export default function Herramientas() {
       }));
 
       setHerramientas(normalizedData);
-      // Guardar en caché para la próxima apertura instantánea
-      localStorage.setItem('peie_cache_herramientas', JSON.stringify(normalizedData));
+
+      // Guardar en caché de forma segura y comprimida (evitar guardar photo_url si es pesada)
+      try {
+        const lightweightCache = normalizedData.map((h: any) => ({
+          id: h.id,
+          code: h.code,
+          name: h.name,
+          brand: h.brand,
+          model: h.model,
+          status: h.status,
+          category: h.category,
+          current_obra_id: h.current_obra_id,
+          photo_url: h.photo_url && h.photo_url.length < 500 ? h.photo_url : null,
+          obras: h.obras
+        }));
+        localStorage.setItem('peie_cache_herramientas', JSON.stringify(lightweightCache));
+      } catch (storageError) {
+        console.warn('QuotaExceededError ignorado: no se pudo guardar en localStorage', storageError);
+      }
     } catch (error: any) {
       if (herramientas.length === 0) {
         toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar las herramientas' });
