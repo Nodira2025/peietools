@@ -227,6 +227,42 @@ export default function Herramientas() {
     toast({ title: 'Éxito', description: 'Inventario completo exportado a Excel correctamente.' });
   };
 
+  // Normalizador inteligente para agrupar herramientas por familias estandarizadas (ej: Escalera 10p, Escalera 10 -> Escalera de 10 Peldaños)
+  const getStandardFamilyName = (name: string, category: string | null): string => {
+    const clean = name.trim();
+    const lower = clean.toLowerCase();
+
+    // 1. Escaleras
+    if (category === 'Escaleras' || lower.includes('escalera')) {
+      const matchPeldaños = lower.match(/\b(\d{1,2})\s*(p|peld|peldaño|peldaños)?\b/);
+      if (matchPeldaños && matchPeldaños[1]) {
+        return `Escalera de ${matchPeldaños[1]} Peldaños`;
+      }
+      return 'Escalera de Obra';
+    }
+
+    // 2. Amoladoras
+    if (category === 'Amoladoras' || lower.includes('amoladora')) {
+      if (lower.includes('7') || lower.includes('180') || lower.includes('grande')) {
+        return 'Amoladora Angular 7" (180mm)';
+      }
+      if (lower.includes('9') || lower.includes('230')) {
+        return 'Amoladora Angular 9" (230mm)';
+      }
+      return 'Amoladora Angular 4 1/2" (115mm)';
+    }
+
+    // 3. Taladros / Rotomartillos
+    if (category === 'Taladros' || lower.includes('taladro') || lower.includes('roto')) {
+      if (lower.includes('roto') || lower.includes('sds')) {
+        return 'Rotomartillo SDS Plus';
+      }
+      return 'Taladro Percutor 13mm';
+    }
+
+    return clean;
+  };
+
   return (
     <div className="space-y-6 pb-safe">
       
@@ -446,7 +482,7 @@ export default function Herramientas() {
               {/* Agrupación inteligente por nombre/modelo estandarizado */}
               {Object.entries(
                 filtered.reduce((acc: Record<string, Herramienta[]>, h) => {
-                  const key = h.name.trim();
+                  const key = getStandardFamilyName(h.name, h.category);
                   if (!acc[key]) acc[key] = [];
                   acc[key].push(h);
                   return acc;
