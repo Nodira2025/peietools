@@ -44,22 +44,30 @@ export default function Logistica() {
 
   // Form State para registrar gasto
   const [activeObras, setActiveObras] = useState<{id: string, name: string}[]>([]);
+  const [allEmpleados, setAllEmpleados] = useState<{id: string, full_name: string, obra_id: string | null}[]>([]);
   const [isGastoOpen, setIsGastoOpen] = useState(false);
   const [gastoObraId, setGastoObraId] = useState('');
+  const [gastoEmpleadoId, setGastoEmpleadoId] = useState('');
   const [gastoConcepto, setGastoConcepto] = useState('');
   const [gastoMonto, setGastoMonto] = useState('');
   const [gastoDetalle, setGastoDetalle] = useState('');
-  const [gastoPago, setGastoPago] = useState('Efectivo');
+  const [gastoPago, setGastoPago] = useState('Cuenta corriente BP');
 
   useEffect(() => {
     fetchSolicitudes();
     fetchFilterOptions();
     fetchActiveObras();
+    fetchEmpleados();
   }, []);
 
   const fetchActiveObras = async () => {
     const { data } = await supabase.from('obras').select('id, name').eq('active', true).order('name');
     if (data) setActiveObras(data);
+  };
+
+  const fetchEmpleados = async () => {
+    const { data } = await supabase.from('empleados').select('id, full_name, obra_id').eq('active', true).order('full_name');
+    if (data) setAllEmpleados(data);
   };
 
   const handleRegistrarGasto = () => {
@@ -69,6 +77,7 @@ export default function Logistica() {
     }
 
     const obraSeleccionada = activeObras.find(o => o.id === gastoObraId)?.name || 'Sin obra específica';
+    const empleadoSeleccionado = allEmpleados.find(e => e.id === gastoEmpleadoId)?.full_name || 'Sin especificar';
     const montoNum = parseFloat(gastoMonto);
     const fecha = new Date();
     const fechaStr = fecha.toLocaleDateString('es-AR');
@@ -91,7 +100,7 @@ export default function Logistica() {
 
     // Contenedor principal de detalles
     doc.setFillColor(248, 250, 252); // slate-50
-    doc.rect(14, 50, 182, 120, 'F');
+    doc.rect(14, 50, 182, 130, 'F');
     
     doc.setFontSize(12);
     doc.setTextColor(30, 41, 59); // slate-800
@@ -109,6 +118,7 @@ export default function Logistica() {
     addLine("Concepto:", gastoConcepto);
     addLine("Monto:", `$${montoNum.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`);
     addLine("Obra destino:", obraSeleccionada);
+    addLine("Solicitado por:", empleadoSeleccionado);
     addLine("Método de pago:", gastoPago);
     addLine("Registrado por:", profile?.full_name || 'Personal Logística');
     addLine("Fecha y hora:", `${fechaStr} a las ${horaStr} hs`);
@@ -125,7 +135,7 @@ export default function Logistica() {
     // Pie de página
     doc.setFontSize(9);
     doc.setTextColor(148, 163, 184); // slate-400
-    doc.text("Este es un comprobante de gasto automático generado desde la aplicación PEIE Tools.", 14, 190);
+    doc.text("Este es un comprobante de gasto automático generado desde la aplicación PEIE Tools.", 14, 195);
 
     // Descargar PDF
     const fileName = `Comprobante_Gasto_${gastoConcepto.replace(/\s+/g, '_')}_${fecha.toISOString().slice(0, 10)}.pdf`;
@@ -141,6 +151,7 @@ export default function Logistica() {
       `- *Concepto:* ${gastoConcepto}`,
       `- *Monto:* $${montoNum.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`,
       `- *Obra:* ${obraSeleccionada}`,
+      `- *Solicitó (Empleado):* ${empleadoSeleccionado}`,
       `- *Método de pago:* ${gastoPago}`,
       `- *Registró:* ${profile?.full_name || 'Logística'}`,
       `- *Fecha:* ${fechaStr} ${horaStr} hs`,
@@ -154,8 +165,9 @@ export default function Logistica() {
     setGastoConcepto('');
     setGastoMonto('');
     setGastoDetalle('');
-    setGastoPago('Efectivo');
+    setGastoPago('Cuenta corriente BP');
     setGastoObraId('');
+    setGastoEmpleadoId('');
 
     toast({ title: 'Gasto Registrado', description: 'Se descargó el PDF del comprobante. Abriendo chat de Federico Grande...' });
 
@@ -330,7 +342,10 @@ export default function Logistica() {
                 <label className="text-xs font-bold text-slate-700">Obra asociada (Opcional)</label>
                 <select 
                   value={gastoObraId}
-                  onChange={e => setGastoObraId(e.target.value)}
+                  onChange={e => {
+                    setGastoObraId(e.target.value);
+                    setGastoEmpleadoId(''); // Reset empleado si cambia la obra
+                  }}
                   className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-sm"
                 >
                   <option value="">Ninguna o General</option>
@@ -346,12 +361,36 @@ export default function Logistica() {
                   onChange={e => setGastoPago(e.target.value)}
                   className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-sm"
                 >
+                  <option value="Cuenta corriente BP">Cuenta corriente BP</option>
+                  <option value="Cuenta corriente LA MADRID">Cuenta corriente LA MADRID</option>
+                  <option value="Cuenta corriente DI MATER">Cuenta corriente DI MATER</option>
                   <option value="Efectivo">Efectivo</option>
                   <option value="Transferencia">Transferencia</option>
                   <option value="Tarjeta de Débito">Tarjeta de Débito</option>
                   <option value="Tarjeta de Crédito">Tarjeta de Crédito</option>
                   <option value="Mercado Pago">Mercado Pago</option>
                 </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Empleado que solicitó (Opcional)</label>
+                <select 
+                  value={gastoEmpleadoId}
+                  onChange={e => setGastoEmpleadoId(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-sm"
+                >
+                  <option value="">Seleccionar empleado...</option>
+                  {(gastoObraId 
+                    ? allEmpleados.filter(e => e.obra_id === gastoObraId)
+                    : allEmpleados
+                  ).map(emp => (
+                    <option key={emp.id} value={emp.id}>{emp.full_name}</option>
+                  ))}
+                </select>
+                {gastoObraId && (
+                  <p className="text-[10px] text-slate-400 font-semibold">
+                    Filtrados por la obra seleccionada ({allEmpleados.filter(e => e.obra_id === gastoObraId).length} empleados)
+                  </p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700">Detalles adicionales</label>
