@@ -415,6 +415,20 @@ export default function Dashboard() {
 
     const motivoFinal = reportMotivo === 'Otro' ? (reportMotivoOtro.trim() || 'Otro motivo especificado por voz/texto') : reportMotivo;
 
+    // Guardar en la base de datos de Supabase para la página de reportes
+    supabase.from('reportes_excedidos').insert([{
+      requester_id: profile?.id,
+      requester_name: profile?.full_name || 'Personal Logística',
+      target_person_id: personaObj?.id || null,
+      target_person_name: personaNombre,
+      recipient_name: recipientName,
+      tarea: reportTarea.trim() || 'Sin descripción específica',
+      motivo: motivoFinal,
+      status: 'Enviado WhatsApp'
+    }]).then(({ error }) => {
+      if (error) console.warn('No se pudo guardar reporte en DB (asegurarse de aplicar supabase_update_v12.sql):', error);
+    });
+
     const waMsg = [
       '*⚠️ REPORTAR TAREA EXCEDIDA DE LOGÍSTICA*',
       '',

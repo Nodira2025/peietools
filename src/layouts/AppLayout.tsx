@@ -161,7 +161,7 @@ export default function AppLayout() {
   const navItems = [
     { name: 'Inicio', path: '/dashboard', icon: Sparkles, show: true },
     { name: 'Notificaciones', path: '/notificaciones', icon: Bell, show: true, badge: pendingCount },
-    { name: 'Reportes', path: '/reportes', icon: BarChart3, show: false },
+    { name: 'Reportes', path: '/reportes', icon: BarChart3, show: isLogistica || isAdmin },
     { name: 'Movimiento de Herramientas', path: '/pedidos-herramientas', icon: FileText, show: true },
     { name: 'Movimiento de Personal', path: '/pedidos-personal', icon: HardHat, show: true },
     { name: 'Herramientas', path: '/herramientas', icon: Wrench, show: true },

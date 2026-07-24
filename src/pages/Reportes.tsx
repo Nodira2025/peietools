@@ -8,9 +8,12 @@ import {
   Download, 
   FileSpreadsheet, 
   FileText as PdfIcon, 
-  Navigation 
+  Navigation,
+  Search,
+  AlertTriangle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { 
   ResponsiveContainer, 
@@ -61,6 +64,17 @@ interface TrasladoPersonal {
   target_obra?: { name: string; latitude: number | null; longitude: number | null } | null;
 }
 
+interface ReporteExcedido {
+  id: string;
+  created_at: string;
+  requester_name: string;
+  target_person_name: string;
+  recipient_name: string;
+  tarea: string | null;
+  motivo: string;
+  status: string;
+}
+
 export default function Reportes() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -68,6 +82,8 @@ export default function Reportes() {
   const [herramientas, setHerramientas] = useState<Herramienta[]>([]);
   const [obras, setObras] = useState<Obra[]>([]);
   const [traslados, setTraslados] = useState<TrasladoPersonal[]>([]);
+  const [reportesExcedidos, setReportesExcedidos] = useState<ReporteExcedido[]>([]);
+  const [reportesSearch, setReportesSearch] = useState('');
   const [totalEmpleados, setTotalEmpleados] = useState(0);
   const [empleadosDisponibles, setEmpleadosDisponibles] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -118,6 +134,13 @@ export default function Reportes() {
         target_obra: Array.isArray(t.target_obra) ? t.target_obra[0] : t.target_obra
       }));
       setTraslados(mappedTData as TrasladoPersonal[]);
+
+      // Load reportes excedidos
+      const { data: repData } = await supabase
+        .from('reportes_excedidos')
+        .select('*')
+        .order('created_at', { ascending: false });
+      setReportesExcedidos(repData || []);
 
       // Load employee counts
       const { data: empData } = await supabase.from('empleados').select('id, status');
@@ -196,6 +219,24 @@ export default function Reportes() {
     toast({ title: 'Éxito', description: 'Reporte Excel descargado.' });
   };
 
+  const exportReportesExcedidosToExcel = () => {
+    const data = filteredReportesExcedidos.map(r => ({
+      Fecha: new Date(r.created_at).toLocaleString('es-AR'),
+      Persona_Encomendo: r.target_person_name,
+      Reportado_Por: r.requester_name,
+      Destinatario_WhatsApp: r.recipient_name,
+      Tarea_Solicitada: r.tarea || 'Sin especificación',
+      Motivo: r.motivo,
+      Estado: r.status
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Reportes_Excedidos");
+    XLSX.writeFile(workbook, `Reportes_Excedidos_Logistica_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast({ title: 'Éxito', description: 'Tabla de Reportes importada a Excel con éxito.' });
+  };
+
   const exportToCSV = () => {
     const headers = ['Codigo', 'Nombre', 'Marca', 'Modelo', 'Categoria', 'Estado', 'Obra'];
     const rows = herramientas.map(h => [
@@ -254,7 +295,17 @@ export default function Reportes() {
 
     doc.save(`Reporte_Inventario_${new Date().toISOString().slice(0, 10)}.pdf`);
     toast({ title: 'Éxito', description: 'Reporte PDF descargado.' });
-  };
+  const filteredReportesExcedidos = reportesExcedidos.filter(r => {
+    const term = reportesSearch.toLowerCase().trim();
+    if (!term) return true;
+    return (
+      r.target_person_name.toLowerCase().includes(term) ||
+      r.requester_name.toLowerCase().includes(term) ||
+      r.recipient_name.toLowerCase().includes(term) ||
+      (r.tarea && r.tarea.toLowerCase().includes(term)) ||
+      r.motivo.toLowerCase().includes(term)
+    );
+  });
 
   // Mapeador de coordenadas para Tucumán
   // Tucumán abarca aproximadamente Lng [-66.3, -64.4] y Lat [-26.0, -28.0]
@@ -604,6 +655,94 @@ export default function Reportes() {
               ))}
             </div>
           </div>
+      {/* 📋 TABLA REGISTRO DE REPORTES EXCEDIDOS DE LOGÍSTICA */}
+      <Card className="rounded-2xl shadow-sm border-rose-100 bg-white overflow-hidden">
+        <CardHeader className="p-5 pb-3 bg-gradient-to-r from-rose-50 to-orange-50/30 border-b border-rose-100/60">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-rose-600 animate-pulse" />
+                <CardTitle className="text-base font-black text-slate-900">
+                  Historial de Tareas y Compras Excedidas
+                </CardTitle>
+                <span className="bg-rose-100 text-rose-800 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                  {filteredReportesExcedidos.length} Registros
+                </span>
+              </div>
+              <CardDescription className="text-xs text-slate-500 font-medium">
+                Registro histórico de tareas/compras reportadas que exceden el alcance habitual de logística.
+              </CardDescription>
+            </div>
+
+            <Button 
+              onClick={exportReportesExcedidosToExcel}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs h-10 px-4 shadow-md shadow-emerald-600/10 flex items-center gap-2 shrink-0"
+            >
+              <FileSpreadsheet className="h-4 w-4" /> Exportar Tabla a Excel
+            </Button>
+          </div>
+
+          <div className="mt-3 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input 
+              placeholder="Buscar por persona, tarea, motivo o destinatario..." 
+              value={reportesSearch}
+              onChange={e => setReportesSearch(e.target.value)}
+              className="pl-9 h-10 rounded-xl bg-white border-rose-200 text-xs focus:ring-2 focus:ring-rose-500"
+            />
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-0 overflow-x-auto">
+          {filteredReportesExcedidos.length === 0 ? (
+            <div className="p-8 text-center space-y-2">
+              <p className="text-sm font-semibold text-slate-600">No hay reportes registrados aún</p>
+              <p className="text-xs text-slate-400">Los reportes creados desde el botón de la pantalla principal aparecerán automáticamente aquí.</p>
+            </div>
+          ) : (
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-100">
+                  <th className="p-3.5 pl-5">Fecha / Hora</th>
+                  <th className="p-3.5">Encomió la Tarea</th>
+                  <th className="p-3.5">Reportado Por</th>
+                  <th className="p-3.5">Enviado a (WhatsApp)</th>
+                  <th className="p-3.5">Tarea / Pedido</th>
+                  <th className="p-3.5">Motivo</th>
+                  <th className="p-3.5 pr-5">Estado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                {filteredReportesExcedidos.map((r) => (
+                  <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="p-3.5 pl-5 whitespace-nowrap text-slate-500 font-semibold">
+                      {new Date(r.created_at).toLocaleDateString('es-AR')} {new Date(r.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs
+                    </td>
+                    <td className="p-3.5 font-bold text-slate-900">
+                      {r.target_person_name}
+                    </td>
+                    <td className="p-3.5 text-slate-600">
+                      {r.requester_name}
+                    </td>
+                    <td className="p-3.5 text-slate-800 font-semibold">
+                      {r.recipient_name}
+                    </td>
+                    <td className="p-3.5 max-w-[200px] truncate text-slate-900 font-medium">
+                      {r.tarea || 'Sin especificación'}
+                    </td>
+                    <td className="p-3.5 max-w-[260px] text-slate-600 leading-relaxed">
+                      {r.motivo}
+                    </td>
+                    <td className="p-3.5 pr-5 whitespace-nowrap">
+                      <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
+                        {r.status || 'Enviado WhatsApp'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </CardContent>
       </Card>
     </div>
