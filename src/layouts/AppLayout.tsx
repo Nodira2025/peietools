@@ -9,6 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 
+import LogoLoader from '../components/LogoLoader';
+
 export default function AppLayout() {
   const { user, profile, loading, signOut } = useAuthStore();
   const location = useLocation();
@@ -143,12 +145,7 @@ export default function AppLayout() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-[100svh] flex flex-col items-center justify-center bg-peie-bg gap-3">
-        <div className="w-12 h-12 border-4 border-peie-blue/20 border-t-peie-blue rounded-full animate-spin" />
-        <p className="text-sm font-medium text-peie-blue animate-pulse">Cargando plataforma...</p>
-      </div>
-    );
+    return <LogoLoader fullScreen text="Cargando plataforma..." size="md" />;
   }
 
   if (!user || !profile) {

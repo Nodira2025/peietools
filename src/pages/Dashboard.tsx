@@ -39,6 +39,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import VoiceInputButton from '../components/VoiceInputButton';
+import LogoLoader from '../components/LogoLoader';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -499,9 +500,8 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center gap-3">
-        <div className="w-10 h-10 border-4 border-peie-blue/20 border-t-peie-blue rounded-full animate-spin" />
-        <p className="text-xs font-semibold text-slate-400 animate-pulse">Cargando panel de control...</p>
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <LogoLoader text="Cargando panel de control..." size="md" />
       </div>
     );
   }

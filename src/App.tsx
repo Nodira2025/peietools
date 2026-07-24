@@ -36,6 +36,8 @@ import Notificaciones from './pages/Notificaciones';
 import SeguimientoTraslado from './pages/SeguimientoTraslado';
 
 
+import LogoLoader from './components/LogoLoader';
+
 export default function App() {
   const { checkUser, loading } = useAuthStore();
 
@@ -44,12 +46,7 @@ export default function App() {
   }, [checkUser]);
 
   if (loading) {
-    return (
-      <div className="min-h-[100svh] flex flex-col items-center justify-center bg-peie-bg gap-3">
-        <div className="w-10 h-10 border-4 border-peie-blue/20 border-t-peie-blue rounded-full animate-spin" />
-        <span className="text-xs font-semibold text-peie-blue animate-pulse">Cargando PEIE Tools...</span>
-      </div>
-    );
+    return <LogoLoader fullScreen text="Cargando PEIE Tools..." size="md" />;
   }
 
   return (
