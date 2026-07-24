@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import VoiceInputButton from '../components/VoiceInputButton';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -56,6 +57,7 @@ export default function Dashboard() {
   const [reportPerson, setReportPerson] = useState('');
   const [reportTarea, setReportTarea] = useState('');
   const [reportMotivo, setReportMotivo] = useState('Se trata de una compra / alquiler especial que excede la logística habitual.');
+  const [reportMotivoOtro, setReportMotivoOtro] = useState('');
 
   const mobileDashboardClass = deviceMode === 'mobile'
     ? 'block space-y-5 max-w-md mx-auto px-2'
@@ -403,6 +405,8 @@ export default function Dashboard() {
     const personaNombre = personaObj ? `${personaObj.full_name} (${personaObj.role || 'Personal'})` : 'No especificado';
     const federicoPhone = '5493814015738';
 
+    const motivoFinal = reportMotivo === 'Otro' ? (reportMotivoOtro.trim() || 'Otro motivo especificado por voz/texto') : reportMotivo;
+
     const waMsg = [
       '*⚠️ REPORTAR TAREA EXCEDIDA DE LOGÍSTICA*',
       '',
@@ -410,7 +414,7 @@ export default function Dashboard() {
       '',
       `- *Persona que encomendó la tarea:* ${personaNombre}`,
       reportTarea.trim() ? `- *Tarea / Pedido solicitado:* ${reportTarea}` : '',
-      `- *Motivo:* ${reportMotivo}`,
+      `- *Motivo:* ${motivoFinal}`,
       `- *Reportado por:* ${profile?.full_name || 'Personal Logística'}`,
       `- *Fecha:* ${new Date().toLocaleDateString('es-AR')} ${new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs`,
       '',
@@ -420,6 +424,7 @@ export default function Dashboard() {
     setIsReportOpen(false);
     setReportPerson('');
     setReportTarea('');
+    setReportMotivoOtro('');
 
     toast({ title: 'Reporte Generado', description: 'Abriendo chat de WhatsApp con Federico Grande...' });
     setTimeout(() => {
@@ -1311,15 +1316,22 @@ export default function Dashboard() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">
-                Tarea / Pedido solicitado (Opcional)
+              <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                <span>Tarea / Pedido solicitado (Opcional)</span>
+                <span className="text-[10px] text-peie-blue font-semibold">🎙️ Podés dictar</span>
               </label>
-              <Input 
-                placeholder="Ej: Comprar grupo electrógeno 10 KVA / Alquilar bobcat"
-                value={reportTarea}
-                onChange={e => setReportTarea(e.target.value)}
-                className="rounded-xl h-11"
-              />
+              <div className="flex gap-2">
+                <Input 
+                  placeholder="Ej: Comprar grupo electrógeno 10 KVA / Alquilar bobcat"
+                  value={reportTarea}
+                  onChange={e => setReportTarea(e.target.value)}
+                  className="rounded-xl h-11 flex-1"
+                />
+                <VoiceInputButton 
+                  onTranscript={t => setReportTarea(prev => prev ? `${prev} ${t}` : t)}
+                  className="h-11 w-11 rounded-xl shrink-0"
+                />
+              </div>
             </div>
 
             <div className="space-y-1.5">
@@ -1343,7 +1355,32 @@ export default function Dashboard() {
                 <option value="Herramienta en uso crítico en obra, requiere negociación especial.">
                   Herramienta en uso crítico, requiere negociación directa
                 </option>
+                <option value="Otro">
+                  Otro motivo (Escribir o dictar con voz)
+                </option>
               </select>
+
+              {reportMotivo === 'Otro' && (
+                <div className="pt-1.5 space-y-1 animate-fadeIn">
+                  <label className="text-[11px] font-bold text-slate-600 flex items-center justify-between">
+                    <span>Escribí o dictá el motivo personalizado:</span>
+                    <span className="text-[10px] text-peie-blue font-semibold">🎙️ Dictar</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <Input 
+                      placeholder="Ej: El proveedor no entrega en obra y requiere retirarse en Famaillá..."
+                      value={reportMotivoOtro}
+                      onChange={e => setReportMotivoOtro(e.target.value)}
+                      className="rounded-xl h-11 flex-1"
+                      required
+                    />
+                    <VoiceInputButton 
+                      onTranscript={t => setReportMotivoOtro(prev => prev ? `${prev} ${t}` : t)}
+                      className="h-11 w-11 rounded-xl shrink-0"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
