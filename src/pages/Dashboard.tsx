@@ -24,7 +24,8 @@ import {
   Camera,
   Plus,
   User,
-  DollarSign
+  DollarSign,
+  AlertTriangle
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { 
@@ -47,6 +48,13 @@ export default function Dashboard() {
   });
 
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+
+  // Modal para Reportar Tarea que excede a Logística
+  const [isReportOpen, setIsReportOpen] = useState(false);
+  const [allProfiles, setAllProfiles] = useState<{id: string, full_name: string, role: string}[]>([]);
+  const [reportPerson, setReportPerson] = useState('');
+  const [reportTarea, setReportTarea] = useState('');
+  const [reportMotivo, setReportMotivo] = useState('Se trata de una compra / alquiler especial que excede la logística habitual.');
 
   const mobileDashboardClass = deviceMode === 'mobile'
     ? 'block space-y-5 max-w-md mx-auto px-2'
@@ -92,7 +100,8 @@ export default function Dashboard() {
           { count: availTools, error: availToolsError },
           { data: activeObrasData, error: activeObrasError },
           { data: allToolsData, error: allToolsError },
-          { data: allEmpsData, error: allEmpsError }
+          { data: allEmpsData, error: allEmpsError },
+          { data: profilesData }
         ] = await Promise.all([
           // Pending tools
           supabase.from('solicitudes').select('id, requester_id, assigned_to').eq('status', 'Pendiente'),
@@ -111,8 +120,14 @@ export default function Dashboard() {
           // All tools locations
           supabase.from('herramientas').select('current_obra_id'),
           // All employees locations
-          supabase.from('empleados').select('obra_id')
+          supabase.from('empleados').select('obra_id'),
+          // All active profiles for report selection
+          supabase.from('profiles').select('id, full_name, role').eq('active', true).order('full_name')
         ]);
+
+        if (profilesData) {
+          setAllProfiles(profilesData);
+        }
 
         if (toolsPendingError) throw toolsPendingError;
         if (personalPendingError) throw personalPendingError;
@@ -377,6 +392,40 @@ export default function Dashboard() {
     );
   };
 
+  const handleSendReport = () => {
+    if (!reportPerson) {
+      toast({ variant: 'destructive', title: 'Persona requerida', description: 'Por favor, seleccioná a la persona que te encomendó la tarea.' });
+      return;
+    }
+
+    const personaObj = allProfiles.find(p => p.id === reportPerson);
+    const personaNombre = personaObj ? `${personaObj.full_name} (${personaObj.role || 'Personal'})` : 'No especificado';
+    const federicoPhone = '5493814015738';
+
+    const waMsg = [
+      '*⚠️ REPORTAR TAREA EXCEDIDA DE LOGÍSTICA*',
+      '',
+      `Hola *Federico*, me encomendaron una tarea que excede la logística habitual:`,
+      '',
+      `- *Persona que encomendó la tarea:* ${personaNombre}`,
+      reportTarea.trim() ? `- *Tarea / Pedido solicitado:* ${reportTarea}` : '',
+      `- *Motivo:* ${reportMotivo}`,
+      `- *Reportado por:* ${profile?.full_name || 'Personal Logística'}`,
+      `- *Fecha:* ${new Date().toLocaleDateString('es-AR')} ${new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs`,
+      '',
+      'Esta tarea se trata de una compra/alquiler o requerimiento especial que excede el alcance del área de logística.',
+    ].filter(Boolean).join('\n');
+
+    setIsReportOpen(false);
+    setReportPerson('');
+    setReportTarea('');
+
+    toast({ title: 'Reporte Generado', description: 'Abriendo chat de WhatsApp con Federico Grande...' });
+    setTimeout(() => {
+      window.open(`https://wa.me/${federicoPhone}?text=${encodeURIComponent(waMsg)}`, '_blank');
+    }, 400);
+  };
+
   const userName = profile?.full_name?.split(' ')[0] || 'Usuario';
   const userRole = profile?.role?.toLowerCase();
   const isAdmin = userRole === 'admin';
@@ -460,38 +509,33 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* 🏗️ VISTA PARA COORDINADORES / ENCARGADOS DE OBRA: TARJETA HERO GIGANTE "PEDIR HERRAMIENTA" */}
+        {/* 🏗️ VISTA PARA COORDINADORES / ENCARGADOS DE OBRA: TARJETA "PEDIR HERRAMIENTA" ESTÁNDAR */}
         {isCoordinador && (
           <div 
             onClick={() => navigate('/solicitudes/nueva')}
-            className="bg-gradient-to-br from-peie-blue via-blue-700 to-indigo-900 text-white rounded-[28px] p-6 shadow-[0_10px_32px_rgba(8,26,99,0.35)] hover:shadow-[0_14px_40px_rgba(8,26,99,0.45)] flex flex-col justify-between cursor-pointer active:scale-[0.98] transition-all duration-200 border-2 border-white/20 relative overflow-hidden group space-y-5"
+            className="bg-gradient-to-r from-peie-blue via-blue-700 to-indigo-800 text-white rounded-[24px] p-4 shadow-[0_6px_24px_rgba(8,26,99,0.22)] hover:shadow-[0_8px_30px_rgba(8,26,99,0.3)] flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all duration-200 border border-white/10 relative overflow-hidden group"
           >
-            <div className="absolute -right-8 -bottom-8 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none group-hover:scale-125 transition-transform" />
+            <div className="absolute -right-6 -bottom-6 w-28 h-28 bg-white/10 rounded-full blur-xl pointer-events-none group-hover:scale-125 transition-transform" />
             
-            <div className="flex items-start justify-between relative z-10">
-              <div className="w-16 h-16 rounded-2xl bg-white/25 backdrop-blur-md flex items-center justify-center text-white shrink-0 shadow-lg border border-white/30">
-                <Wrench size={34} className="stroke-[2.5]" />
+            <div className="flex items-center gap-3.5 relative z-10">
+              <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0 shadow-inner border border-white/20">
+                <Wrench size={24} className="stroke-[2.5]" />
               </div>
-              <span className="bg-amber-400 text-slate-950 text-xs font-black px-3.5 py-1.5 rounded-full uppercase tracking-wider shadow-md">
-                Pedir en 1 Clic
-              </span>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-black uppercase tracking-wider leading-none text-white">Pedir Herramienta</h3>
+                  <span className="bg-amber-400 text-slate-950 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tight shadow-sm">
+                    Solicitar
+                  </span>
+                </div>
+                <p className="text-[10px] text-blue-100 font-bold leading-tight">
+                  Solicitá las herramientas que necesitás para tu obra en 1 minuto.
+                </p>
+              </div>
             </div>
-
-            <div className="space-y-2 relative z-10">
-              <h3 className="text-2xl font-black uppercase tracking-tight leading-tight text-white">
-                ¿Qué herramienta necesitás en tu obra?
-              </h3>
-              <p className="text-xs text-blue-100 font-semibold leading-relaxed">
-                Dictá con voz o escribí el nombre de la herramienta. Logística gestiona el traslado.
-              </p>
+            <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center shrink-0 ml-2 relative z-10">
+              <ChevronRight size={18} className="text-white" />
             </div>
-
-            <Button
-              type="button"
-              className="w-full h-14 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black rounded-2xl text-base shadow-xl flex items-center justify-center gap-2.5 mt-2 active:scale-[0.97] transition-all"
-            >
-              <Wrench size={22} className="stroke-[3]" /> ¡PEDIR HERRAMIENTA AHORA! <ChevronRight size={20} />
-            </Button>
           </div>
         )}
 
@@ -499,7 +543,7 @@ export default function Dashboard() {
         {isAdmin && (
           <div 
             onClick={() => navigate('/solicitudes/nueva')}
-            className="bg-gradient-to-r from-peie-blue via-blue-700 to-indigo-800 text-white rounded-[24px] p-5 shadow-[0_6px_24px_rgba(8,26,99,0.22)] hover:shadow-[0_8px_30px_rgba(8,26,99,0.3)] flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all duration-200 border border-white/10 relative overflow-hidden group"
+            className="bg-gradient-to-r from-peie-blue via-blue-700 to-indigo-800 text-white rounded-[24px] p-4 shadow-[0_6px_24px_rgba(8,26,99,0.22)] hover:shadow-[0_8px_30px_rgba(8,26,99,0.3)] flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all duration-200 border border-white/10 relative overflow-hidden group"
           >
             <div className="absolute -right-6 -bottom-6 w-28 h-28 bg-white/10 rounded-full blur-xl pointer-events-none group-hover:scale-125 transition-transform" />
             
@@ -557,6 +601,30 @@ export default function Dashboard() {
               <div className="space-y-1">
                 <h3 className="text-sm font-black uppercase tracking-wider leading-none">Registrar Gasto</h3>
                 <p className="text-[10px] text-slate-100 font-bold leading-tight">Comprobantes y rendición con cuenta corriente por WhatsApp.</p>
+              </div>
+            </div>
+            <ChevronRight size={18} className="text-white shrink-0" />
+          </div>
+        )}
+
+        {/* ⚠️ NUEVA TARJETA: Reportar Tarea Excedida a Federico (Logística y Admins) */}
+        {(isAdmin || isLogistica) && (
+          <div 
+            onClick={() => setIsReportOpen(true)}
+            className="bg-gradient-to-r from-rose-600 to-red-500 text-white rounded-[24px] p-4 shadow-[0_4px_20px_rgba(225,29,72,0.15)] hover:shadow-[0_4px_20px_rgba(225,29,72,0.25)] flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all duration-200"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-white shrink-0">
+                <AlertTriangle size={24} className="stroke-[2.5] text-amber-300 animate-pulse" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-black uppercase tracking-wider leading-none">Reportar Tarea</h3>
+                  <span className="bg-amber-300 text-slate-950 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tight shadow-sm">
+                    Excede Logística
+                  </span>
+                </div>
+                <p className="text-[10px] text-rose-100 font-bold leading-tight">Avisa por WhatsApp a Federico sobre compras/tareas especiales.</p>
               </div>
             </div>
             <ChevronRight size={18} className="text-white shrink-0" />
@@ -1202,6 +1270,96 @@ export default function Dashboard() {
               className="bg-blue-600 text-white hover:bg-blue-700 rounded-xl font-bold text-xs px-5 shadow-md shadow-blue-600/10"
             >
               Entendido
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal para Reportar Tarea que excede a Logística */}
+      <Dialog open={isReportOpen} onOpenChange={setIsReportOpen}>
+        <DialogContent className="rounded-3xl w-[92%] max-w-md bg-white border-slate-100 shadow-xl overflow-hidden p-0">
+          <div className="bg-gradient-to-r from-rose-700 to-red-600 text-white p-5 relative">
+            <DialogHeader className="text-left space-y-1">
+              <DialogTitle className="text-xl font-black tracking-tight flex items-center gap-2">
+                <AlertTriangle className="h-6 w-6 text-amber-300 animate-bounce" />
+                <span>Reportar Tarea a Federico</span>
+              </DialogTitle>
+              <DialogDescription className="text-rose-100 text-xs font-semibold">
+                Aviso automático por WhatsApp para tareas o compras que exceden la logística.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="p-5 space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700">
+                Persona que encomendó la tarea *
+              </label>
+              <select 
+                value={reportPerson}
+                onChange={e => setReportPerson(e.target.value)}
+                className="w-full h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:ring-2 focus:ring-rose-500"
+              >
+                <option value="">Seleccionar persona...</option>
+                {allProfiles.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.full_name} ({p.role || 'Usuario'})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700">
+                Tarea / Pedido solicitado (Opcional)
+              </label>
+              <Input 
+                placeholder="Ej: Comprar grupo electrógeno 10 KVA / Alquilar bobcat"
+                value={reportTarea}
+                onChange={e => setReportTarea(e.target.value)}
+                className="rounded-xl h-11"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700">
+                Motivo del reporte
+              </label>
+              <select 
+                value={reportMotivo}
+                onChange={e => setReportMotivo(e.target.value)}
+                className="w-full h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:ring-2 focus:ring-rose-500"
+              >
+                <option value="Se trata de una compra / alquiler especial que excede la logística habitual.">
+                  Se trata de una compra / alquiler especial (excede logística)
+                </option>
+                <option value="No hay vehículo ni chofer disponible para este tipo de traslado pesado.">
+                  No hay vehículo / chofer adecuado disponible
+                </option>
+                <option value="Requiere aprobación previa o fondos de caja chica de gerencia.">
+                  Requiere aprobación / fondos de gerencia
+                </option>
+                <option value="Herramienta en uso crítico en obra, requiere negociación especial.">
+                  Herramienta en uso crítico, requiere negociación directa
+                </option>
+              </select>
+            </div>
+          </div>
+
+          <div className="bg-slate-50 p-4 border-t border-slate-100 flex items-center justify-end gap-2 rounded-b-3xl">
+            <Button 
+              variant="ghost" 
+              onClick={() => setIsReportOpen(false)}
+              className="rounded-xl font-bold text-xs"
+            >
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleSendReport}
+              disabled={!reportPerson}
+              className="bg-rose-600 hover:bg-rose-700 text-white font-black rounded-xl text-xs h-11 px-5 shadow-lg shadow-rose-600/20 flex items-center gap-2"
+            >
+              <MessageCircle size={16} /> Abrir WhatsApp <ChevronRight size={14} />
             </Button>
           </div>
         </DialogContent>
