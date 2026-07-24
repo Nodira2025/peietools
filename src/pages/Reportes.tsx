@@ -655,6 +655,9 @@ export default function Reportes() {
               ))}
             </div>
           </div>
+        </CardContent>
+      </Card>
+
       {/* 📋 TABLA REGISTRO DE REPORTES EXCEDIDOS DE LOGÍSTICA */}
       <Card className="rounded-2xl shadow-sm border-rose-100 bg-white overflow-hidden">
         <CardHeader className="p-5 pb-3 bg-gradient-to-r from-rose-50 to-orange-50/30 border-b border-rose-100/60">
