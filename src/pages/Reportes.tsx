@@ -295,6 +295,8 @@ export default function Reportes() {
 
     doc.save(`Reporte_Inventario_${new Date().toISOString().slice(0, 10)}.pdf`);
     toast({ title: 'Éxito', description: 'Reporte PDF descargado.' });
+  };
+
   const filteredReportesExcedidos = reportesExcedidos.filter(r => {
     const term = reportesSearch.toLowerCase().trim();
     if (!term) return true;
