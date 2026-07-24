@@ -53,6 +53,9 @@ export default function Dashboard() {
 
   // Modal para Reportar Tarea que excede a Logística
   const [isReportOpen, setIsReportOpen] = useState(false);
+  const [personCategory, setPersonCategory] = useState<'obra' | 'oficina'>('obra');
+  const [oficinaProfiles, setOficinaProfiles] = useState<{id: string, full_name: string, role: string, whatsapp?: string | null}[]>([]);
+  const [obraEmployees, setObraEmployees] = useState<{id: string, full_name: string, role: string, whatsapp?: string | null}[]>([]);
   const [allProfiles, setAllProfiles] = useState<{id: string, full_name: string, role: string, whatsapp?: string | null}[]>([]);
   const [reportPerson, setReportPerson] = useState('');
   const [reportRecipient, setReportRecipient] = useState('5493814015738'); // Default: Federico Grande
@@ -132,29 +135,39 @@ export default function Dashboard() {
           supabase.from('empleados').select('id, full_name, specialty, whatsapp').order('full_name')
         ]);
 
+        const oficinaList: {id: string, full_name: string, role: string, whatsapp?: string | null}[] = [];
+        const obraList: {id: string, full_name: string, role: string, whatsapp?: string | null}[] = [];
         const combinedList: {id: string, full_name: string, role: string, whatsapp?: string | null}[] = [];
-        
+
         if (profilesData) {
           profilesData.forEach(p => {
-            combinedList.push({ id: p.id, full_name: p.full_name, role: p.role || 'Usuario', whatsapp: p.whatsapp });
+            const item = { id: p.id, full_name: p.full_name, role: p.role || 'Usuario Sistema', whatsapp: p.whatsapp };
+            oficinaList.push(item);
+            combinedList.push(item);
           });
         }
+
         if (electricistasData) {
           electricistasData.forEach(e => {
-            // Evitar duplicados por nombre si ya está en profiles
+            const item = { 
+              id: e.id, 
+              full_name: e.full_name, 
+              role: e.specialty || 'Personal de Obra', 
+              whatsapp: e.whatsapp 
+            };
+            obraList.push(item);
             if (!combinedList.some(c => c.full_name.toLowerCase().trim() === e.full_name.toLowerCase().trim())) {
-              combinedList.push({ 
-                id: e.id, 
-                full_name: e.full_name, 
-                role: e.specialty || 'Electricista / Operario', 
-                whatsapp: e.whatsapp 
-              });
+              combinedList.push(item);
             }
           });
         }
-        
-        // Ordenar alfabéticamente
+
+        oficinaList.sort((a, b) => a.full_name.localeCompare(b.full_name));
+        obraList.sort((a, b) => a.full_name.localeCompare(b.full_name));
         combinedList.sort((a, b) => a.full_name.localeCompare(b.full_name));
+
+        setOficinaProfiles(oficinaList);
+        setObraEmployees(obraList);
         setAllProfiles(combinedList);
 
         if (toolsPendingError) throw toolsPendingError;
@@ -1361,19 +1374,51 @@ export default function Dashboard() {
               </select>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 block">
                 Persona que encomendó la tarea *
               </label>
+
+              {/* Pestañas para cambiar entre Personal de Obra y Oficina */}
+              <div className="grid grid-cols-2 p-1 bg-slate-100 rounded-xl text-xs font-bold gap-1">
+                <button
+                  type="button"
+                  onClick={() => { setPersonCategory('obra'); setReportPerson(''); }}
+                  className={`py-2 rounded-lg transition-all ${
+                    personCategory === 'obra'
+                      ? 'bg-white text-rose-700 shadow-sm font-black'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  👷 Personal en Obra ({obraEmployees.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setPersonCategory('oficina'); setReportPerson(''); }}
+                  className={`py-2 rounded-lg transition-all ${
+                    personCategory === 'oficina'
+                      ? 'bg-white text-rose-700 shadow-sm font-black'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  🏢 Oficina / Sistema ({oficinaProfiles.length})
+                </button>
+              </div>
+
+              {/* Selector dinámico según la categoría elegida */}
               <select 
                 value={reportPerson}
                 onChange={e => setReportPerson(e.target.value)}
                 className="w-full h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:ring-2 focus:ring-rose-500"
               >
-                <option value="">Seleccionar persona...</option>
-                {allProfiles.map(p => (
+                <option value="">
+                  {personCategory === 'obra' 
+                    ? 'Seleccionar personal de obra (electricista, operario)...' 
+                    : 'Seleccionar usuario de oficina (coordinador, admin)...'}
+                </option>
+                {(personCategory === 'obra' ? obraEmployees : oficinaProfiles).map(p => (
                   <option key={p.id} value={p.id}>
-                    {p.full_name} ({p.role || 'Usuario'})
+                    {p.full_name} ({p.role})
                   </option>
                 ))}
               </select>
