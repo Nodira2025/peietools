@@ -53,8 +53,9 @@ export default function Dashboard() {
 
   // Modal para Reportar Tarea que excede a Logística
   const [isReportOpen, setIsReportOpen] = useState(false);
-  const [allProfiles, setAllProfiles] = useState<{id: string, full_name: string, role: string}[]>([]);
+  const [allProfiles, setAllProfiles] = useState<{id: string, full_name: string, role: string, whatsapp?: string | null}[]>([]);
   const [reportPerson, setReportPerson] = useState('');
+  const [reportRecipient, setReportRecipient] = useState('5493814015738'); // Default: Federico Grande
   const [reportTarea, setReportTarea] = useState('');
   const [reportMotivo, setReportMotivo] = useState('Se trata de una compra / alquiler especial que excede la logística habitual.');
   const [reportMotivoOtro, setReportMotivoOtro] = useState('');
@@ -125,7 +126,7 @@ export default function Dashboard() {
           // All employees locations
           supabase.from('empleados').select('obra_id'),
           // All active profiles for report selection
-          supabase.from('profiles').select('id, full_name, role').eq('active', true).order('full_name')
+          supabase.from('profiles').select('id, full_name, role, whatsapp').eq('active', true).order('full_name')
         ]);
 
         if (profilesData) {
@@ -403,14 +404,21 @@ export default function Dashboard() {
 
     const personaObj = allProfiles.find(p => p.id === reportPerson);
     const personaNombre = personaObj ? `${personaObj.full_name} (${personaObj.role || 'Personal'})` : 'No especificado';
-    const federicoPhone = '5493814015738';
+    const recipientObj = allProfiles.find(p => p.id === reportRecipient);
+    
+    // Si eligió un usuario de la lista con WhatsApp, usar ese número. Sino usar por defecto Federico (5493814015738).
+    const targetPhone = (recipientObj?.whatsapp && recipientObj.whatsapp.length > 6) 
+      ? recipientObj.whatsapp 
+      : (reportRecipient && reportRecipient !== '5493814015738' ? reportRecipient : '5493814015738');
+    
+    const recipientName = recipientObj?.full_name || 'Federico Grande';
 
     const motivoFinal = reportMotivo === 'Otro' ? (reportMotivoOtro.trim() || 'Otro motivo especificado por voz/texto') : reportMotivo;
 
     const waMsg = [
       '*⚠️ REPORTAR TAREA EXCEDIDA DE LOGÍSTICA*',
       '',
-      `Hola *Federico*, me encomendaron una tarea que excede la logística habitual:`,
+      `Hola *${recipientName.split(' ')[0]}*, me encomendaron una tarea que excede la logística habitual:`,
       '',
       `- *Persona que encomendó la tarea:* ${personaNombre}`,
       reportTarea.trim() ? `- *Tarea / Pedido solicitado:* ${reportTarea}` : '',
@@ -426,9 +434,9 @@ export default function Dashboard() {
     setReportTarea('');
     setReportMotivoOtro('');
 
-    toast({ title: 'Reporte Generado', description: 'Abriendo chat de WhatsApp con Federico Grande...' });
+    toast({ title: 'Reporte Generado', description: `Abriendo chat de WhatsApp con ${recipientName}...` });
     setTimeout(() => {
-      window.open(`https://wa.me/${federicoPhone}?text=${encodeURIComponent(waMsg)}`, '_blank');
+      window.open(`https://wa.me/${targetPhone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(waMsg)}`, '_blank');
     }, 400);
   };
 
@@ -1288,7 +1296,7 @@ export default function Dashboard() {
             <DialogHeader className="text-left space-y-1">
               <DialogTitle className="text-xl font-black tracking-tight flex items-center gap-2">
                 <AlertTriangle className="h-6 w-6 text-amber-300 animate-bounce" />
-                <span>Reportar Tarea a Federico</span>
+                <span>Reportar Tarea</span>
               </DialogTitle>
               <DialogDescription className="text-rose-100 text-xs font-semibold">
                 Aviso automático por WhatsApp para tareas o compras que exceden la logística.
@@ -1297,6 +1305,24 @@ export default function Dashboard() {
           </div>
 
           <div className="p-5 space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700">
+                Enviar reporte por WhatsApp a: *
+              </label>
+              <select 
+                value={reportRecipient}
+                onChange={e => setReportRecipient(e.target.value)}
+                className="w-full h-11 px-3 rounded-xl border border-rose-200 bg-rose-50/40 text-sm font-bold text-rose-950 focus:ring-2 focus:ring-rose-500"
+              >
+                <option value="5493814015738">Federico Grande (Administración)</option>
+                {allProfiles.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.full_name} ({p.role || 'Usuario'})
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700">
                 Persona que encomendó la tarea *
