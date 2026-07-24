@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Truck, Clock, Package, CheckCircle, ArrowRight, Wrench, Search } from 'lucide-react';
+import { Truck, Clock, Package, CheckCircle, ArrowRight, Wrench, Search, FileSpreadsheet, AlertTriangle } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import FilterBar from '../components/FilterBar';
 import { Input } from '@/components/ui/input';
@@ -303,17 +303,27 @@ export default function Logistica() {
   return (
     <div className="space-y-6 pb-safe">
       {/* Header */}
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-peie-blue">Panel de Logística</h1>
-          <p className="text-sm text-muted-foreground mt-1">Gestión unificada de pedidos y traslados</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Gestión unificada de pedidos y traslados</p>
         </div>
-        <Dialog open={isGastoOpen} onOpenChange={setIsGastoOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs h-10 px-3 shrink-0 flex items-center gap-1.5 shadow-md">
-              💵 Registrar Gasto
-            </Button>
-          </DialogTrigger>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Button 
+            onClick={() => navigate('/reportes')}
+            variant="outline"
+            className="bg-white border-rose-200 text-rose-700 hover:bg-rose-50 font-bold rounded-xl text-xs h-10 px-3 flex-1 sm:flex-initial flex items-center justify-center gap-1.5 shadow-sm"
+          >
+            <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0" />
+            <span>Historial de Reportes</span>
+          </Button>
+
+          <Dialog open={isGastoOpen} onOpenChange={setIsGastoOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs h-10 px-3 flex-1 sm:flex-initial flex items-center justify-center gap-1.5 shadow-md">
+                💵 Registrar Gasto
+              </Button>
+            </DialogTrigger>
           <DialogContent className="rounded-3xl w-[90%] max-w-md">
             <DialogHeader>
               <DialogTitle>Registrar Gasto de Logística</DialogTitle>
