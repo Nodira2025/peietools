@@ -431,6 +431,7 @@ export default function Logistica() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Buscador y Filtros */}
