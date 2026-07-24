@@ -105,7 +105,8 @@ export default function Dashboard() {
           { data: activeObrasData, error: activeObrasError },
           { data: allToolsData, error: allToolsError },
           { data: allEmpsData, error: allEmpsError },
-          { data: profilesData }
+          { data: profilesData },
+          { data: electricistasData }
         ] = await Promise.all([
           // Pending tools
           supabase.from('solicitudes').select('id, requester_id, assigned_to').eq('status', 'Pendiente'),
@@ -126,12 +127,35 @@ export default function Dashboard() {
           // All employees locations
           supabase.from('empleados').select('obra_id'),
           // All active profiles for report selection
-          supabase.from('profiles').select('id, full_name, role, whatsapp').eq('active', true).order('full_name')
+          supabase.from('profiles').select('id, full_name, role, whatsapp').eq('active', true).order('full_name'),
+          // Electricistas and operarios from empleados table
+          supabase.from('empleados').select('id, full_name, specialty, whatsapp').order('full_name')
         ]);
 
+        const combinedList: {id: string, full_name: string, role: string, whatsapp?: string | null}[] = [];
+        
         if (profilesData) {
-          setAllProfiles(profilesData);
+          profilesData.forEach(p => {
+            combinedList.push({ id: p.id, full_name: p.full_name, role: p.role || 'Usuario', whatsapp: p.whatsapp });
+          });
         }
+        if (electricistasData) {
+          electricistasData.forEach(e => {
+            // Evitar duplicados por nombre si ya está en profiles
+            if (!combinedList.some(c => c.full_name.toLowerCase().trim() === e.full_name.toLowerCase().trim())) {
+              combinedList.push({ 
+                id: e.id, 
+                full_name: e.full_name, 
+                role: e.specialty || 'Electricista / Operario', 
+                whatsapp: e.whatsapp 
+              });
+            }
+          });
+        }
+        
+        // Ordenar alfabéticamente
+        combinedList.sort((a, b) => a.full_name.localeCompare(b.full_name));
+        setAllProfiles(combinedList);
 
         if (toolsPendingError) throw toolsPendingError;
         if (personalPendingError) throw personalPendingError;
