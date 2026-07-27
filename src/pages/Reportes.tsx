@@ -88,7 +88,7 @@ export default function Reportes() {
   const [empleadosDisponibles, setEmpleadosDisponibles] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  const isAuthorized = profile?.role === 'admin' || profile?.role === 'logistica';
+  const isAuthorized = profile?.role === 'admin' || profile?.role === 'logistica' || profile?.role === 'solicitante' || profile?.role === 'encargado';
 
   useEffect(() => {
     if (profile && !isAuthorized) {
