@@ -310,6 +310,14 @@ export default function Logistica() {
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <Button 
+            onClick={() => navigate('/reportes-novedades-obra')}
+            className="bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs h-10 px-3 flex-1 sm:flex-initial flex items-center justify-center gap-1.5 shadow-md"
+          >
+            <Wrench className="h-4 w-4 shrink-0" />
+            <span>Novedades / Garrafas</span>
+          </Button>
+
+          <Button 
             onClick={() => navigate('/reportes')}
             variant="outline"
             className="bg-white border-rose-200 text-rose-700 hover:bg-rose-50 font-bold rounded-xl text-xs h-10 px-3 flex-1 sm:flex-initial flex items-center justify-center gap-1.5 shadow-sm"

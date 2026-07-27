@@ -25,6 +25,7 @@ import {
   Search,
   Filter
 } from 'lucide-react';
+import { showNativeNotification } from '../lib/pushNotifications';
 
 interface NotificacionHerramienta {
   id: string;
@@ -286,16 +287,32 @@ export default function Notificaciones() {
     <div className="space-y-6 pb-safe max-w-4xl mx-auto">
       
       {/* Cabecera */}
-      <div className="flex items-center gap-3">
-        <div className="p-3 bg-peie-blue/10 text-peie-blue rounded-2xl shadow-inner">
-          <Bell className="w-6 h-6" />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-peie-blue/10 text-peie-blue rounded-2xl shadow-inner">
+            <Bell className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black text-peie-blue leading-none">Centro de Notificaciones</h1>
+            <p className="text-xs text-muted-foreground mt-1">
+              Revisá el estado y las solicitudes de traslado en las que estás involucrado.
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-black text-peie-blue leading-none">Centro de Notificaciones</h1>
-          <p className="text-xs text-muted-foreground mt-1">
-            Revisá el estado y las solicitudes de traslado en las que estás involucrado.
-          </p>
-        </div>
+
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            showNativeNotification('🔔 Alerta de Prueba PEIE', {
+              body: 'Esta es una notificación de prueba en la barra de tu dispositivo.',
+              onClickUrl: '/notificaciones',
+            });
+          }}
+          className="text-xs gap-1.5 font-bold border-amber-300 text-amber-800 hover:bg-amber-50 rounded-xl"
+        >
+          <Bell className="h-3.5 w-3.5" /> Probar Alerta Nativa
+        </Button>
       </div>
 
       {/* Filtros */}

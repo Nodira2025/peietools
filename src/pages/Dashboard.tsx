@@ -634,27 +634,8 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Tarjeta secundaria para mis pedidos (Coordinadores) */}
-        {isCoordinador && (
-          <div 
-            onClick={() => navigate('/solicitudes')}
-            className="bg-white border border-slate-200 rounded-[24px] p-4 shadow-sm hover:shadow-md flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-slate-100 text-peie-blue flex items-center justify-center shrink-0">
-                <FileText size={20} />
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-slate-800">Ver Mis Pedidos Solicitados</h4>
-                <p className="text-[10px] text-slate-400 font-semibold">Consultá el estado del traslado de tus herramientas</p>
-              </div>
-            </div>
-            <ChevronRight size={16} className="text-slate-400" />
-          </div>
-        )}
-
-        {/* Acceso a Registrar Gasto de Logística (Admins y Logística) */}
-        {(isAdmin || isLogistica) && (
+        {/* Acceso a Registrar Gasto (Admins, Logística y Coordinadores) */}
+        {(isAdmin || isLogistica || isCoordinador) && (
           <div 
             onClick={() => navigate('/logistica?nuevoGasto=true')}
             className="bg-gradient-to-r from-emerald-600 to-teal-500 text-white rounded-[24px] p-4 shadow-[0_4px_20px_rgba(16,185,129,0.12)] hover:shadow-[0_4px_20px_rgba(16,185,129,0.2)] flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all duration-200"
@@ -669,6 +650,25 @@ export default function Dashboard() {
               </div>
             </div>
             <ChevronRight size={18} className="text-white shrink-0" />
+          </div>
+        )}
+
+        {/* Tarjeta secundaria para mis pedidos (Coordinadores / Admins) */}
+        {(isCoordinador || isAdmin) && (
+          <div 
+            onClick={() => navigate('/solicitudes')}
+            className="bg-white border border-slate-200 rounded-[24px] p-4 shadow-sm hover:shadow-md flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-slate-100 text-peie-blue flex items-center justify-center shrink-0">
+                <FileText size={20} />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-800">Ver Mis Pedidos Solicitados</h4>
+                <p className="text-[10px] text-slate-400 font-semibold">Consultá el estado del traslado de tus herramientas</p>
+              </div>
+            </div>
+            <ChevronRight size={16} className="text-slate-400" />
           </div>
         )}
 

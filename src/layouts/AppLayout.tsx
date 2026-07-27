@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Navigate, Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { supabase } from '../lib/supabase';
-import { Home, Wrench, FileText, Truck, Users, Building, LogOut, ShoppingCart, Sparkles, HardHat, ClipboardList, BarChart3, MoreHorizontal, Bell, Key, Eye, EyeOff } from 'lucide-react';
+import { Home, Wrench, FileText, Truck, Users, Building, LogOut, ShoppingCart, Sparkles, HardHat, ClipboardList, BarChart3, MoreHorizontal, Bell, Key, Eye, EyeOff, DollarSign } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 
 import LogoLoader from '../components/LogoLoader';
+import NotificationPermissionBanner from '../components/NotificationPermissionBanner';
+import { showNativeNotification } from '../lib/pushNotifications';
 
 export default function AppLayout() {
   const { user, profile, loading, signOut } = useAuthStore();
@@ -106,7 +108,46 @@ export default function AppLayout() {
     fetchPendingCount();
     
     const interval = setInterval(fetchPendingCount, 30000);
-    return () => clearInterval(interval);
+
+    // Suscripción Realtime para notificaciones Push nativas en cel y PC
+    const channel = supabase
+      .channel('realtime-push-notifications')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'solicitudes' },
+        () => {
+          showNativeNotification('🚚 Nuevo Pedido de Herramientas', {
+            body: 'Se ha registrado una nueva solicitud en PEIE Tools.',
+            onClickUrl: '/notificaciones',
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'traslados_personal' },
+        () => {
+          showNativeNotification('👷 Nuevo Traslado de Personal', {
+            body: 'Se ha registrado una nueva solicitud de traslado de personal.',
+            onClickUrl: '/notificaciones',
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'reportes_novedades_obra' },
+        () => {
+          showNativeNotification('🔧 Nueva Novedad de Obra / Reparación', {
+            body: 'Se ha ingresado una nueva novedad o reporte de insumo.',
+            onClickUrl: '/reportes-novedades-obra',
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
   }, [profile]);
 
   useEffect(() => {
@@ -165,6 +206,7 @@ export default function AppLayout() {
     { name: 'Mis Obras', path: '/mis-obras', icon: Building, show: true },
     { name: 'Personal', path: '/personal', icon: HardHat, show: true },
     { name: 'Órdenes', path: '/ordenes', icon: ClipboardList, show: false },
+    { name: 'Novedades de Obra', path: '/reportes-novedades-obra', icon: Wrench, show: true },
     { name: 'Logística', path: '/logistica', icon: Truck, show: isLogistica || isAdmin },
     { name: 'Compras', path: '/compras', icon: ShoppingCart, show: false },
     { name: 'Obras (Admin)', path: '/obras', icon: Building, show: isAdmin },
@@ -355,6 +397,7 @@ export default function AppLayout() {
         
         {/* Contenedor fluido de páginas */}
         <div className={containerClass}>
+          <NotificationPermissionBanner />
           <Outlet />
         </div>
 
@@ -463,6 +506,15 @@ export default function AppLayout() {
               >
                 <BarChart3 size={24} className="text-orange-400" />
                 <span className="text-[11px] font-black uppercase tracking-tight">Reportes KPI</span>
+              </Link>
+
+              <Link 
+                to="/logistica?nuevoGasto=true" 
+                onClick={() => setShowMas(false)}
+                className="flex flex-col items-center justify-center p-4 bg-emerald-950/40 border border-emerald-800/80 rounded-2xl hover:bg-emerald-900/60 transition-all text-center gap-2"
+              >
+                <DollarSign size={24} className="text-emerald-400" />
+                <span className="text-[11px] font-black uppercase tracking-tight text-emerald-300">Registrar Gasto</span>
               </Link>
 
               {isAdmin && (
