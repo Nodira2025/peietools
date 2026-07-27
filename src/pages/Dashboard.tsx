@@ -672,51 +672,27 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ⚠️ TARJETA: Reportar Tarea Excedida a Federico (Admins, Logística y Coordinadores) */}
+        {/* TARJETA: Reportar Tarea (Estilo limpio, sobrio y elegante) */}
         {(isAdmin || isLogistica || isCoordinador) && (
           <div 
             onClick={() => setIsReportOpen(true)}
-            className="bg-gradient-to-r from-rose-600 to-red-500 text-white rounded-[24px] p-4 shadow-[0_4px_20px_rgba(225,29,72,0.15)] hover:shadow-[0_4px_20px_rgba(225,29,72,0.25)] flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all duration-200"
+            className="bg-white border border-slate-200 rounded-[24px] p-4 shadow-xs hover:shadow-md flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all duration-200"
           >
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-white shrink-0">
-                <AlertTriangle size={24} className="stroke-[2.5] text-amber-300 animate-pulse" />
+              <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-700 border border-amber-200/60 flex items-center justify-center shrink-0">
+                <FileText size={20} className="stroke-[2]" />
               </div>
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-black uppercase tracking-wider leading-none">Reportar Tarea</h3>
-                  <span className="bg-amber-300 text-slate-950 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tight shadow-sm">
-                    Excede Logística
+                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Reportar Tarea</h3>
+                  <span className="bg-slate-100 text-slate-600 text-[9px] font-bold px-2 py-0.5 rounded-full border border-slate-200">
+                    Aviso a Federico
                   </span>
                 </div>
-                <p className="text-[10px] text-rose-100 font-bold leading-tight">Avisa por WhatsApp a Federico sobre compras/tareas especiales.</p>
+                <p className="text-[10px] text-slate-400 font-semibold leading-tight">Envío de reporte o compra especial por WhatsApp.</p>
               </div>
             </div>
-            <ChevronRight size={18} className="text-white shrink-0" />
-          </div>
-        )}
-
-        {/* 🔧 TARJETA: Novedad de Obra / Garrafas / Reparaciones (Admins, Logística y Coordinadores) */}
-        {(isAdmin || isLogistica || isCoordinador) && (
-          <div 
-            onClick={() => navigate('/nuevo-reporte-obra')}
-            className="bg-gradient-to-r from-amber-600 via-amber-700 to-orange-700 text-white rounded-[24px] p-4 shadow-[0_4px_20px_rgba(217,119,6,0.15)] hover:shadow-[0_4px_20px_rgba(217,119,6,0.25)] flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all duration-200"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-white shrink-0">
-                <Wrench size={24} className="stroke-[2.5]" />
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-black uppercase tracking-wider leading-none">Novedad / Reparaciones</h3>
-                  <span className="bg-white text-slate-950 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tight shadow-sm">
-                    Garrafas/Equipos
-                  </span>
-                </div>
-                <p className="text-[10px] text-amber-100 font-bold leading-tight">Reportá garrafas, arreglos o cargas para tu obra.</p>
-              </div>
-            </div>
-            <ChevronRight size={18} className="text-white shrink-0" />
+            <ChevronRight size={16} className="text-slate-400 shrink-0" />
           </div>
         )}
 
