@@ -58,6 +58,7 @@ interface PersonalLogistica {
 
 type WizardStep = 
   | 'select_tool'      // "¿Qué herramienta querés trasladar?"
+  | 'select_date'      // "¿Para cuándo se necesita en obra?"
   | 'select_obra'      // "¿Hacia dónde debe enviarse?"
   | 'select_logistica' // "¿Quién lo transporta?"
   | 'select_priority'  // "¿Qué tan urgente es?"
@@ -86,6 +87,8 @@ export default function NuevaSolicitud() {
   const [selectedLogisticaId, setSelectedLogisticaId] = useState('');
   const [priority, setPriority] = useState('Normal');
   const [comments, setComments] = useState('');
+  const [neededDatePreset, setNeededDatePreset] = useState<'hoy' | 'manana' | 'custom'>('hoy');
+  const [customNeededDate, setCustomNeededDate] = useState('');
   const [loading, setLoading] = useState(false);
 
   // Layout View Mode (Form vs Wizard)
@@ -351,18 +354,30 @@ export default function NuevaSolicitud() {
   const executeSubmit = async () => {
     if (!profile) return;
 
-    const isFreeText = !selectedToolId && toolSearch.trim().length > 0;
-
-    if ((!selectedToolId && !isFreeText) || !targetObraId) {
+    if (!selectedToolId) {
       toast({ 
         variant: 'destructive', 
-        title: 'Faltan datos', 
-        description: 'Debés ingresar o dictar la herramienta y la obra de destino.' 
+        title: 'Herramienta requerida', 
+        description: 'Por favor seleccioná una herramienta específica del catálogo oficial.' 
       });
       return;
     }
 
-    const tool = selectedToolId ? herramientas.find(h => h.id === selectedToolId) : null;
+    if (!targetObraId) {
+      toast({ 
+        variant: 'destructive', 
+        title: 'Obra de destino requerida', 
+        description: 'Por favor seleccioná la obra de destino.' 
+      });
+      return;
+    }
+
+    const tool = herramientas.find(h => h.id === selectedToolId);
+    if (!tool) {
+      toast({ variant: 'destructive', title: 'Error', description: 'La herramienta seleccionada no es válida.' });
+      return;
+    }
+
     const logisticaUser = selectedLogisticaId 
       ? personalLogistica.find(p => p.id === selectedLogisticaId) 
       : (personalLogistica[0] || null);
@@ -373,27 +388,40 @@ export default function NuevaSolicitud() {
       return;
     }
 
+    // Calcular Fecha de Necesidad ISO
+    let neededDateIso: string | null = null;
+    let neededDateLabel = 'Hoy mismo';
+    const now = new Date();
+    if (neededDatePreset === 'hoy') {
+      neededDateIso = now.toISOString();
+      neededDateLabel = 'Hoy mismo (Urgente)';
+    } else if (neededDatePreset === 'manana') {
+      const tom = new Date(now);
+      tom.setDate(tom.getDate() + 1);
+      tom.setHours(8, 0, 0, 0);
+      neededDateIso = tom.toISOString();
+      neededDateLabel = `Mañana (${tom.toLocaleDateString('es-AR')} a las 8:00 AM)`;
+    } else if (neededDatePreset === 'custom' && customNeededDate) {
+      const d = new Date(customNeededDate);
+      neededDateIso = d.toISOString();
+      neededDateLabel = d.toLocaleString('es-AR');
+    }
+
     setLoading(true);
     const securityCode = Math.floor(100000 + Math.random() * 900000).toString();
-
-    const toolDescription = tool 
-      ? `${tool.name} [${tool.code}]` 
-      : toolSearch.trim();
-
-    const finalComments = isFreeText
-      ? `Pedido libre: ${toolSearch.trim()}${comments.trim() ? ` | Observaciones: ${comments.trim()}` : ''}`
-      : (comments.trim() || null);
+    const toolDescription = `${tool.name} [${tool.code}]`;
 
     // 1. Guardar la solicitud
     const { data: newSolicitud, error } = await supabase.from('solicitudes').insert([{
       requester_id: profile.id,
-      herramienta_id: tool ? tool.id : null,
-      source_obra_id: tool ? tool.current_obra_id : null,
+      herramienta_id: tool.id,
+      source_obra_id: tool.current_obra_id,
       target_obra_id: targetObraId,
       assigned_to: logisticaUser?.id || null,
       priority,
       status: 'Pendiente',
-      comments: finalComments,
+      comments: comments.trim() || null,
+      needed_date: neededDateIso,
       security_code: securityCode
     }]).select().single();
 
@@ -422,11 +450,12 @@ export default function NuevaSolicitud() {
         '',
         `- *Solicita:* ${profile.full_name} (${profile.role || 'Solicitante'})`,
         `- *Herramienta:* ${toolDescription}`,
-        tool ? `- *Origen actual:* ${tool.obras?.name || 'Base Central'}` : '- *Origen:* A determinar por Logística',
+        `- *Origen actual:* ${tool.obras?.name || 'Base Central'}`,
         `- *Destino:* ${targetObra.name}`,
+        `- *Fecha de Necesidad:* ${neededDateLabel}`,
         `- *Prioridad:* ${priority}`,
         '',
-        `*Notas:* ${finalComments || 'Sin especificaciones'}`,
+        `*Notas:* ${comments.trim() || 'Sin especificaciones'}`,
         '',
         'Aprobar o gestionar el envío desde acá:',
         `${APP_URL}/solicitudes/${newSolicitud.id}`
@@ -612,6 +641,56 @@ export default function NuevaSolicitud() {
                 )}
               </div>
 
+              {/* Fecha de Necesidad en Obra */}
+              <div className="space-y-2 bg-amber-50/60 p-4 rounded-2xl border border-amber-200/60">
+                <Label className="text-xs font-bold text-amber-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <Clock size={14} className="text-amber-600" /> FECHA DE NECESIDAD EN OBRA *
+                </Label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNeededDatePreset('hoy')}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all ${
+                      neededDatePreset === 'hoy'
+                        ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-amber-50'
+                    }`}
+                  >
+                    ⚡ Hoy Mismo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNeededDatePreset('manana')}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all ${
+                      neededDatePreset === 'manana'
+                        ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-amber-50'
+                    }`}
+                  >
+                    🌅 Mañana 8 AM
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNeededDatePreset('custom')}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all ${
+                      neededDatePreset === 'custom'
+                        ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-amber-50'
+                    }`}
+                  >
+                    📅 Otra Fecha
+                  </button>
+                </div>
+                {neededDatePreset === 'custom' && (
+                  <Input
+                    type="datetime-local"
+                    value={customNeededDate}
+                    onChange={(e) => setCustomNeededDate(e.target.value)}
+                    className="h-10 rounded-xl bg-white border-slate-200 mt-2 text-xs font-semibold"
+                  />
+                )}
+              </div>
+
               {/* Prioridad */}
               <div className="space-y-2">
                 <Label htmlFor="prioridad-select" className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nivel de Prioridad</Label>
@@ -664,136 +743,127 @@ export default function NuevaSolicitud() {
           <div className="h-1.5 bg-gradient-to-r from-peie-blue via-peie-light to-peie-blue" />
           <CardContent className="px-5 py-6 space-y-5">
 
-            {/* STEP 0: SELECT TOOL */}
+            {/* STEP 0: SELECT TOOL (Catálogo Oficial) */}
             {wizardStep === 'select_tool' && (
               <div className="space-y-5">
                 <BackButton onBack={() => navigate(-1)} />
                 <StepHeader 
                   title="¿Qué herramienta necesitás?" 
-                  subtitle="Dictá con voz o escribí el nombre"
+                  subtitle="Elegí la herramienta exacta del catálogo"
                 />
 
-                {!showCatalog ? (
-                  <div className="space-y-4">
-                    {/* Entradas rápidas por dictado o texto */}
-                    <div className="space-y-3">
-                      <div className="relative flex gap-2">
-                        <Input
-                          placeholder="Ej: Amoladora 7 pulgadas, Taladro..."
-                          value={toolSearch}
-                          onChange={(e) => {
-                            setToolSearch(e.target.value);
-                            setSelectedToolId('');
-                          }}
-                          className="h-14 rounded-2xl border-slate-200 focus-visible:ring-peie-blue text-base font-semibold flex-1 shadow-sm"
-                        />
-                        <VoiceInputButton 
-                          onTranscript={(text) => {
-                            setToolSearch(text);
-                            setSelectedToolId('');
-                          }} 
-                          className="h-14 w-14 shrink-0 rounded-2xl bg-slate-100 text-slate-600 shadow-sm" 
-                        />
-                      </div>
-
-                      {/* Atajos rápidos de herramientas habituales */}
-                      <div className="space-y-1.5 pt-1">
-                        <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Atajos rápidos:</span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {['Amoladora', 'Taladro', 'Escalera', 'Rotomartillo', 'Garrafa', 'Andamio', 'Pinza'].map((tag) => (
-                            <button
-                              key={tag}
-                              type="button"
-                              onClick={() => {
-                                setToolSearch(tag);
-                                setSelectedToolId('');
-                              }}
-                              className={`text-xs px-3 py-1.5 rounded-xl font-bold transition-all ${
-                                toolSearch.toLowerCase().includes(tag.toLowerCase())
-                                  ? 'bg-peie-blue text-white shadow-sm'
-                                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                              }`}
-                            >
-                              {tag}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <Button
-                        onClick={() => goToWizardStep('select_obra')}
-                        disabled={!toolSearch.trim()}
-                        className="w-full h-14 bg-peie-blue hover:bg-peie-blue/90 text-white font-black rounded-2xl text-base shadow-lg shadow-peie-blue/10 active:scale-[0.98] transition-all flex items-center justify-center gap-2 mt-3"
-                      >
-                        Continuar a Obra Destino <ChevronRight size={18} />
-                      </Button>
-
-                      <div className="pt-2 text-center">
-                        <button
-                          type="button"
-                          onClick={() => setShowCatalog(true)}
-                          className="text-xs text-peie-blue font-bold hover:underline"
-                        >
-                          🔍 O elegí una herramienta específica del catálogo
-                        </button>
-                      </div>
-                    </div>
+                <div className="space-y-3">
+                  <div className="relative">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
+                    <Input
+                      placeholder="Buscar por código, nombre o medida (ej: Amoladora 7)..."
+                      value={toolSearch}
+                      onChange={(e) => {
+                        setToolSearch(e.target.value);
+                        setSelectedToolId('');
+                      }}
+                      className="h-12 pl-10 rounded-2xl border-slate-200 focus-visible:ring-peie-blue bg-slate-50/50 text-sm font-semibold"
+                    />
                   </div>
-                ) : (
-                  /* Catálogo desplegable con búsqueda */
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-500">Catálogo de Herramientas</span>
+
+                  <div className="space-y-2.5 max-h-[55vh] overflow-y-auto pr-1">
+                    {filteredHerramientas.slice(0, 20).map(t => (
                       <button
+                        key={t.id}
                         type="button"
-                        onClick={() => setShowCatalog(false)}
-                        className="text-xs text-peie-blue font-bold hover:underline"
-                      >
-                        ← Volver a dictado libre
-                      </button>
-                    </div>
-
-                    <div className="relative">
-                      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
-                      <Input
-                        placeholder="Buscar por código o nombre..."
-                        value={toolSearch}
-                        onChange={(e) => {
-                          setToolSearch(e.target.value);
-                          setSelectedToolId('');
+                        onClick={() => {
+                          setSelectedToolId(t.id);
+                          setToolSearch(`${t.name} [${t.code}]`);
+                          goToWizardStep('select_date');
                         }}
-                        className="h-12 pl-10 rounded-2xl border-slate-200 focus-visible:ring-peie-blue bg-slate-50/50 text-sm font-semibold"
-                      />
-                    </div>
-
-                    <div className="space-y-2.5 max-h-[45vh] overflow-y-auto pr-1">
-                      {filteredHerramientas.slice(0, 15).map(t => (
-                        <button
-                          key={t.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedToolId(t.id);
-                            setToolSearch(`${t.name} [${t.code}]`);
-                            goToWizardStep('select_obra');
-                          }}
-                          className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl border-2 border-slate-200 bg-white text-left active:scale-[0.97] transition-all hover:border-peie-blue"
-                        >
-                          <Wrench size={20} className="text-peie-blue shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <p className="font-bold text-slate-700 truncate">{t.name}</p>
-                            <p className="text-xs text-slate-400 font-bold">Código: {t.code} • Ubicación: {t.obras?.name || 'Base Desconocida'}</p>
-                          </div>
-                          <ChevronRight size={18} className="text-slate-300 shrink-0" />
-                        </button>
-                      ))}
-                      {filteredHerramientas.length === 0 && (
-                        <div className="text-center py-8 text-slate-400 font-semibold text-sm">
-                          No se encontraron herramientas.
+                        className={`w-full flex items-center gap-3 px-5 py-4 rounded-2xl border-2 text-left active:scale-[0.97] transition-all ${
+                          selectedToolId === t.id
+                            ? 'border-peie-blue bg-peie-blue/5'
+                            : 'border-slate-200 bg-white hover:border-peie-blue'
+                        }`}
+                      >
+                        <Wrench size={20} className="text-peie-blue shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-slate-700 truncate">{t.name}</p>
+                          <p className="text-xs text-slate-400 font-bold">Código: {t.code} • Ubicación: {t.obras?.name || 'Base Central'}</p>
                         </div>
-                      )}
-                    </div>
+                        <ChevronRight size={18} className="text-slate-300 shrink-0" />
+                      </button>
+                    ))}
+                    {filteredHerramientas.length === 0 && (
+                      <div className="text-center py-8 text-slate-400 font-semibold text-sm">
+                        No se encontraron herramientas en el catálogo.
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
+              </div>
+            )}
+
+            {/* STEP 1: SELECT FECHA DE NECESIDAD EN OBRA */}
+            {wizardStep === 'select_date' && (
+              <div className="space-y-5">
+                <BackButton onBack={() => goToWizardStep('select_tool')} />
+                <StepHeader 
+                  title="¿Para cuándo se necesita en obra?" 
+                  subtitle="Indicá la fecha y hora estimada de entrega"
+                />
+
+                <div className="space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNeededDatePreset('hoy');
+                      goToWizardStep('select_obra');
+                    }}
+                    className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 text-left transition-all ${
+                      neededDatePreset === 'hoy' ? 'border-amber-500 bg-amber-50/60' : 'border-slate-200 bg-white'
+                    }`}
+                  >
+                    <div>
+                      <h4 className="font-black text-sm text-slate-800">⚡ Hoy Mismo (Urgente)</h4>
+                      <p className="text-xs text-slate-500">Se requiere la entrega en el día de hoy.</p>
+                    </div>
+                    <ChevronRight size={18} className="text-amber-600" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNeededDatePreset('manana');
+                      goToWizardStep('select_obra');
+                    }}
+                    className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 text-left transition-all ${
+                      neededDatePreset === 'manana' ? 'border-amber-500 bg-amber-50/60' : 'border-slate-200 bg-white'
+                    }`}
+                  >
+                    <div>
+                      <h4 className="font-black text-sm text-slate-800">🌅 Mañana a Primera Hora (8:00 AM)</h4>
+                      <p className="text-xs text-slate-500">Se requiere listo en obra para iniciar la jornada mañana.</p>
+                    </div>
+                    <ChevronRight size={18} className="text-amber-600" />
+                  </button>
+
+                  <div className="p-4 rounded-2xl border-2 border-slate-200 bg-white space-y-3">
+                    <h4 className="font-black text-sm text-slate-800">📅 Otra Fecha u Hora Específica</h4>
+                    <Input
+                      type="datetime-local"
+                      value={customNeededDate}
+                      onChange={(e) => setCustomNeededDate(e.target.value)}
+                      className="h-12 rounded-xl text-sm font-semibold border-slate-200"
+                    />
+                    <Button
+                      disabled={!customNeededDate}
+                      onClick={() => {
+                        setNeededDatePreset('custom');
+                        goToWizardStep('select_obra');
+                      }}
+                      className="w-full h-11 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-sm"
+                    >
+                      Confirmar Fecha y Continuar
+                    </Button>
+                  </div>
+                </div>
               </div>
             )}
 

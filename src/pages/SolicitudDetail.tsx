@@ -32,6 +32,10 @@ export default function SolicitudDetail() {
   const [isRejectionOpen, setIsRejectionOpen] = useState(false);
 
   const [inputSecurityCode, setInputSecurityCode] = useState('');
+  const [allHerramientas, setAllHerramientas] = useState<any[]>([]);
+  const [isChangeToolOpen, setIsChangeToolOpen] = useState(false);
+  const [newSelectedToolId, setNewSelectedToolId] = useState('');
+  const [changingTool, setChangingTool] = useState(false);
 
   // WhatsApp Preview state
   const [waPreviewOpen, setWaPreviewOpen] = useState(false);
@@ -46,7 +50,46 @@ export default function SolicitudDetail() {
   useEffect(() => {
     if (id) fetchSolicitud();
     fetchEmpleados();
+    fetchAllHerramientas();
   }, [id]);
+
+  const fetchAllHerramientas = async () => {
+    const { data } = await supabase.from('herramientas').select('id, name, code, brand, model, current_obra_id, obras(name)').order('name');
+    if (data) setAllHerramientas(data);
+  };
+
+  const handleChangeTool = async (newToolId: string) => {
+    if (!newToolId || !solicitud) return;
+    setChangingTool(true);
+    try {
+      const selectedToolObj = allHerramientas.find(h => h.id === newToolId);
+      const { error } = await supabase
+        .from('solicitudes')
+        .update({
+          herramienta_id: newToolId,
+          source_obra_id: selectedToolObj?.current_obra_id || null
+        })
+        .eq('id', solicitud.id);
+
+      if (error) throw error;
+
+      await supabase.from('movimientos').insert([{
+        herramienta_id: newToolId,
+        solicitud_id: solicitud.id,
+        user_id: profile?.id,
+        action: 'Logística cambió la herramienta asignada al pedido',
+        notes: `Nueva herramienta: ${selectedToolObj?.name || 'S/D'} [${selectedToolObj?.code || 'S/D'}]`
+      }]);
+
+      toast({ title: 'Herramienta Actualizada', description: `Se asignó ${selectedToolObj?.name} al pedido.` });
+      setIsChangeToolOpen(false);
+      fetchSolicitud();
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Error al cambiar', description: err.message });
+    } finally {
+      setChangingTool(false);
+    }
+  };
 
   const fetchEmpleados = async () => {
     const { data } = await supabase.from('empleados').select('id, full_name').eq('active', true).order('full_name');
@@ -348,14 +391,44 @@ export default function SolicitudDetail() {
               <CardTitle className="text-xl font-bold text-peie-blue">
                 {solicitud.herramientas?.name || solicitud.comments || 'Herramienta solicitada'}
               </CardTitle>
-              <CardDescription className="text-sm font-mono mt-1 bg-slate-100 w-max px-2 py-1 rounded">
-                {solicitud.herramientas?.code || 'PEDIDO LIBRE'}
-              </CardDescription>
+              <div className="flex items-center gap-2 mt-1">
+                <CardDescription className="text-sm font-mono bg-slate-100 px-2 py-1 rounded">
+                  {solicitud.herramientas?.code || 'SIN CÓDIGO'}
+                </CardDescription>
+                {isAdminOrLogistica && canAct && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setIsChangeToolOpen(true)}
+                    className="h-7 text-xs font-bold border-peie-blue text-peie-blue hover:bg-peie-blue/5 rounded-lg"
+                  >
+                    ✏️ Cambiar Herramienta Asignada
+                  </Button>
+                )}
+              </div>
             </div>
             {getStatusBadge(solicitud.status)}
           </div>
         </CardHeader>
         <CardContent className="space-y-5">
+          {/* Fecha de Necesidad en Obra */}
+          {solicitud.needed_date && (
+            <div className="bg-amber-50 border border-amber-200/80 p-3 rounded-xl flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clock className="h-5 w-5 text-amber-600 shrink-0" />
+                <div>
+                  <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Fecha de Necesidad en Obra</p>
+                  <p className="text-xs font-black text-amber-900 mt-0.5">
+                    {new Date(solicitud.needed_date).toLocaleString('es-AR')}
+                  </p>
+                </div>
+              </div>
+              <span className="text-[10px] font-bold bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full">
+                Requerido
+              </span>
+            </div>
+          )}
+
           {/* Info del traslado */}
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-red-50 p-3 rounded-xl border border-red-100">
@@ -372,7 +445,7 @@ export default function SolicitudDetail() {
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2 text-sm">
             <p><strong className="text-slate-500">Solicitante:</strong> <span className="text-slate-800 font-medium">{solicitud.profiles?.full_name || 'Solicitante'}</span></p>
             <p><strong className="text-slate-500">Prioridad:</strong> <span className="text-slate-800 font-medium">{solicitud.priority}</span></p>
-            <p><strong className="text-slate-500">Fecha:</strong> <span className="text-slate-800 font-medium">{new Date(solicitud.created_at).toLocaleString()}</span></p>
+            <p><strong className="text-slate-500">Fecha de Registro:</strong> <span className="text-slate-800 font-medium">{new Date(solicitud.created_at).toLocaleString()}</span></p>
             {solicitud.assigned && <p><strong className="text-slate-500">Responsable:</strong> <span className="text-slate-800 font-medium">{solicitud.assigned.full_name}</span></p>}
             {solicitud.comments && <p><strong className="text-slate-500">Notas:</strong> <span className="text-slate-800">{solicitud.comments}</span></p>}
             {solicitud.status === 'Rechazada' && solicitud.rejection_reason && (
@@ -384,19 +457,6 @@ export default function SolicitudDetail() {
               </div>
             )}
           </div>
-
-          {/* Mostrar código de seguridad al solicitante */}
-          {isRequester && solicitud.security_code && solicitud.status !== 'Confirmada' && solicitud.status !== 'Cancelada' && solicitud.status !== 'Rechazada' && (
-            <div className="p-4 bg-amber-50/60 border border-amber-200/80 rounded-2xl flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Código de Seguridad para Entrega</p>
-                <p className="text-2xl font-black text-amber-800 tracking-widest mt-1 font-mono">{solicitud.security_code}</p>
-              </div>
-              <p className="text-[10px] text-amber-600/80 max-w-[180px] leading-tight text-right">
-                Facilitá este código al personal de logística cuando entreguen la herramienta en la obra para confirmar la entrega.
-              </p>
-            </div>
-          )}
 
           {/* Tarjeta de seguimiento en tiempo real */}
           {solicitud.status === 'En traslado' && (
@@ -826,6 +886,62 @@ export default function SolicitudDetail() {
           </Button>
         </div>
       )}
+
+      {/* Dialog para Cambiar Herramienta Asignada (Logística) */}
+      <Dialog open={isChangeToolOpen} onOpenChange={setIsChangeToolOpen}>
+        <DialogContent className="rounded-2xl max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-peie-blue flex items-center gap-2">
+              <Package size={20} /> Cambiar Herramienta Asignada
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Seleccioná la herramienta del stock/catálogo que Logística asignará para cumplir con este pedido.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Herramienta Actual:</label>
+              <div className="p-3 bg-slate-50 rounded-xl border text-sm font-bold text-slate-700">
+                {solicitud.herramientas?.name || 'Ninguna'} [{solicitud.herramientas?.code || '-'}]
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-peie-blue uppercase tracking-wider">Nueva Herramienta del Catálogo:</label>
+              <select
+                value={newSelectedToolId}
+                onChange={(e) => setNewSelectedToolId(e.target.value)}
+                className="w-full h-12 rounded-xl border border-slate-200 px-3 text-sm font-semibold bg-white focus:ring-2 focus:ring-peie-blue"
+              >
+                <option value="">-- Seleccionar Herramienta --</option>
+                {allHerramientas.map(h => (
+                  <option key={h.id} value={h.id}>
+                    {h.name} [{h.code}] - Ubicación: {h.obras?.name || 'Base Central'}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsChangeToolOpen(false)}
+              className="rounded-xl font-bold"
+            >
+              Cancelar
+            </Button>
+            <Button
+              disabled={!newSelectedToolId || changingTool}
+              onClick={() => handleChangeTool(newSelectedToolId)}
+              className="bg-peie-blue hover:bg-peie-blue/90 text-white font-bold rounded-xl"
+            >
+              {changingTool ? 'Guardando...' : 'Confirmar Cambio'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Reusable WhatsApp Preview Modal */}
       <WhatsAppPreviewModal

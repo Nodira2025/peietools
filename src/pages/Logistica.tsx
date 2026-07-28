@@ -19,6 +19,7 @@ interface LogisticaItem {
   status: string;
   priority: string;
   created_at: string;
+  needed_date?: string | null;
   item_name: string;
   item_code: string;
   source_name: string;
@@ -200,7 +201,7 @@ export default function Logistica() {
       const { data: toolsData, error: toolsError } = await supabase
         .from('solicitudes')
         .select(`
-          id, status, priority, created_at, comments,
+          id, status, priority, created_at, needed_date, comments,
           herramientas!solicitudes_herramienta_id_fkey(name, code, obras!herramientas_current_obra_id_fkey(name)),
           target_obra:obras!solicitudes_target_obra_id_fkey(name),
           profiles!solicitudes_requester_id_fkey(full_name)
@@ -234,6 +235,7 @@ export default function Logistica() {
             status: s.status,
             priority: s.priority,
             created_at: s.created_at,
+            needed_date: s.needed_date,
             item_name: s.herramientas?.name || cleanComment || 'Herramienta solicitada',
             item_code: s.herramientas?.code || 'LIBRE',
             source_name: s.herramientas?.obras?.name || 'A determinar por Logística',
@@ -509,6 +511,12 @@ export default function Logistica() {
                       </div>
                       <h3 className="font-bold text-slate-800 text-base">{s.item_name}</h3>
                       <p className="text-xs font-mono text-slate-400 mt-0.5">{s.item_code}</p>
+                      {s.needed_date && (
+                        <div className="mt-2 bg-amber-100/90 border border-amber-300 text-amber-900 px-2.5 py-1 rounded-lg text-[11px] font-black flex items-center gap-1.5 w-max">
+                          <Clock size={12} className="text-amber-700 shrink-0" />
+                          Necesidad en obra: {new Date(s.needed_date).toLocaleString('es-AR')}
+                        </div>
+                      )}
                       <div className="flex items-center gap-2 mt-3 text-xs">
                         <span className="bg-white/70 px-2 py-1 rounded-lg text-slate-600 truncate max-w-[40%]">{s.source_name}</span>
                         <ArrowRight className="h-3 w-3 text-slate-400 shrink-0" />
