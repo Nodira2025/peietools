@@ -184,11 +184,20 @@ export default function Reportes() {
       setComprasHistorial((compData || []) as any);
 
       // Load gastos historial
-      const { data: gasData } = await supabase
+      let { data: gasData, error: gasErr } = await supabase
         .from('gastos_logistica')
-        .select('*, profiles!gastos_logistica_registered_by_fkey(full_name)')
+        .select('*, profiles(full_name)')
         .order('created_at', { ascending: false });
+
+      if (gasErr) {
+        const res = await supabase
+          .from('gastos_logistica')
+          .select('*')
+          .order('created_at', { ascending: false });
+        gasData = res.data;
+      }
       setGastosHistorial((gasData || []) as any);
+
 
 
       // Load employee counts

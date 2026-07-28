@@ -139,13 +139,24 @@ export default function Logistica() {
 
   const fetchGastosHistorial = async () => {
     setLoadingGastos(true);
-    const { data } = await supabase
+    let { data, error } = await supabase
       .from('gastos_logistica')
-      .select('*, profiles!gastos_logistica_registered_by_fkey(full_name)')
+      .select('*, profiles(full_name)')
       .order('created_at', { ascending: false });
-    if (data) setGastosList(data);
+
+    if (error) {
+      console.warn('Fallback al consultar gastos_logistica:', error.message);
+      const res = await supabase
+        .from('gastos_logistica')
+        .select('*')
+        .order('created_at', { ascending: false });
+      data = res.data;
+    }
+
+    setGastosList(data || []);
     setLoadingGastos(false);
   };
+
 
   useEffect(() => {
     fetchSolicitudes();
@@ -177,7 +188,8 @@ export default function Logistica() {
     if (data) setAllEmpleados(data);
   };
 
-  const handleRegistrarGasto = () => {
+  const handleRegistrarGasto = async () => {
+
     if (!gastoConcepto || !gastoMonto) {
       toast({ variant: 'destructive', title: 'Campos incompletos', description: 'Por favor, ingresá el concepto y el monto.' });
       return;
@@ -248,8 +260,8 @@ export default function Logistica() {
     const fileName = `Comprobante_Gasto_${gastoConcepto.replace(/\s+/g, '_')}_${fecha.toISOString().slice(0, 10)}.pdf`;
     doc.save(fileName);
 
-    // Guardar en la tabla de base de datos gastos_logistica (Tolerante a fallos)
-    supabase.from('gastos_logistica').insert([{
+    // Guardar en la tabla de base de datos gastos_logistica
+    const { error: insErr } = await supabase.from('gastos_logistica').insert([{
       concepto: gastoConcepto,
       monto: montoNum,
       obra_id: gastoObraId || null,
@@ -258,9 +270,22 @@ export default function Logistica() {
       metodo_pago: gastoPago,
       detalle: gastoDetalle.trim() || null,
       registered_by: profile?.id || null
-    }]).then(({ error }) => {
-      if (error) console.warn('Aviso al guardar en gastos_logistica:', error.message);
-    });
+    }]);
+
+    if (insErr) {
+      console.error('Error insertando en gastos_logistica:', insErr);
+      toast({
+        variant: 'destructive',
+        title: 'Aviso de Base de Datos',
+        description: `Error al guardar en BD: ${insErr.message}`
+      });
+    } else {
+      toast({
+        title: 'Gasto Registrado',
+        description: 'El gasto fue guardado con éxito en el historial.'
+      });
+    }
+
 
 
     // 2. Construir mensaje de WhatsApp para Federico Grande (+54 9 3814 01-5738)
