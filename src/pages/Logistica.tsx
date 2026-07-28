@@ -139,6 +139,10 @@ export default function Logistica() {
     if (searchParams.get('nuevoGasto') === 'true') {
       setIsGastoOpen(true);
     }
+    if (searchParams.get('nuevaCompra') === 'true') {
+      setIsCompraOpen(true);
+    }
+
   }, []);
 
   const fetchActiveObras = async () => {
