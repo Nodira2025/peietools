@@ -34,8 +34,7 @@ import OrdenDetail from './pages/OrdenDetail';
 import NuevoPersonalAsistido from './pages/NuevoPersonalAsistido';
 import Notificaciones from './pages/Notificaciones';
 import SeguimientoTraslado from './pages/SeguimientoTraslado';
-import NuevoReporteObra from './pages/NuevoReporteObra';
-import ReportesNovedadesObra from './pages/ReportesNovedadesObra';
+
 
 
 import LogoLoader from './components/LogoLoader';
@@ -79,8 +78,6 @@ export default function App() {
           <Route path="/compras/:id" element={<CompraDetail />} />
           
           <Route path="/logistica" element={<Logistica />} />
-          <Route path="/reportes-novedades-obra" element={<ReportesNovedadesObra />} />
-          <Route path="/nuevo-reporte-obra" element={<NuevoReporteObra />} />
           <Route path="/obras" element={<Obras />} />
           <Route path="/mis-obras" element={<MisObras />} />
           <Route path="/personal" element={<Personal />} />

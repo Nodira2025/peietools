@@ -132,17 +132,8 @@ export default function AppLayout() {
           });
         }
       )
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'reportes_novedades_obra' },
-        () => {
-          showNativeNotification('🔧 Nueva Novedad de Obra / Reparación', {
-            body: 'Se ha ingresado una nueva novedad o reporte de insumo.',
-            onClickUrl: '/reportes-novedades-obra',
-          });
-        }
-      )
       .subscribe();
+
 
     return () => {
       clearInterval(interval);
@@ -206,7 +197,6 @@ export default function AppLayout() {
     { name: 'Mis Obras', path: '/mis-obras', icon: Building, show: true },
     { name: 'Personal', path: '/personal', icon: HardHat, show: true },
     { name: 'Órdenes', path: '/ordenes', icon: ClipboardList, show: false },
-    { name: 'Novedades de Obra', path: '/reportes-novedades-obra', icon: Wrench, show: true },
     { name: 'Logística', path: '/logistica', icon: Truck, show: isLogistica || isAdmin },
     { name: 'Compras', path: '/compras', icon: ShoppingCart, show: false },
     { name: 'Obras (Admin)', path: '/obras', icon: Building, show: isAdmin },
