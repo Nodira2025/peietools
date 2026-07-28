@@ -228,6 +228,21 @@ export default function Logistica() {
     const fileName = `Comprobante_Gasto_${gastoConcepto.replace(/\s+/g, '_')}_${fecha.toISOString().slice(0, 10)}.pdf`;
     doc.save(fileName);
 
+    // Guardar en la tabla de base de datos gastos_logistica (Tolerante a fallos)
+    supabase.from('gastos_logistica').insert([{
+      concepto: gastoConcepto,
+      monto: montoNum,
+      obra_id: gastoObraId || null,
+      obra_name: obraSeleccionada,
+      empleado_name: empleadoSeleccionado,
+      metodo_pago: gastoPago,
+      detalle: gastoDetalle.trim() || null,
+      registered_by: profile?.id || null
+    }]).then(({ error }) => {
+      if (error) console.warn('Aviso al guardar en gastos_logistica:', error.message);
+    });
+
+
     // 2. Construir mensaje de WhatsApp para Federico Grande (+54 9 3814 01-5738)
     const federicoPhone = '5493814015738';
     const waMsg = [

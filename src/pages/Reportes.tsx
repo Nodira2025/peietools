@@ -75,6 +75,32 @@ interface ReporteExcedido {
   status: string;
 }
 
+interface CompraHistorial {
+  id: string;
+  created_at: string;
+  tool_name: string;
+  quantity: number;
+  priority: string;
+  description: string | null;
+  raw_whatsapp_text: string | null;
+  requested_employee: string | null;
+  status: string;
+  obras?: { name: string } | null;
+  profiles?: { full_name: string } | null;
+}
+
+interface GastoHistorial {
+  id: string;
+  created_at: string;
+  concepto: string;
+  monto: number;
+  obra_name: string | null;
+  empleado_name: string | null;
+  metodo_pago: string;
+  detalle: string | null;
+  profiles?: { full_name: string } | null;
+}
+
 export default function Reportes() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -84,9 +110,17 @@ export default function Reportes() {
   const [traslados, setTraslados] = useState<TrasladoPersonal[]>([]);
   const [reportesExcedidos, setReportesExcedidos] = useState<ReporteExcedido[]>([]);
   const [reportesSearch, setReportesSearch] = useState('');
+  
+  const [comprasHistorial, setComprasHistorial] = useState<CompraHistorial[]>([]);
+  const [comprasSearch, setComprasSearch] = useState('');
+
+  const [gastosHistorial, setGastosHistorial] = useState<GastoHistorial[]>([]);
+  const [gastosSearch, setGastosSearch] = useState('');
+
   const [totalEmpleados, setTotalEmpleados] = useState(0);
   const [empleadosDisponibles, setEmpleadosDisponibles] = useState(0);
   const [loading, setLoading] = useState(true);
+
 
   const isAuthorized = profile?.role === 'admin' || profile?.role === 'logistica' || profile?.role === 'solicitante' || profile?.role === 'encargado';
 
@@ -141,6 +175,21 @@ export default function Reportes() {
         .select('*')
         .order('created_at', { ascending: false });
       setReportesExcedidos(repData || []);
+
+      // Load compras historial
+      const { data: compData } = await supabase
+        .from('solicitudes_compras')
+        .select('*, obras(name), profiles!solicitudes_compras_requester_id_fkey(full_name)')
+        .order('created_at', { ascending: false });
+      setComprasHistorial((compData || []) as any);
+
+      // Load gastos historial
+      const { data: gasData } = await supabase
+        .from('gastos_logistica')
+        .select('*, profiles!gastos_logistica_registered_by_fkey(full_name)')
+        .order('created_at', { ascending: false });
+      setGastosHistorial((gasData || []) as any);
+
 
       // Load employee counts
       const { data: empData } = await supabase.from('empleados').select('id, status');
@@ -297,7 +346,72 @@ export default function Reportes() {
     toast({ title: 'Éxito', description: 'Reporte PDF descargado.' });
   };
 
+  const exportComprasToExcel = () => {
+    const data = comprasHistorial.map(c => ({
+      'Fecha / Hora': new Date(c.created_at).toLocaleString('es-AR'),
+      'Ítem / Requerimiento': c.tool_name,
+      'Cantidad': c.quantity,
+      'Prioridad': c.priority,
+      'Estado': c.status,
+      'Empleado Solicitante': c.requested_employee || 'No especificado',
+      'Obra Destino': c.obras?.name || 'Inventario Base',
+      'Registrado Por': c.profiles?.full_name || 'Logística',
+      'Detalle IA': c.description || '',
+      'Texto Original WhatsApp': c.raw_whatsapp_text || ''
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Órdenes de Compra');
+    XLSX.writeFile(workbook, `Reporte_Compras_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast({ title: 'Éxito', description: 'Historial de compras exportado a Excel.' });
+  };
+
+  const exportGastosToExcel = () => {
+    const data = gastosHistorial.map(g => ({
+      'Fecha / Hora': new Date(g.created_at).toLocaleString('es-AR'),
+      'Concepto / Compra': g.concepto,
+      'Monto ($)': g.monto,
+      'Obra Destino': g.obra_name || 'Sin obra',
+      'Empleado Solicitó': g.empleado_name || 'Sin especificar',
+      'Método de Pago': g.metodo_pago,
+      'Registrado Por': g.profiles?.full_name || 'Logística',
+      'Detalles / Observaciones': g.detalle || ''
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Gastos Logística');
+    XLSX.writeFile(workbook, `Reporte_Gastos_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast({ title: 'Éxito', description: 'Historial de gastos exportado a Excel.' });
+  };
+
+  const filteredCompras = comprasHistorial.filter(c => {
+    const term = comprasSearch.toLowerCase().trim();
+    if (!term) return true;
+    return (
+      c.tool_name.toLowerCase().includes(term) ||
+      (c.requested_employee && c.requested_employee.toLowerCase().includes(term)) ||
+      (c.obras?.name && c.obras.name.toLowerCase().includes(term)) ||
+      (c.profiles?.full_name && c.profiles.full_name.toLowerCase().includes(term)) ||
+      c.status.toLowerCase().includes(term)
+    );
+  });
+
+  const filteredGastos = gastosHistorial.filter(g => {
+    const term = gastosSearch.toLowerCase().trim();
+    if (!term) return true;
+    return (
+      g.concepto.toLowerCase().includes(term) ||
+      (g.obra_name && g.obra_name.toLowerCase().includes(term)) ||
+      (g.empleado_name && g.empleado_name.toLowerCase().includes(term)) ||
+      g.metodo_pago.toLowerCase().includes(term) ||
+      (g.profiles?.full_name && g.profiles.full_name.toLowerCase().includes(term))
+    );
+  });
+
   const filteredReportesExcedidos = reportesExcedidos.filter(r => {
+
     const term = reportesSearch.toLowerCase().trim();
     if (!term) return true;
     return (
@@ -750,6 +864,194 @@ export default function Reportes() {
           )}
         </CardContent>
       </Card>
+
+      {/* 💵 TABLA HISTORIAL DE GASTOS DE LOGÍSTICA */}
+
+      <Card className="rounded-2xl shadow-sm border-emerald-100 bg-white overflow-hidden">
+        <CardHeader className="p-5 pb-3 bg-gradient-to-r from-emerald-50 to-teal-50/30 border-b border-emerald-100/60">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">💵</span>
+                <CardTitle className="text-base font-black text-slate-900">
+                  Historial de Gastos de Logística
+                </CardTitle>
+                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                  {filteredGastos.length} Registros
+                </span>
+              </div>
+              <CardDescription className="text-xs text-slate-500 font-medium">
+                Registro detallado de compras rápidas, comprobantes y rendición de gastos.
+              </CardDescription>
+            </div>
+
+            <Button 
+              onClick={exportGastosToExcel}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs h-10 px-4 shadow-md shadow-emerald-600/10 flex items-center gap-2 shrink-0"
+            >
+              <FileSpreadsheet className="h-4 w-4" /> Exportar Gastos a Excel
+            </Button>
+          </div>
+
+          <div className="mt-3 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input 
+              placeholder="Buscar gasto por concepto, obra, empleado o método de pago..." 
+              value={gastosSearch}
+              onChange={e => setGastosSearch(e.target.value)}
+              className="pl-9 h-10 rounded-xl bg-white border-emerald-200 text-xs focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-0 overflow-x-auto">
+          {filteredGastos.length === 0 ? (
+            <div className="p-8 text-center space-y-2">
+              <p className="text-sm font-semibold text-slate-600">No hay gastos registrados aún</p>
+              <p className="text-xs text-slate-400">Los gastos registrados desde el botón "💵 Registrar Gasto" aparecerán automáticamente aquí.</p>
+            </div>
+          ) : (
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-100">
+                  <th className="p-3.5 pl-5">Fecha / Hora</th>
+                  <th className="p-3.5">Concepto / Compra</th>
+                  <th className="p-3.5 text-right">Monto Total</th>
+                  <th className="p-3.5">Obra Destino</th>
+                  <th className="p-3.5">Solicitó (Empleado)</th>
+                  <th className="p-3.5">Método de Pago</th>
+                  <th className="p-3.5 pr-5">Registrado Por</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                {filteredGastos.map((g) => (
+                  <tr key={g.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="p-3.5 pl-5 whitespace-nowrap text-slate-500 font-semibold">
+                      {new Date(g.created_at).toLocaleDateString('es-AR')} {new Date(g.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs
+                    </td>
+                    <td className="p-3.5 font-extrabold text-slate-900">
+                      {g.concepto}
+                      {g.detalle && <p className="text-[10px] text-slate-400 font-normal mt-0.5 line-clamp-1">{g.detalle}</p>}
+                    </td>
+                    <td className="p-3.5 text-right font-black text-emerald-700 text-sm">
+                      ${g.monto?.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="p-3.5 text-slate-800 font-semibold">
+                      {g.obra_name || 'Sin obra'}
+                    </td>
+                    <td className="p-3.5 text-amber-900 font-bold">
+                      {g.empleado_name || 'Sin especificar'}
+                    </td>
+                    <td className="p-3.5 text-slate-600">
+                      <span className="bg-slate-100 px-2 py-0.5 rounded text-[10px] font-bold text-slate-700">{g.metodo_pago}</span>
+                    </td>
+                    <td className="p-3.5 pr-5 text-slate-600">
+                      {g.profiles?.full_name || 'Logística'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 🛍️ TABLA HISTORIAL DE ÓRDENES DE COMPRA */}
+      <Card className="rounded-2xl shadow-sm border-amber-100 bg-white overflow-hidden">
+        <CardHeader className="p-5 pb-3 bg-gradient-to-r from-amber-50 to-orange-50/30 border-b border-amber-100/60">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🛍️</span>
+                <CardTitle className="text-base font-black text-slate-900">
+                  Historial de Órdenes de Compra (WhatsApp + IA)
+                </CardTitle>
+                <span className="bg-amber-100 text-amber-900 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                  {filteredCompras.length} Registros
+                </span>
+              </div>
+              <CardDescription className="text-xs text-slate-500 font-medium">
+                Historial completo de pedidos de compras ingresados desde celulares con normalización de IA.
+              </CardDescription>
+            </div>
+
+            <Button 
+              onClick={exportComprasToExcel}
+              className="bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs h-10 px-4 shadow-md shadow-amber-600/10 flex items-center gap-2 shrink-0"
+            >
+              <FileSpreadsheet className="h-4 w-4" /> Exportar Compras a Excel
+            </Button>
+          </div>
+
+          <div className="mt-3 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input 
+              placeholder="Buscar compra por ítem, obra, empleado o estado..." 
+              value={comprasSearch}
+              onChange={e => setComprasSearch(e.target.value)}
+              className="pl-9 h-10 rounded-xl bg-white border-amber-200 text-xs focus:ring-2 focus:ring-amber-500"
+            />
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-0 overflow-x-auto">
+          {filteredCompras.length === 0 ? (
+            <div className="p-8 text-center space-y-2">
+              <p className="text-sm font-semibold text-slate-600">No hay órdenes de compra registradas aún</p>
+              <p className="text-xs text-slate-400">Las compras reportadas desde celular aparecerán automáticamente aquí.</p>
+            </div>
+          ) : (
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-100">
+                  <th className="p-3.5 pl-5">Fecha / Hora</th>
+                  <th className="p-3.5">Requerimiento / Ítems</th>
+                  <th className="p-3.5">Empleado Solicitante</th>
+                  <th className="p-3.5">Obra Destino</th>
+                  <th className="p-3.5">Prioridad</th>
+                  <th className="p-3.5">Estado</th>
+                  <th className="p-3.5 pr-5">Cargado Por</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                {filteredCompras.map((c) => (
+                  <tr key={c.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="p-3.5 pl-5 whitespace-nowrap text-slate-500 font-semibold">
+                      {new Date(c.created_at).toLocaleDateString('es-AR')} {new Date(c.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs
+                    </td>
+                    <td className="p-3.5 font-extrabold text-slate-900 max-w-[220px]">
+                      {c.tool_name}
+                      {c.description && <p className="text-[10px] text-slate-500 font-medium mt-0.5 line-clamp-2 whitespace-pre-line">{c.description}</p>}
+                    </td>
+                    <td className="p-3.5 text-amber-900 font-bold">
+                      {c.requested_employee || 'No especificado'}
+                    </td>
+                    <td className="p-3.5 text-slate-800 font-semibold">
+                      {c.obras?.name || 'Inventario Base'}
+                    </td>
+                    <td className="p-3.5">
+                      <span className={`font-extrabold ${
+                        c.priority === 'Urgente' ? 'text-rose-600' :
+                        c.priority === 'Alta' ? 'text-amber-600' :
+                        c.priority === 'Normal' ? 'text-peie-blue' : 'text-slate-500'
+                      }`}>{c.priority}</span>
+                    </td>
+                    <td className="p-3.5 whitespace-nowrap">
+                      <span className="bg-amber-100 text-amber-800 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
+                        {c.status}
+                      </span>
+                    </td>
+                    <td className="p-3.5 pr-5 text-slate-600">
+                      {c.profiles?.full_name || 'Logística'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
+
