@@ -85,6 +85,9 @@ export default function NuevaSolicitud() {
   const [selectedToolId, setSelectedToolId] = useState(preselectedToolId);
   const [targetObraId, setTargetObraId] = useState('');
   const [filterEncargado, setFilterEncargado] = useState('');
+  const [selectedLogisticaId, setSelectedLogisticaId] = useState('');
+  const [priority, setPriority] = useState('Normal');
+  const [comments, setComments] = useState('');
   const getDefaultNeededDate = () => {
     const d = new Date();
     d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
@@ -93,6 +96,7 @@ export default function NuevaSolicitud() {
 
   const [neededDate, setNeededDate] = useState(getDefaultNeededDate());
   const [loading, setLoading] = useState(false);
+
 
 
   // Layout View Mode (Form vs Wizard)
