@@ -539,40 +539,39 @@ export default function Dashboard() {
           </div>
         </Card>
 
-        {/* 🚚 VISTA PARA LOGÍSTICA: TARJETA GIGANTE DE "PEDIDOS DE HERRAMIENTAS" PRIMERO */}
+        {/* 🚚 VISTA PARA LOGÍSTICA: TARJETA COMPACTA DE "PEDIDOS DE HERRAMIENTAS" */}
         {isLogistica && (
           <div 
             onClick={() => navigate('/logistica')}
-            className="bg-gradient-to-br from-amber-500 via-orange-600 to-red-700 text-white rounded-[28px] p-6 shadow-[0_10px_30px_rgba(234,88,12,0.3)] hover:shadow-[0_12px_36px_rgba(234,88,12,0.4)] flex flex-col justify-between cursor-pointer active:scale-[0.98] transition-all duration-200 border border-white/20 relative overflow-hidden group space-y-4"
+            className="bg-gradient-to-r from-amber-500 via-orange-600 to-red-600 text-white rounded-[24px] p-4 shadow-[0_6px_24px_rgba(234,88,12,0.25)] hover:shadow-[0_8px_30px_rgba(234,88,12,0.35)] flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all duration-200 border border-white/20 relative overflow-hidden group"
           >
-            <div className="absolute -right-8 -bottom-8 w-36 h-36 bg-white/10 rounded-full blur-2xl pointer-events-none group-hover:scale-125 transition-transform" />
+            <div className="absolute -right-6 -bottom-6 w-28 h-28 bg-white/15 rounded-full blur-xl pointer-events-none group-hover:scale-125 transition-transform" />
             
-            <div className="flex items-start justify-between relative z-10">
-              <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0 shadow-lg border border-white/20">
-                <Truck size={30} className="stroke-[2.5]" />
+            <div className="flex items-center gap-3.5 relative z-10">
+              <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0 shadow-inner border border-white/20">
+                <Truck size={24} className="stroke-[2.5]" />
               </div>
-              <span className="bg-white text-orange-700 text-xs font-black px-3 py-1.5 rounded-full uppercase tracking-wider shadow-md flex items-center gap-1">
-                <Bell size={12} className="animate-bounce" /> {counts.pendingTools} Pendientes
-              </span>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-black uppercase tracking-wider leading-none text-white">
+                    Pedidos de Herramientas
+                  </h3>
+                  <span className="bg-white text-orange-700 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tight shadow-sm">
+                    {counts.pendingTools} Pendientes
+                  </span>
+                </div>
+                <p className="text-[10px] text-orange-100 font-bold leading-tight">
+                  Revisá, asigná chofer y gestioná traslados entre obras.
+                </p>
+              </div>
             </div>
 
-            <div className="space-y-1.5 relative z-10">
-              <h3 className="text-xl font-black uppercase tracking-tight leading-tight text-white">
-                Pedidos de Herramientas
-              </h3>
-              <p className="text-xs text-orange-100 font-semibold leading-relaxed">
-                Revisá, asigná chofer y gestioná los traslados de herramientas entre obras.
-              </p>
+            <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center shrink-0 ml-2 relative z-10">
+              <ChevronRight size={18} className="text-white" />
             </div>
-
-            <Button
-              type="button"
-              className="w-full h-12 bg-white hover:bg-slate-100 text-orange-700 font-black rounded-2xl text-sm shadow-md flex items-center justify-center gap-2 mt-1"
-            >
-              <Truck size={18} /> Ver Pedidos de Herramientas <ChevronRight size={18} />
-            </Button>
           </div>
         )}
+
 
         {/* 🏗️ VISTA PARA COORDINADORES / ENCARGADOS DE OBRA: TARJETA "PEDIR HERRAMIENTA" ESTÁNDAR */}
         {isCoordinador && (
