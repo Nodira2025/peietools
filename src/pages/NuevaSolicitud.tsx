@@ -24,7 +24,8 @@ import {
   MapPin, 
   AlertTriangle,
   ChevronRight,
-  Wrench
+  Wrench,
+  Clock
 } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { buildWhatsAppLink, APP_URL } from '../lib/whatsapp';
