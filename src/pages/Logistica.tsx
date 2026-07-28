@@ -131,6 +131,22 @@ export default function Logistica() {
   };
 
 
+  // Form State para Registro de Gastos (Historial)
+  const [isHistorialGastosOpen, setIsHistorialGastosOpen] = useState(false);
+  const [gastosList, setGastosList] = useState<any[]>([]);
+  const [loadingGastos, setLoadingGastos] = useState(false);
+  const [searchGastoText, setSearchGastoText] = useState('');
+
+  const fetchGastosHistorial = async () => {
+    setLoadingGastos(true);
+    const { data } = await supabase
+      .from('gastos_logistica')
+      .select('*, profiles!gastos_logistica_registered_by_fkey(full_name)')
+      .order('created_at', { ascending: false });
+    if (data) setGastosList(data);
+    setLoadingGastos(false);
+  };
+
   useEffect(() => {
     fetchSolicitudes();
     fetchFilterOptions();
@@ -144,8 +160,12 @@ export default function Logistica() {
     if (searchParams.get('nuevaCompra') === 'true') {
       setIsCompraOpen(true);
     }
-
+    if (searchParams.get('verGastos') === 'true') {
+      setIsHistorialGastosOpen(true);
+      fetchGastosHistorial();
+    }
   }, []);
+
 
   const fetchActiveObras = async () => {
     const { data } = await supabase.from('obras').select('id, name').eq('active', true).order('name');
@@ -583,6 +603,7 @@ export default function Logistica() {
               </DialogDescription>
             </DialogHeader>
 
+
             <div className="space-y-4 py-3">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700">Concepto / ¿Qué se compró? *</label>
@@ -697,8 +718,85 @@ export default function Logistica() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Botón y Modal de Registro de Gastos */}
+        <Dialog open={isHistorialGastosOpen} onOpenChange={(open) => {
+          setIsHistorialGastosOpen(open);
+          if (open) fetchGastosHistorial();
+        }}>
+          <DialogTrigger asChild>
+            <Button className="bg-teal-700 hover:bg-teal-800 text-white font-bold rounded-xl text-xs h-10 px-3 flex-1 sm:flex-initial flex items-center justify-center gap-1.5 shadow-md">
+              📋 Registro de Gastos
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="rounded-3xl w-[94%] max-w-2xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-black text-slate-900 flex items-center gap-2">
+                <span className="text-xl">📋</span> Registro de Gastos de Logística
+              </DialogTitle>
+              <DialogDescription className="text-xs text-slate-500">
+                Historial completo de gastos registrados por logística y comprobantes generados.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input 
+                  placeholder="Buscar por concepto, obra, empleado o método de pago..." 
+                  value={searchGastoText}
+                  onChange={e => setSearchGastoText(e.target.value)}
+                  className="pl-9 h-10 rounded-xl text-xs border-slate-200"
+                />
+              </div>
+
+              {loadingGastos ? (
+                <div className="p-8 text-center text-xs text-slate-500 font-medium">
+                  Cargando gastos...
+                </div>
+              ) : gastosList.length === 0 ? (
+                <div className="p-8 text-center space-y-1">
+                  <p className="text-sm font-semibold text-slate-700">No hay gastos registrados aún</p>
+                  <p className="text-xs text-slate-400">Los gastos que registres aparecerán en este historial.</p>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {gastosList.filter(g => {
+                    const term = searchGastoText.toLowerCase().trim();
+                    if (!term) return true;
+                    return (
+                      g.concepto.toLowerCase().includes(term) ||
+                      (g.obra_name && g.obra_name.toLowerCase().includes(term)) ||
+                      (g.empleado_name && g.empleado_name.toLowerCase().includes(term)) ||
+                      g.metodo_pago.toLowerCase().includes(term)
+                    );
+                  }).map((g) => (
+                    <div key={g.id} className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-sm text-slate-900">{g.concepto}</span>
+                          <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2.5 py-0.5 rounded-full">
+                            ${g.monto?.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 font-medium">
+                          🏗️ <strong>Obra:</strong> {g.obra_name || 'Sin obra'} | 👷 <strong>Solicitó:</strong> {g.empleado_name || 'Sin especificar'}
+                        </p>
+                        <p className="text-[11px] text-slate-400">
+                          💳 <strong>Pago:</strong> {g.metodo_pago} | 🕒 {new Date(g.created_at).toLocaleDateString('es-AR')} {new Date(g.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs
+                        </p>
+                        {g.detalle && <p className="text-xs text-slate-600 bg-white p-2 rounded-xl border border-slate-100 italic mt-1">{g.detalle}</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
         </div>
       </div>
+
 
       {/* Buscador y Filtros */}
       <div className="space-y-3">

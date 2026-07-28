@@ -681,24 +681,43 @@ export default function Dashboard() {
         )}
 
 
-        {/* Acceso a Registrar Gasto (Admins, Logística y Coordinadores) */}
+        {/* Acceso a Registrar Gasto y Registro de Gastos (Admins, Logística y Coordinadores) */}
         {(isAdmin || isLogistica || isCoordinador) && (
-          <div 
-            onClick={() => navigate('/logistica?nuevoGasto=true')}
-            className="bg-gradient-to-r from-emerald-600 to-teal-500 text-white rounded-[24px] p-4 shadow-[0_4px_20px_rgba(16,185,129,0.12)] hover:shadow-[0_4px_20px_rgba(16,185,129,0.2)] flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all duration-200"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-white shrink-0">
-                <DollarSign size={24} className="stroke-[2.5]" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div 
+              onClick={() => navigate('/logistica?nuevoGasto=true')}
+              className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-[24px] p-4 shadow-[0_4px_20px_rgba(16,185,129,0.15)] hover:shadow-[0_6px_24px_rgba(16,185,129,0.25)] flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all duration-200 border border-white/20 relative overflow-hidden group"
+            >
+              <div className="flex items-center gap-3.5 relative z-10">
+                <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0 shadow-inner border border-white/20">
+                  <DollarSign size={24} className="stroke-[2.5]" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-black uppercase tracking-wider leading-none">Registrar Gasto</h3>
+                  <p className="text-[10px] text-emerald-100 font-bold leading-tight">Carga rápida y comprobante PDF.</p>
+                </div>
               </div>
-              <div className="space-y-1">
-                <h3 className="text-sm font-black uppercase tracking-wider leading-none">Registrar Gasto</h3>
-                <p className="text-[10px] text-slate-100 font-bold leading-tight">Comprobantes y rendición con cuenta corriente por WhatsApp.</p>
-              </div>
+              <ChevronRight size={18} className="text-white shrink-0 relative z-10" />
             </div>
-            <ChevronRight size={18} className="text-white shrink-0" />
+
+            <div 
+              onClick={() => navigate('/logistica?verGastos=true')}
+              className="bg-white border border-slate-200 rounded-[24px] p-4 shadow-sm hover:shadow-md flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-200">
+                  <span className="text-lg">📋</span>
+                </div>
+                <div className="space-y-0.5">
+                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">Registro de Gastos</h3>
+                  <p className="text-[10px] text-slate-500 font-bold">Consultá todo el historial de gastos.</p>
+                </div>
+              </div>
+              <ChevronRight size={18} className="text-emerald-600 shrink-0" />
+            </div>
           </div>
         )}
+
 
 
         {/* Tarjeta secundaria para mis pedidos (Coordinadores / Admins) */}
