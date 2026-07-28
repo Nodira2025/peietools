@@ -25,8 +25,11 @@ import {
   Plus,
   User,
   DollarSign,
-  AlertTriangle
+  AlertTriangle,
+  ShoppingBag,
+  Clock
 } from 'lucide-react';
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { 
   DropdownMenu, 
@@ -512,254 +515,228 @@ export default function Dashboard() {
       {/* ========================================================================= */}
       {/* 1. DISPOSITIVOS MÓVILES (md:hidden block)                                 */}
       {/* ========================================================================= */}
-      <div className={mobileDashboardClass}>
+      <div className={`${mobileDashboardClass} space-y-4`}>
+
         
-        {/* Barra de Notificaciones */}
-        <Card 
+        {/* 🔔 Barra de Notificaciones */}
+        <div 
           onClick={handleNotificationClick}
-          className="bg-white border-0 shadow-[0_4px_20px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_20px_rgba(0,0,0,0.08)] transition-all cursor-pointer rounded-[24px] p-4 flex items-center justify-between group active:scale-[0.99] w-full"
+          className="bg-white border border-slate-200/80 shadow-sm hover:shadow-md transition-all cursor-pointer rounded-2xl p-3.5 flex items-center justify-between group active:scale-[0.99] w-full"
         >
-          <div className="flex items-center gap-4">
-            <div className="relative w-12 h-12 bg-rose-500 rounded-full flex items-center justify-center text-white shadow-md shadow-rose-500/20">
-              <Bell size={22} className="stroke-[2] text-white" />
+          <div className="flex items-center gap-3.5">
+            <div className="relative w-10 h-10 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center shrink-0 border border-rose-100">
+              <Bell size={20} className="stroke-[2.2]" />
               {totalNotifications > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 bg-rose-600 text-white text-[10px] font-black rounded-full w-5 h-5 flex items-center justify-center border-2 border-white">
+                <span className="absolute -top-1 -right-1 bg-rose-600 text-white text-[9px] font-black rounded-full w-4.5 h-4.5 flex items-center justify-center border-2 border-white">
                   {totalNotifications}
                 </span>
               )}
             </div>
             <div className="flex flex-col">
-              <span className="text-sm font-black text-[#031530] leading-tight">Notificación</span>
-              <span className="text-xs text-slate-400 font-bold mt-0.5">
+              <span className="text-xs font-black text-slate-900 leading-tight">Centro de Notificaciones</span>
+              <span className="text-[11px] text-slate-500 font-medium mt-0.5">
                 {totalNotifications > 0 
-                  ? `Tienes ${totalNotifications} notificaciones nuevas` 
-                  : 'No tienes notificaciones nuevas'}
+                  ? `Tenés ${totalNotifications} notificaciones nuevas` 
+                  : 'Sin notificaciones pendientes'}
               </span>
             </div>
           </div>
-        </Card>
+          <ChevronRight size={18} className="text-slate-400 shrink-0" />
+        </div>
 
-        {/* 🚚 VISTA PARA LOGÍSTICA: TARJETA COMPACTA DE "PEDIDOS DE HERRAMIENTAS" */}
+        {/* 🚀 HERO FEATURE CARD: ACCIÓN PRINCIPAL (HERRAMIENTAS) */}
         {isLogistica && (
           <div 
             onClick={() => navigate('/logistica')}
-            className="bg-gradient-to-r from-amber-500 via-orange-600 to-red-600 text-white rounded-[24px] p-4 shadow-[0_6px_24px_rgba(234,88,12,0.25)] hover:shadow-[0_8px_30px_rgba(234,88,12,0.35)] flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all duration-200 border border-white/20 relative overflow-hidden group"
+            className="bg-gradient-to-r from-[#031530] via-[#082856] to-[#0e3c7e] text-white rounded-2xl p-4 shadow-md hover:shadow-lg flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all duration-200 border border-white/10 relative overflow-hidden group"
           >
-            <div className="absolute -right-6 -bottom-6 w-28 h-28 bg-white/15 rounded-full blur-xl pointer-events-none group-hover:scale-125 transition-transform" />
+            <div className="absolute -right-6 -bottom-6 w-28 h-28 bg-white/10 rounded-full blur-xl pointer-events-none group-hover:scale-125 transition-transform" />
             
             <div className="flex items-center gap-3.5 relative z-10">
-              <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0 shadow-inner border border-white/20">
-                <Truck size={24} className="stroke-[2.5]" />
+              <div className="w-11 h-11 rounded-xl bg-white/15 backdrop-blur-md flex items-center justify-center text-white shrink-0 shadow-inner border border-white/20">
+                <Truck size={22} className="stroke-[2.5]" />
               </div>
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-black uppercase tracking-wider leading-none text-white">
+                  <h3 className="text-xs font-black uppercase tracking-wider leading-none text-white">
                     Pedidos de Herramientas
                   </h3>
-                  <span className="bg-white text-orange-700 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tight shadow-sm">
+                  <span className="bg-amber-400 text-slate-950 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tight shadow-xs">
                     {counts.pendingTools} Pendientes
                   </span>
                 </div>
-                <p className="text-[10px] text-orange-100 font-bold leading-tight">
-                  Revisá, asigná chofer y gestioná traslados entre obras.
+                <p className="text-[11px] text-slate-200 font-medium leading-tight">
+                  Gestioná traslados y asignación de choferes entre obras.
                 </p>
               </div>
             </div>
 
-            <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center shrink-0 ml-2 relative z-10">
-              <ChevronRight size={18} className="text-white" />
+            <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center shrink-0 ml-2 relative z-10">
+              <ChevronRight size={16} className="text-white" />
             </div>
           </div>
         )}
 
-
-        {/* 🏗️ VISTA PARA COORDINADORES / ENCARGADOS DE OBRA: TARJETA "PEDIR HERRAMIENTA" ESTÁNDAR */}
-        {isCoordinador && (
+        {(isCoordinador || isAdmin) && !isLogistica && (
           <div 
             onClick={() => navigate('/solicitudes/nueva')}
-            className="bg-gradient-to-r from-peie-blue via-blue-700 to-indigo-800 text-white rounded-[24px] p-4 shadow-[0_6px_24px_rgba(8,26,99,0.22)] hover:shadow-[0_8px_30px_rgba(8,26,99,0.3)] flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all duration-200 border border-white/10 relative overflow-hidden group"
+            className="bg-gradient-to-r from-[#031530] via-[#082856] to-[#0e3c7e] text-white rounded-2xl p-4 shadow-md hover:shadow-lg flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all duration-200 border border-white/10 relative overflow-hidden group"
           >
             <div className="absolute -right-6 -bottom-6 w-28 h-28 bg-white/10 rounded-full blur-xl pointer-events-none group-hover:scale-125 transition-transform" />
             
             <div className="flex items-center gap-3.5 relative z-10">
-              <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0 shadow-inner border border-white/20">
-                <Wrench size={24} className="stroke-[2.5]" />
+              <div className="w-11 h-11 rounded-xl bg-white/15 backdrop-blur-md flex items-center justify-center text-white shrink-0 shadow-inner border border-white/20">
+                <Wrench size={22} className="stroke-[2.5]" />
               </div>
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-black uppercase tracking-wider leading-none text-white">Pedir Herramienta</h3>
-                  <span className="bg-amber-400 text-slate-950 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tight shadow-sm">
+                  <h3 className="text-xs font-black uppercase tracking-wider leading-none text-white">Pedir Herramienta</h3>
+                  <span className="bg-amber-400 text-slate-950 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tight shadow-xs">
                     Solicitar
                   </span>
                 </div>
-                <p className="text-[10px] text-blue-100 font-bold leading-tight">
+                <p className="text-[11px] text-slate-200 font-medium leading-tight">
                   Solicitá las herramientas que necesitás para tu obra en 1 minuto.
                 </p>
               </div>
             </div>
-            <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center shrink-0 ml-2 relative z-10">
-              <ChevronRight size={18} className="text-white" />
+            <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center shrink-0 ml-2 relative z-10">
+              <ChevronRight size={16} className="text-white" />
             </div>
           </div>
         )}
 
-        {/* 👑 VISTA PARA ADMINS (SI NO ES COORDINADOR NI LOGÍSTICA) */}
-        {isAdmin && (
-          <div 
-            onClick={() => navigate('/solicitudes/nueva')}
-            className="bg-gradient-to-r from-peie-blue via-blue-700 to-indigo-800 text-white rounded-[24px] p-4 shadow-[0_6px_24px_rgba(8,26,99,0.22)] hover:shadow-[0_8px_30px_rgba(8,26,99,0.3)] flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all duration-200 border border-white/10 relative overflow-hidden group"
-          >
-            <div className="absolute -right-6 -bottom-6 w-28 h-28 bg-white/10 rounded-full blur-xl pointer-events-none group-hover:scale-125 transition-transform" />
-            
-            <div className="flex items-center gap-3.5 relative z-10">
-              <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0 shadow-inner border border-white/20">
-                <Wrench size={24} className="stroke-[2.5]" />
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-black uppercase tracking-wider leading-none text-white">Pedir Herramienta</h3>
-                  <span className="bg-amber-400 text-slate-950 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tight shadow-sm">
-                    Solicitar
-                  </span>
-                </div>
-                <p className="text-[10px] text-blue-100 font-bold leading-tight">
-                  Solicitá las herramientas que necesitás para tu obra en 1 minuto.
-                </p>
-              </div>
-            </div>
-            <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center shrink-0 ml-2 relative z-10">
-              <ChevronRight size={18} className="text-white" />
-            </div>
-          </div>
-        )}
-
-        {/* Acceso a Reportar Orden de Compra con IA (Admins, Logística y Coordinadores) */}
+        {/* 🛍️ SECCIÓN: GESTIÓN DE COMPRAS */}
         {(isAdmin || isLogistica || isCoordinador) && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div 
-              onClick={() => navigate('/logistica?nuevaCompra=true')}
-              className="bg-gradient-to-r from-amber-500 via-amber-600 to-orange-600 text-white rounded-[24px] p-4 shadow-[0_6px_24px_rgba(217,119,6,0.25)] hover:shadow-[0_8px_30px_rgba(217,119,6,0.35)] flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all duration-200 border border-white/20 relative overflow-hidden group"
-            >
-              <div className="absolute -right-6 -bottom-6 w-28 h-28 bg-white/15 rounded-full blur-xl pointer-events-none group-hover:scale-125 transition-transform" />
-              <div className="flex items-center gap-3.5 relative z-10">
-                <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0 shadow-inner border border-white/20">
-                  <span className="text-xl">🛍️</span>
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-black uppercase tracking-wider leading-none text-white">Reportar Compra</h3>
-                    <span className="bg-white text-amber-900 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tight shadow-sm">
-                      WhatsApp + IA
-                    </span>
+          <div className="space-y-2 pt-1">
+            <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 px-1">
+              🛍️ Gestión de Compras
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div 
+                onClick={() => navigate('/logistica?nuevaCompra=true')}
+                className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-sm hover:shadow-md flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0 border border-amber-200/60">
+                    <ShoppingBag size={20} className="stroke-[2]" />
                   </div>
-                  <p className="text-[10px] text-amber-100 font-bold leading-tight">
-                    Pegá el texto de WhatsApp del empleado y la IA lo estructura al instante.
-                  </p>
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">Reportar Compra</h3>
+                      <span className="bg-amber-100 text-amber-900 text-[8px] font-black px-1.5 py-0.2 rounded uppercase">IA</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 font-medium">Pegá el WhatsApp y la IA lo procesa.</p>
+                  </div>
                 </div>
+                <ChevronRight size={16} className="text-slate-400 shrink-0" />
               </div>
-              <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center shrink-0 ml-2 relative z-10">
-                <ChevronRight size={18} className="text-white" />
-              </div>
-            </div>
 
-            <div 
-              onClick={() => navigate('/compras')}
-              className="bg-white border border-slate-200 rounded-[24px] p-4 shadow-sm hover:shadow-md flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0 border border-amber-200">
-                  <span className="text-lg">📋</span>
+              <div 
+                onClick={() => navigate('/compras')}
+                className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-sm hover:shadow-md flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 border border-slate-200/60">
+                    <FileText size={20} className="stroke-[2]" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">Registro de Compras</h3>
+                    <p className="text-[10px] text-slate-500 font-medium">Consultá compras en curso y procesadas.</p>
+                  </div>
                 </div>
-                <div className="space-y-0.5">
-                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">Registro de Compras</h3>
-                  <p className="text-[10px] text-slate-500 font-bold">Consultá las compras en curso y procesadas.</p>
-                </div>
+                <ChevronRight size={16} className="text-slate-400 shrink-0" />
               </div>
-              <ChevronRight size={18} className="text-amber-600 shrink-0" />
             </div>
           </div>
         )}
 
-
-        {/* Acceso a Registrar Gasto y Registro de Gastos (Admins, Logística y Coordinadores) */}
+        {/* 💵 SECCIÓN: GESTIÓN DE GASTOS */}
         {(isAdmin || isLogistica || isCoordinador) && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div 
-              onClick={() => navigate('/logistica?nuevoGasto=true')}
-              className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-[24px] p-4 shadow-[0_4px_20px_rgba(16,185,129,0.15)] hover:shadow-[0_6px_24px_rgba(16,185,129,0.25)] flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all duration-200 border border-white/20 relative overflow-hidden group"
-            >
-              <div className="flex items-center gap-3.5 relative z-10">
-                <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0 shadow-inner border border-white/20">
-                  <DollarSign size={24} className="stroke-[2.5]" />
+          <div className="space-y-2 pt-1">
+            <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 px-1">
+              💵 Control de Gastos
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div 
+                onClick={() => navigate('/logistica?nuevoGasto=true')}
+                className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-sm hover:shadow-md flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-200/60">
+                    <DollarSign size={20} className="stroke-[2.2]" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">Registrar Gasto</h3>
+                    <p className="text-[10px] text-slate-500 font-medium">Carga rápida y comprobante PDF.</p>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <h3 className="text-sm font-black uppercase tracking-wider leading-none">Registrar Gasto</h3>
-                  <p className="text-[10px] text-emerald-100 font-bold leading-tight">Carga rápida y comprobante PDF.</p>
-                </div>
+                <ChevronRight size={16} className="text-slate-400 shrink-0" />
               </div>
-              <ChevronRight size={18} className="text-white shrink-0 relative z-10" />
-            </div>
 
-            <div 
-              onClick={() => navigate('/logistica?verGastos=true')}
-              className="bg-white border border-slate-200 rounded-[24px] p-4 shadow-sm hover:shadow-md flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-200">
-                  <span className="text-lg">📋</span>
+              <div 
+                onClick={() => navigate('/logistica?verGastos=true')}
+                className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-sm hover:shadow-md flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 border border-slate-200/60">
+                    <FileText size={20} className="stroke-[2]" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">Registro de Gastos</h3>
+                    <p className="text-[10px] text-slate-500 font-medium">Historial completo de gastos cargados.</p>
+                  </div>
                 </div>
-                <div className="space-y-0.5">
-                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">Registro de Gastos</h3>
-                  <p className="text-[10px] text-slate-500 font-bold">Consultá todo el historial de gastos.</p>
-                </div>
+                <ChevronRight size={16} className="text-slate-400 shrink-0" />
               </div>
-              <ChevronRight size={18} className="text-emerald-600 shrink-0" />
             </div>
           </div>
         )}
 
-
-
-        {/* Tarjeta secundaria para mis pedidos (Coordinadores / Admins) */}
-        {(isCoordinador || isAdmin) && (
-          <div 
-            onClick={() => navigate('/solicitudes')}
-            className="bg-white border border-slate-200 rounded-[24px] p-4 shadow-sm hover:shadow-md flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-slate-100 text-peie-blue flex items-center justify-center shrink-0">
-                <FileText size={20} />
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-slate-800">Ver Mis Pedidos Solicitados</h4>
-                <p className="text-[10px] text-slate-400 font-semibold">Consultá el estado del traslado de tus herramientas</p>
-              </div>
-            </div>
-            <ChevronRight size={16} className="text-slate-400" />
-          </div>
-        )}
-
-        {/* TARJETA: Reportar Tarea (Estilo limpio, sobrio y elegante) */}
+        {/* 📋 SECCIÓN: REPORTES Y SEGUIMIENTO */}
         {(isAdmin || isLogistica || isCoordinador) && (
-          <div 
-            onClick={() => setIsReportOpen(true)}
-            className="bg-white border border-slate-200 rounded-[24px] p-4 shadow-xs hover:shadow-md flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all duration-200"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-700 border border-amber-200/60 flex items-center justify-center shrink-0">
-                <FileText size={20} className="stroke-[2]" />
-              </div>
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Reportar Tarea</h3>
-                  <span className="bg-slate-100 text-slate-600 text-[9px] font-bold px-2 py-0.5 rounded-full border border-slate-200">
-                    Aviso a Federico
-                  </span>
+          <div className="space-y-2 pt-1">
+            <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 px-1">
+              📋 Avisos y Seguimiento
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div 
+                onClick={() => setIsReportOpen(true)}
+                className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-sm hover:shadow-md flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0 border border-indigo-200/60">
+                    <FileText size={20} className="stroke-[2]" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">Reportar Tarea</h3>
+                      <span className="bg-indigo-100 text-indigo-900 text-[8px] font-black px-1.5 py-0.2 rounded uppercase">WhatsApp</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 font-medium">Aviso de tarea o compra especial.</p>
+                  </div>
                 </div>
-                <p className="text-[10px] text-slate-400 font-semibold leading-tight">Envío de reporte o compra especial por WhatsApp.</p>
+                <ChevronRight size={16} className="text-slate-400 shrink-0" />
               </div>
+
+              {(isCoordinador || isAdmin) && (
+                <div 
+                  onClick={() => navigate('/solicitudes')}
+                  className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-sm hover:shadow-md flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 border border-slate-200/60">
+                      <Clock size={20} className="stroke-[2]" />
+                    </div>
+                    <div className="space-y-0.5">
+                      <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">Mis Pedidos</h3>
+                      <p className="text-[10px] text-slate-500 font-medium">Estado del traslado de herramientas.</p>
+                    </div>
+                  </div>
+                  <ChevronRight size={16} className="text-slate-400 shrink-0" />
+                </div>
+              )}
             </div>
-            <ChevronRight size={16} className="text-slate-400 shrink-0" />
           </div>
         )}
 
@@ -767,56 +744,54 @@ export default function Dashboard() {
         {(isAdmin || isLogistica) && (
           <div 
             onClick={() => navigate('/herramientas/busqueda-visual')}
-            className="bg-gradient-to-r from-peie-blue to-peie-light text-white rounded-[24px] p-4 shadow-[0_4px_20px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_20px_rgba(0,0,0,0.08)] flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all duration-200"
+            className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-sm hover:shadow-md flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all"
           >
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-white shrink-0">
-                <Camera size={24} className="stroke-[2.5]" />
+              <div className="w-10 h-10 rounded-xl bg-[#031530] text-white flex items-center justify-center shrink-0">
+                <Camera size={20} className="stroke-[2]" />
               </div>
-              <div className="space-y-1">
-                <h3 className="text-sm font-black uppercase tracking-wider leading-none">Buscar Herramienta</h3>
-                <p className="text-[10px] text-slate-100 font-bold leading-tight">Identificá, trasladá o reportá fallas de herramientas al instante.</p>
+              <div className="space-y-0.5">
+                <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">Buscar Herramienta</h3>
+                <p className="text-[10px] text-slate-500 font-medium">Identificá, trasladá o reportá fallas con cámara/QR.</p>
               </div>
             </div>
-            <ChevronRight size={18} className="text-white shrink-0" />
+            <ChevronRight size={16} className="text-slate-400 shrink-0" />
           </div>
         )}
 
         {/* Asistentes de Alta (Solo Admins) */}
         {isAdmin && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-center gap-4 my-1">
-              <div className="h-[1px] bg-slate-200 flex-1" />
-              <span className="text-[10px] font-black text-peie-blue uppercase tracking-widest whitespace-nowrap">Asistentes de Alta</span>
-              <div className="h-[1px] bg-slate-200 flex-1" />
-            </div>
+          <div className="space-y-2 pt-1">
+            <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 px-1">
+              ⚡ Asistentes de Alta
+            </h4>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2.5">
               {/* Alta Herramienta Asistida */}
               <div 
                 onClick={() => navigate('/herramientas/nueva')}
-                className="bg-[#F3F6FD] border border-[#E2EAFD] rounded-[24px] p-4 flex flex-col justify-between cursor-pointer active:scale-[0.97] transition-all duration-200 min-h-[114px] shadow-sm shadow-[#081a63]/2"
+                className="bg-white border border-slate-200/80 rounded-2xl p-3.5 flex flex-col justify-between cursor-pointer active:scale-[0.97] transition-all min-h-[105px] shadow-sm hover:shadow-md"
               >
-                <div className="w-10 h-10 rounded-2xl bg-peie-blue text-white flex items-center justify-center shadow-md shadow-peie-blue/15">
-                  <Plus size={20} className="stroke-[3]" />
+                <div className="w-9 h-9 rounded-xl bg-peie-blue text-white flex items-center justify-center shadow-xs">
+                  <Plus size={18} className="stroke-[3]" />
                 </div>
                 <div className="space-y-0.5">
-                  <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-wide">Alta Herramienta</h4>
-                  <p className="text-[8px] text-slate-400 font-bold leading-tight">Asistente paso a paso</p>
+                  <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-wide">Alta Herramienta</h4>
+                  <p className="text-[9px] text-slate-500 font-medium leading-tight">Carga asistida</p>
                 </div>
               </div>
 
               {/* Alta Personal Asistida */}
               <div 
                 onClick={() => navigate('/personal/nuevo-asistido')}
-                className="bg-[#FAF7FE] border border-[#F2EAFF] rounded-[24px] p-4 flex flex-col justify-between cursor-pointer active:scale-[0.97] transition-all duration-200 min-h-[114px] shadow-sm shadow-violet-600/2"
+                className="bg-white border border-slate-200/80 rounded-2xl p-3.5 flex flex-col justify-between cursor-pointer active:scale-[0.97] transition-all min-h-[105px] shadow-sm hover:shadow-md"
               >
-                <div className="w-10 h-10 rounded-2xl bg-violet-600 text-white flex items-center justify-center shadow-md shadow-violet-600/15">
-                  <User size={20} className="stroke-[3]" />
+                <div className="w-9 h-9 rounded-xl bg-violet-600 text-white flex items-center justify-center shadow-xs">
+                  <User size={18} className="stroke-[3]" />
                 </div>
                 <div className="space-y-0.5">
-                  <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-wide">Alta Personal</h4>
-                  <p className="text-[8px] text-slate-400 font-bold leading-tight">Asistente paso a paso</p>
+                  <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-wide">Alta Personal</h4>
+                  <p className="text-[9px] text-slate-500 font-medium leading-tight">Carga asistida</p>
                 </div>
               </div>
             </div>
@@ -824,6 +799,7 @@ export default function Dashboard() {
         )}
 
       </div>
+
 
       {/* ========================================================================= */}
       {/* 2. ESCRITORIO / PC (hidden md:block)                                      */}
