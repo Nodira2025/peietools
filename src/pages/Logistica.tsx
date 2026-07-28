@@ -54,6 +54,8 @@ export default function Logistica() {
   const [gastoMonto, setGastoMonto] = useState('');
   const [gastoDetalle, setGastoDetalle] = useState('');
   const [gastoPago, setGastoPago] = useState('Cuenta corriente BP');
+  const [sendWpGasto, setSendWpGasto] = useState(false);
+
 
   // Form State para registrar orden de compra (WhatsApp + IA)
   const [isCompraOpen, setIsCompraOpen] = useState(false);
@@ -254,12 +256,15 @@ export default function Logistica() {
     setGastoObraId('');
     setGastoEmpleadoId('');
 
-    toast({ title: 'Gasto Registrado', description: 'Se descargó el PDF del comprobante. Abriendo chat de Federico Grande...' });
+    if (sendWpGasto) {
+      toast({ title: 'Gasto Registrado', description: 'Se descargó el PDF del comprobante. Abriendo chat de Federico Grande...' });
+      setTimeout(() => {
+        window.open(buildWhatsAppLink(federicoPhone, waMsg), '_blank');
+      }, 500);
+    } else {
+      toast({ title: 'Gasto Registrado', description: 'Se descargó el PDF del comprobante en tu dispositivo.' });
+    }
 
-    // Enviar WhatsApp al solicitante
-    setTimeout(() => {
-      window.open(buildWhatsAppLink(federicoPhone, waMsg), '_blank');
-    }, 500);
   };
 
   const fetchFilterOptions = async () => {
@@ -648,7 +653,21 @@ export default function Logistica() {
                   className="rounded-xl min-h-[70px]"
                 />
               </div>
+              <div className="flex items-center space-x-2 pt-2 border-t border-slate-100">
+
+                <input
+                  type="checkbox"
+                  id="sendWpGasto"
+                  checked={sendWpGasto}
+                  onChange={(e) => setSendWpGasto(e.target.checked)}
+                  className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                />
+                <label htmlFor="sendWpGasto" className="text-xs font-bold text-slate-700 cursor-pointer select-none">
+                  📲 Enviar resumen por WhatsApp a Federico Grande (Opcional)
+                </label>
+              </div>
             </div>
+
             <DialogFooter className="flex-row gap-2">
               <DialogClose asChild>
                 <Button variant="ghost" className="flex-1 rounded-xl">Cancelar</Button>
