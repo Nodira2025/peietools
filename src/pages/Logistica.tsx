@@ -595,13 +595,16 @@ export default function Logistica() {
                 💵 Registrar Gasto
               </Button>
             </DialogTrigger>
-          <DialogContent className="rounded-3xl w-[90%] max-w-md">
+          <DialogContent className="rounded-3xl w-[92%] max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Registrar Gasto de Logística</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-lg font-black text-slate-900 flex items-center gap-2">
+                <span className="text-xl">💵</span> Registrar Gasto de Logística
+              </DialogTitle>
+              <DialogDescription className="text-xs text-slate-500">
                 Crea un comprobante de compra para enviárselo a Federico Grande por WhatsApp.
               </DialogDescription>
             </DialogHeader>
+
 
 
             <div className="space-y-4 py-3">
