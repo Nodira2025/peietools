@@ -504,16 +504,21 @@ export default function Logistica() {
 
                   {/* Empleado que solicita */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700">Empleado que solicita (Opcional):</label>
-                    <div className="relative">
-                      <Input
-                        placeholder="Escribí el nombre del empleado..."
-                        value={compraEmpleadoName}
-                        onChange={(e) => setCompraEmpleadoName(e.target.value)}
-                        className="rounded-xl h-10 bg-white border-slate-200 text-xs font-semibold"
-                      />
-                    </div>
+                    <label className="text-xs font-bold text-slate-700">Empleado que solicita (Seleccionar de la lista):</label>
+                    <select
+                      value={compraEmpleadoName}
+                      onChange={(e) => setCompraEmpleadoName(e.target.value)}
+                      className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-800"
+                    >
+                      <option value="">-- Sin Empleado Específico --</option>
+                      {allEmpleados.map((emp) => (
+                        <option key={emp.id} value={emp.full_name}>
+                          👷 {emp.full_name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
+
 
                   {/* Obra asociada */}
                   <div className="space-y-1.5">

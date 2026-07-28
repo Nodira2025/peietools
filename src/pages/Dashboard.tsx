@@ -636,32 +636,51 @@ export default function Dashboard() {
 
         {/* Acceso a Reportar Orden de Compra con IA (Admins, Logística y Coordinadores) */}
         {(isAdmin || isLogistica || isCoordinador) && (
-          <div 
-            onClick={() => navigate('/logistica?nuevaCompra=true')}
-            className="bg-gradient-to-r from-amber-500 via-amber-600 to-orange-600 text-white rounded-[24px] p-4 shadow-[0_6px_24px_rgba(217,119,6,0.25)] hover:shadow-[0_8px_30px_rgba(217,119,6,0.35)] flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all duration-200 border border-white/20 relative overflow-hidden group"
-          >
-            <div className="absolute -right-6 -bottom-6 w-28 h-28 bg-white/15 rounded-full blur-xl pointer-events-none group-hover:scale-125 transition-transform" />
-            <div className="flex items-center gap-3.5 relative z-10">
-              <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0 shadow-inner border border-white/20">
-                <span className="text-xl">🛍️</span>
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-black uppercase tracking-wider leading-none text-white">Reportar Compra</h3>
-                  <span className="bg-white text-amber-900 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tight shadow-sm">
-                    WhatsApp + IA
-                  </span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div 
+              onClick={() => navigate('/logistica?nuevaCompra=true')}
+              className="bg-gradient-to-r from-amber-500 via-amber-600 to-orange-600 text-white rounded-[24px] p-4 shadow-[0_6px_24px_rgba(217,119,6,0.25)] hover:shadow-[0_8px_30px_rgba(217,119,6,0.35)] flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all duration-200 border border-white/20 relative overflow-hidden group"
+            >
+              <div className="absolute -right-6 -bottom-6 w-28 h-28 bg-white/15 rounded-full blur-xl pointer-events-none group-hover:scale-125 transition-transform" />
+              <div className="flex items-center gap-3.5 relative z-10">
+                <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0 shadow-inner border border-white/20">
+                  <span className="text-xl">🛍️</span>
                 </div>
-                <p className="text-[10px] text-amber-100 font-bold leading-tight">
-                  Pegá el texto de WhatsApp del empleado y la IA lo estructura al instante.
-                </p>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-black uppercase tracking-wider leading-none text-white">Reportar Compra</h3>
+                    <span className="bg-white text-amber-900 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tight shadow-sm">
+                      WhatsApp + IA
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-amber-100 font-bold leading-tight">
+                    Pegá el texto de WhatsApp del empleado y la IA lo estructura al instante.
+                  </p>
+                </div>
+              </div>
+              <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center shrink-0 ml-2 relative z-10">
+                <ChevronRight size={18} className="text-white" />
               </div>
             </div>
-            <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center shrink-0 ml-2 relative z-10">
-              <ChevronRight size={18} className="text-white" />
+
+            <div 
+              onClick={() => navigate('/compras')}
+              className="bg-white border border-slate-200 rounded-[24px] p-4 shadow-sm hover:shadow-md flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0 border border-amber-200">
+                  <span className="text-lg">📋</span>
+                </div>
+                <div className="space-y-0.5">
+                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">Registro de Compras</h3>
+                  <p className="text-[10px] text-slate-500 font-bold">Consultá las compras en curso y procesadas.</p>
+                </div>
+              </div>
+              <ChevronRight size={18} className="text-amber-600 shrink-0" />
             </div>
           </div>
         )}
+
 
         {/* Acceso a Registrar Gasto (Admins, Logística y Coordinadores) */}
         {(isAdmin || isLogistica || isCoordinador) && (
