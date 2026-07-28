@@ -85,12 +85,15 @@ export default function NuevaSolicitud() {
   const [selectedToolId, setSelectedToolId] = useState(preselectedToolId);
   const [targetObraId, setTargetObraId] = useState('');
   const [filterEncargado, setFilterEncargado] = useState('');
-  const [selectedLogisticaId, setSelectedLogisticaId] = useState('');
-  const [priority, setPriority] = useState('Normal');
-  const [comments, setComments] = useState('');
-  const [neededDatePreset, setNeededDatePreset] = useState<'hoy' | 'manana' | 'custom'>('hoy');
-  const [customNeededDate, setCustomNeededDate] = useState('');
+  const getDefaultNeededDate = () => {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 16);
+  };
+
+  const [neededDate, setNeededDate] = useState(getDefaultNeededDate());
   const [loading, setLoading] = useState(false);
+
 
   // Layout View Mode (Form vs Wizard)
   const [isMobile, setIsMobile] = useState(false);
@@ -390,23 +393,16 @@ export default function NuevaSolicitud() {
     }
 
     // Calcular Fecha de Necesidad ISO
-    let neededDateIso: string | null = null;
-    let neededDateLabel = 'Hoy mismo';
-    const now = new Date();
-    if (neededDatePreset === 'hoy') {
-      neededDateIso = now.toISOString();
-      neededDateLabel = 'Hoy mismo (Urgente)';
-    } else if (neededDatePreset === 'manana') {
-      const tom = new Date(now);
-      tom.setDate(tom.getDate() + 1);
-      tom.setHours(8, 0, 0, 0);
-      neededDateIso = tom.toISOString();
-      neededDateLabel = `Mañana (${tom.toLocaleDateString('es-AR')} a las 8:00 AM)`;
-    } else if (neededDatePreset === 'custom' && customNeededDate) {
-      const d = new Date(customNeededDate);
-      neededDateIso = d.toISOString();
-      neededDateLabel = d.toLocaleString('es-AR');
-    }
+    const neededDateObj = neededDate ? new Date(neededDate) : new Date();
+    const neededDateIso = neededDateObj.toISOString();
+    const neededDateLabel = neededDateObj.toLocaleString('es-AR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
 
     setLoading(true);
     const securityCode = Math.floor(100000 + Math.random() * 900000).toString();
@@ -642,54 +638,19 @@ export default function NuevaSolicitud() {
                 )}
               </div>
 
-              {/* Fecha de Necesidad en Obra */}
+              {/* Fecha y Hora de Necesidad en Obra (Único selector) */}
               <div className="space-y-2 bg-amber-50/60 p-4 rounded-2xl border border-amber-200/60">
-                <Label className="text-xs font-bold text-amber-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <Clock size={14} className="text-amber-600" /> FECHA DE NECESIDAD EN OBRA *
+                <Label htmlFor="needed-date-input" className="text-xs font-bold text-amber-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <Clock size={14} className="text-amber-600" /> FECHA Y HORA DE NECESIDAD EN OBRA *
                 </Label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setNeededDatePreset('hoy')}
-                    className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all ${
-                      neededDatePreset === 'hoy'
-                        ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
-                        : 'bg-white text-slate-700 border-slate-200 hover:bg-amber-50'
-                    }`}
-                  >
-                    ⚡ Hoy Mismo
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setNeededDatePreset('manana')}
-                    className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all ${
-                      neededDatePreset === 'manana'
-                        ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
-                        : 'bg-white text-slate-700 border-slate-200 hover:bg-amber-50'
-                    }`}
-                  >
-                    🌅 Mañana 8 AM
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setNeededDatePreset('custom')}
-                    className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all ${
-                      neededDatePreset === 'custom'
-                        ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
-                        : 'bg-white text-slate-700 border-slate-200 hover:bg-amber-50'
-                    }`}
-                  >
-                    📅 Otra Fecha
-                  </button>
-                </div>
-                {neededDatePreset === 'custom' && (
-                  <Input
-                    type="datetime-local"
-                    value={customNeededDate}
-                    onChange={(e) => setCustomNeededDate(e.target.value)}
-                    className="h-10 rounded-xl bg-white border-slate-200 mt-2 text-xs font-semibold"
-                  />
-                )}
+                <Input
+                  id="needed-date-input"
+                  type="datetime-local"
+                  value={neededDate}
+                  onChange={(e) => setNeededDate(e.target.value)}
+                  className="h-11 rounded-xl bg-white border-slate-200 text-sm font-bold text-slate-800"
+                  required
+                />
               </div>
 
               {/* Prioridad */}
@@ -801,69 +762,36 @@ export default function NuevaSolicitud() {
               </div>
             )}
 
-            {/* STEP 1: SELECT FECHA DE NECESIDAD EN OBRA */}
+            {/* STEP 1: SELECT FECHA Y HORA DE NECESIDAD EN OBRA */}
             {wizardStep === 'select_date' && (
               <div className="space-y-5">
                 <BackButton onBack={() => goToWizardStep('select_tool')} />
                 <StepHeader 
-                  title="¿Para cuándo se necesita en obra?" 
-                  subtitle="Indicá la fecha y hora estimada de entrega"
+                  title="¿Cuándo se necesita en obra?" 
+                  subtitle="Seleccioná el día y la hora exacta de entrega"
                 />
 
-                <div className="space-y-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNeededDatePreset('hoy');
-                      goToWizardStep('select_obra');
-                    }}
-                    className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 text-left transition-all ${
-                      neededDatePreset === 'hoy' ? 'border-amber-500 bg-amber-50/60' : 'border-slate-200 bg-white'
-                    }`}
-                  >
-                    <div>
-                      <h4 className="font-black text-sm text-slate-800">⚡ Hoy Mismo (Urgente)</h4>
-                      <p className="text-xs text-slate-500">Se requiere la entrega en el día de hoy.</p>
-                    </div>
-                    <ChevronRight size={18} className="text-amber-600" />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNeededDatePreset('manana');
-                      goToWizardStep('select_obra');
-                    }}
-                    className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 text-left transition-all ${
-                      neededDatePreset === 'manana' ? 'border-amber-500 bg-amber-50/60' : 'border-slate-200 bg-white'
-                    }`}
-                  >
-                    <div>
-                      <h4 className="font-black text-sm text-slate-800">🌅 Mañana a Primera Hora (8:00 AM)</h4>
-                      <p className="text-xs text-slate-500">Se requiere listo en obra para iniciar la jornada mañana.</p>
-                    </div>
-                    <ChevronRight size={18} className="text-amber-600" />
-                  </button>
-
-                  <div className="p-4 rounded-2xl border-2 border-slate-200 bg-white space-y-3">
-                    <h4 className="font-black text-sm text-slate-800">📅 Otra Fecha u Hora Específica</h4>
-                    <Input
-                      type="datetime-local"
-                      value={customNeededDate}
-                      onChange={(e) => setCustomNeededDate(e.target.value)}
-                      className="h-12 rounded-xl text-sm font-semibold border-slate-200"
-                    />
-                    <Button
-                      disabled={!customNeededDate}
-                      onClick={() => {
-                        setNeededDatePreset('custom');
-                        goToWizardStep('select_obra');
-                      }}
-                      className="w-full h-11 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-sm"
-                    >
-                      Confirmar Fecha y Continuar
-                    </Button>
+                <div className="p-4 rounded-2xl border-2 border-amber-200 bg-amber-50/50 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Clock size={20} className="text-amber-600 shrink-0" />
+                    <span className="text-xs font-bold text-amber-900 uppercase tracking-wider">Fecha y Hora de Entrega Requerida</span>
                   </div>
+
+                  <Input
+                    type="datetime-local"
+                    value={neededDate}
+                    onChange={(e) => setNeededDate(e.target.value)}
+                    className="h-14 rounded-xl text-base font-bold bg-white border-slate-200 text-slate-800"
+                    required
+                  />
+
+                  <Button
+                    disabled={!neededDate}
+                    onClick={() => goToWizardStep('select_obra')}
+                    className="w-full h-13 bg-peie-blue hover:bg-peie-blue/90 text-white font-black rounded-xl text-sm shadow-lg flex items-center justify-center gap-2"
+                  >
+                    Confirmar Fecha y Continuar <ChevronRight size={18} />
+                  </Button>
                 </div>
               </div>
             )}
@@ -1037,6 +965,7 @@ export default function NuevaSolicitud() {
 
                   <div className="space-y-2 text-sm text-slate-700 font-medium">
                     <p>📦 <strong className="text-slate-500">Herramienta:</strong> {toolSelectedObject ? `${toolSelectedObject.name} [${toolSelectedObject.code}]` : (toolSearch.trim() || 'Herramienta solicitada')}</p>
+                    <p>🕒 <strong className="text-slate-500">Fecha de Necesidad:</strong> <span className="font-bold text-amber-800">{neededDate ? new Date(neededDate).toLocaleString('es-AR') : 'No especificada'}</span></p>
                     <p>🚩 <strong className="text-slate-500">Origen:</strong> {toolSelectedObject?.obras?.name || 'A determinar por Logística'}</p>
                     <p>📍 <strong className="text-slate-500">Destino:</strong> {targetObraObject?.name || 'No seleccionada'}</p>
                     <p>👤 <strong className="text-slate-500">Encargado Logística:</strong> {logisticaUserObject?.full_name || personalLogistica[0]?.full_name || 'Asignación automática'}</p>

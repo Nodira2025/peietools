@@ -17,10 +17,11 @@ interface Solicitud {
   priority: string;
   status: string;
   created_at: string;
-  source_name?: string;
-  target_name?: string;
-  item_name?: string;
-  item_code?: string;
+  needed_date?: string | null;
+  source_name: string;
+  target_name: string;
+  item_name: string;
+  item_code: string;
   requester_name: string;
   requester_whatsapp: string | null;
   assigned_name?: string;
@@ -70,7 +71,7 @@ export default function Solicitudes() {
       const { data: toolsData, error: toolsError } = await supabase
         .from('solicitudes')
         .select(`
-          id, requester_id, priority, status, created_at,
+          id, requester_id, priority, status, created_at, needed_date,
           profiles!solicitudes_requester_id_fkey(full_name, whatsapp),
           herramientas!solicitudes_herramienta_id_fkey(name, code, obras!herramientas_current_obra_id_fkey(name)),
           target_obra:obras!solicitudes_target_obra_id_fkey(name),
@@ -101,6 +102,7 @@ export default function Solicitudes() {
           priority: s.priority,
           status: s.status,
           created_at: s.created_at,
+          needed_date: s.needed_date,
           source_name: s.herramientas?.obras?.name || 'Desconocida',
           target_name: s.target_obra?.name || 'Desconocida',
           item_name: s.herramientas?.name,
@@ -414,6 +416,12 @@ export default function Solicitudes() {
                         solicitud.priority === 'Alta' ? 'text-amber-600' :
                         solicitud.priority === 'Normal' ? 'text-peie-blue' : 'text-slate-500'
                       }`}>{solicitud.priority}</span>
+                    </div>
+                  )}
+                  {solicitud.needed_date && (
+                    <div className="flex justify-between items-center bg-amber-50 px-2 py-1 rounded-lg border border-amber-200/60">
+                      <span className="text-amber-700 font-bold text-[10px] uppercase">Fecha Necesidad:</span>
+                      <span className="font-bold text-amber-900 text-xs">{new Date(solicitud.needed_date).toLocaleString('es-AR')}</span>
                     </div>
                   )}
                   {solicitud.assigned_name && (

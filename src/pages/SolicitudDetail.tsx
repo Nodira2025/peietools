@@ -828,6 +828,12 @@ export default function SolicitudDetail() {
                       <span className="text-slate-400 text-xs">Prioridad</span>
                       <span className="text-slate-700">{solicitud.priority}</span>
                     </div>
+                    {solicitud.needed_date && (
+                      <div className="flex justify-between bg-amber-50 px-2 py-1.5 rounded-lg -mx-1">
+                        <span className="text-amber-700 text-xs font-bold">Fecha de Necesidad</span>
+                        <span className="font-bold text-amber-900">{new Date(solicitud.needed_date).toLocaleString('es-AR')}</span>
+                      </div>
+                    )}
                     {receivedByName && (
                       <div className="flex justify-between bg-emerald-50 px-2 py-1.5 rounded-lg -mx-1">
                         <span className="text-emerald-600 text-xs font-bold">Recibio en obra</span>
