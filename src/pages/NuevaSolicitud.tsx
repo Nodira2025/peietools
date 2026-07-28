@@ -413,7 +413,7 @@ export default function NuevaSolicitud() {
     const toolDescription = `${tool.name} [${tool.code}]`;
 
     // 1. Guardar la solicitud
-    const { data: newSolicitud, error } = await supabase.from('solicitudes').insert([{
+    const insertPayload: any = {
       requester_id: profile.id,
       herramienta_id: tool.id,
       source_obra_id: tool.current_obra_id,
@@ -424,7 +424,17 @@ export default function NuevaSolicitud() {
       comments: comments.trim() || null,
       needed_date: neededDateIso,
       security_code: securityCode
-    }]).select().single();
+    };
+
+    let { data: newSolicitud, error } = await supabase.from('solicitudes').insert([insertPayload]).select().single();
+
+    if (error && error.message?.includes('needed_date')) {
+      delete insertPayload.needed_date;
+      const retry = await supabase.from('solicitudes').insert([insertPayload]).select().single();
+      newSolicitud = retry.data;
+      error = retry.error;
+    }
+
 
     if (newSolicitud && tool) {
       await supabase.from('movimientos').insert([{

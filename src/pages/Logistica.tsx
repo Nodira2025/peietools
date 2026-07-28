@@ -198,7 +198,7 @@ export default function Logistica() {
     setLoading(true);
     try {
       // 1. Fetch Herramientas
-      const { data: toolsData, error: toolsError } = await supabase
+      let { data: toolsData, error: toolsError } = await supabase
         .from('solicitudes')
         .select(`
           id, status, priority, created_at, needed_date, comments,
@@ -208,7 +208,22 @@ export default function Logistica() {
         `)
         .in('status', ['Pendiente', 'Asignada', 'En retiro', 'En traslado', 'Entregada']);
 
+      if (toolsError && toolsError.message?.includes('needed_date')) {
+        const fallback = await supabase
+          .from('solicitudes')
+          .select(`
+            id, status, priority, created_at, comments,
+            herramientas!solicitudes_herramienta_id_fkey(name, code, obras!herramientas_current_obra_id_fkey(name)),
+            target_obra:obras!solicitudes_target_obra_id_fkey(name),
+            profiles!solicitudes_requester_id_fkey(full_name)
+          `)
+          .in('status', ['Pendiente', 'Asignada', 'En retiro', 'En traslado', 'Entregada']);
+        toolsData = fallback.data;
+        toolsError = fallback.error;
+      }
+
       if (toolsError) throw toolsError;
+
 
       // 2. Fetch Personal
       const { data: personalData, error: personalError } = await supabase

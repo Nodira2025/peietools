@@ -68,7 +68,7 @@ export default function Solicitudes() {
     setLoading(true);
     try {
       // 1. Fetch Herramientas (Solicitudes)
-      const { data: toolsData, error: toolsError } = await supabase
+      let { data: toolsData, error: toolsError } = await supabase
         .from('solicitudes')
         .select(`
           id, requester_id, priority, status, created_at, needed_date,
@@ -78,7 +78,22 @@ export default function Solicitudes() {
           assigned:profiles!solicitudes_assigned_to_fkey(full_name)
         `);
 
+      if (toolsError && toolsError.message?.includes('needed_date')) {
+        const fallback = await supabase
+          .from('solicitudes')
+          .select(`
+            id, requester_id, priority, status, created_at,
+            profiles!solicitudes_requester_id_fkey(full_name, whatsapp),
+            herramientas!solicitudes_herramienta_id_fkey(name, code, obras!herramientas_current_obra_id_fkey(name)),
+            target_obra:obras!solicitudes_target_obra_id_fkey(name),
+            assigned:profiles!solicitudes_assigned_to_fkey(full_name)
+          `);
+        toolsData = fallback.data;
+        toolsError = fallback.error;
+      }
+
       if (toolsError) throw toolsError;
+
 
       // 2. Fetch Personal (Traslados)
       const { data: personalData, error: personalError } = await supabase
