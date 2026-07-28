@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Truck, Clock, Package, CheckCircle, ArrowRight, Wrench, Search, FileSpreadsheet, AlertTriangle } from 'lucide-react';
+import { Truck, Clock, Package, CheckCircle, ArrowRight, Wrench, Search, FileSpreadsheet, AlertTriangle, Sparkles, ShoppingBag } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import FilterBar from '../components/FilterBar';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Textarea } from '@/components/ui/textarea';
 import { jsPDF } from 'jspdf';
 import { buildWhatsAppLink } from '../lib/whatsapp';
+import { normalizeWhatsAppPurchaseText } from '../lib/aiPurchaseFormatter';
 
 interface LogisticaItem {
   id: string;
@@ -53,6 +54,80 @@ export default function Logistica() {
   const [gastoMonto, setGastoMonto] = useState('');
   const [gastoDetalle, setGastoDetalle] = useState('');
   const [gastoPago, setGastoPago] = useState('Cuenta corriente BP');
+
+  // Form State para registrar orden de compra (WhatsApp + IA)
+  const [isCompraOpen, setIsCompraOpen] = useState(false);
+  const [compraRawText, setCompraRawText] = useState('');
+  const [compraTitle, setCompraTitle] = useState('');
+  const [compraDescription, setCompraDescription] = useState('');
+  const [compraPriority, setCompraPriority] = useState('Normal');
+  const [compraObraId, setCompraObraId] = useState('');
+  const [compraEmpleadoName, setCompraEmpleadoName] = useState('');
+  const [compraSaving, setCompraSaving] = useState(false);
+  const [isAIFormatted, setIsAIFormatted] = useState(false);
+
+  const handleApplyAI = () => {
+    if (!compraRawText.trim()) {
+      toast({ variant: 'destructive', title: 'Texto vacío', description: 'Pegá primero el texto del mensaje de WhatsApp.' });
+      return;
+    }
+    const res = normalizeWhatsAppPurchaseText(compraRawText);
+    setCompraTitle(res.formattedTitle);
+    setCompraDescription(res.formattedDescription);
+    setCompraPriority(res.detectedPriority);
+    setIsAIFormatted(true);
+    toast({ title: '✨ Texto estructurado con IA', description: 'Se identificaron ítems, cantidades y formato limpio.' });
+  };
+
+  const handleSaveCompra = async () => {
+    if (!profile) return;
+    const title = compraTitle.trim() || compraRawText.trim();
+    if (!title) {
+      toast({ variant: 'destructive', title: 'Faltan datos', description: 'Por favor ingresá o pegá el texto de la compra.' });
+      return;
+    }
+
+    setCompraSaving(true);
+    try {
+      const payload: any = {
+        tool_name: title,
+        description: compraDescription.trim() || null,
+        quantity: 1,
+        priority: compraPriority,
+        justification: 'Registrado desde cel de Logística',
+        obra_id: compraObraId || null,
+        requester_id: profile.id,
+        status: 'Pendiente',
+        raw_whatsapp_text: compraRawText.trim() || null,
+        requested_employee: compraEmpleadoName.trim() || null
+      };
+
+      let { error } = await supabase.from('solicitudes_compras').insert([payload]);
+      if (error && (error.message?.includes('raw_whatsapp_text') || error.message?.includes('requested_employee'))) {
+        delete payload.raw_whatsapp_text;
+        delete payload.requested_employee;
+        const fallback = await supabase.from('solicitudes_compras').insert([payload]);
+        error = fallback.error;
+      }
+
+      if (error) throw error;
+
+      toast({ title: '¡Compra Registrada!', description: 'Guardada en el Registro de Compras (PC).' });
+      setIsCompraOpen(false);
+      setCompraRawText('');
+      setCompraTitle('');
+      setCompraDescription('');
+      setCompraPriority('Normal');
+      setCompraObraId('');
+      setCompraEmpleadoName('');
+      setIsAIFormatted(false);
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Error al guardar', description: err.message });
+    } finally {
+      setCompraSaving(false);
+    }
+  };
+
 
   useEffect(() => {
     fetchSolicitudes();
@@ -335,6 +410,136 @@ export default function Logistica() {
             <span>Historial de Reportes</span>
           </Button>
 
+          {/* Botón para Reportar Orden de Compra (Pegar WhatsApp + IA) */}
+          <Dialog open={isCompraOpen} onOpenChange={setIsCompraOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-amber-600 hover:bg-amber-700 text-white font-black rounded-xl text-xs h-10 px-3 flex-1 sm:flex-initial flex items-center justify-center gap-1.5 shadow-md">
+                🛍️ Reportar Compra
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="rounded-3xl w-[92%] max-w-md max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="text-lg font-extrabold text-peie-blue flex items-center gap-2">
+                  <ShoppingBag className="w-5 h-5 text-amber-600" /> Reportar Orden de Compra
+                </DialogTitle>
+                <DialogDescription className="text-xs text-slate-500">
+                  Pegá el texto crudo del mensaje de WhatsApp del empleado y la IA lo estructurará automáticamente para el Registro de Compras (PC).
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-2">
+                {/* 1. Área de Pegado del Texto Crudo */}
+                <div className="space-y-1.5 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                  <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                    <span>1. Pegar Texto de WhatsApp *</span>
+                    <span className="text-[10px] text-slate-400 font-normal">Copia directa del chat</span>
+                  </label>
+                  <Textarea
+                    rows={4}
+                    placeholder="Ej: Hola Santi, necesito 2 discos de amoladora de 7 pulgadas y 3 pares de guantes de baqueta urgente para la obra..."
+                    value={compraRawText}
+                    onChange={(e) => setCompraRawText(e.target.value)}
+                    className="rounded-xl bg-white border-slate-200 text-sm font-semibold p-3"
+                  />
+                  <Button
+                    type="button"
+                    onClick={handleApplyAI}
+                    disabled={!compraRawText.trim()}
+                    className="w-full h-11 bg-gradient-to-r from-peie-blue to-peie-light hover:opacity-90 text-white font-extrabold rounded-xl text-xs flex items-center justify-center gap-2 mt-2 shadow-sm"
+                  >
+                    <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+                    ✨ Estructurar y Limpiar con IA
+                  </Button>
+                </div>
+
+                {/* 2. Resultado Procesado por IA */}
+                <div className="space-y-3 bg-amber-50/60 p-3 rounded-2xl border border-amber-200/80">
+                  <span className="text-[10px] font-black text-amber-800 uppercase tracking-wider flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-amber-600" /> Resultado Procesado por IA
+                  </span>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">Título / Ítems Principales:</label>
+                    <Input
+                      value={compraTitle}
+                      onChange={(e) => setCompraTitle(e.target.value)}
+                      placeholder="Ej: Discos de amoladora 7 pulgadas (2u) y Guantes de baqueta (3u)"
+                      className="rounded-xl bg-white h-10 border-slate-200 text-xs font-bold"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">Detalle Estructurado con Cantidades:</label>
+                    <Textarea
+                      rows={3}
+                      value={compraDescription}
+                      onChange={(e) => setCompraDescription(e.target.value)}
+                      placeholder="• [2u] Discos de amoladora 7 pulgadas&#10;• [3u] Guantes de baqueta"
+                      className="rounded-xl bg-white border-slate-200 text-xs font-medium p-2.5"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">Prioridad Detectada:</label>
+                    <select
+                      value={compraPriority}
+                      onChange={(e) => setCompraPriority(e.target.value)}
+                      className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-800"
+                    >
+                      <option value="Baja">Baja</option>
+                      <option value="Normal">Normal</option>
+                      <option value="Alta">Alta</option>
+                      <option value="Urgente">Urgente</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* 3. Campos Opcionales (Empleado y Obra) */}
+                <div className="space-y-3 pt-1 border-t border-slate-100">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Campos Opcionales</span>
+
+                  {/* Empleado que solicita */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">Empleado que solicita (Opcional):</label>
+                    <div className="relative">
+                      <Input
+                        placeholder="Escribí el nombre del empleado..."
+                        value={compraEmpleadoName}
+                        onChange={(e) => setCompraEmpleadoName(e.target.value)}
+                        className="rounded-xl h-10 bg-white border-slate-200 text-xs font-semibold"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Obra asociada */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">Obra asociada (Opcional):</label>
+                    <select
+                      value={compraObraId}
+                      onChange={(e) => setCompraObraId(e.target.value)}
+                      className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800"
+                    >
+                      <option value="">-- Sin Obra Específica / Base --</option>
+                      {activeObras.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <Button
+                  onClick={handleSaveCompra}
+                  disabled={compraSaving || (!compraTitle && !compraRawText)}
+                  className="w-full h-12 bg-peie-blue hover:bg-peie-blue/90 text-white font-extrabold rounded-2xl text-sm mt-4 shadow-lg"
+                >
+                  {compraSaving ? 'Guardando...' : '💾 Guardar en Registro de Compras (PC)'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           <Dialog open={isGastoOpen} onOpenChange={setIsGastoOpen}>
             <DialogTrigger asChild>
               <Button className="bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs h-10 px-3 flex-1 sm:flex-initial flex items-center justify-center gap-1.5 shadow-md">
@@ -348,6 +553,7 @@ export default function Logistica() {
                 Crea un comprobante de compra para enviárselo a Federico Grande por WhatsApp.
               </DialogDescription>
             </DialogHeader>
+
             <div className="space-y-4 py-3">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700">Concepto / ¿Qué se compró? *</label>

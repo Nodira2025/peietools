@@ -43,6 +43,42 @@ export default function SolicitudDetail() {
   const [waPreviewMessage, setWaPreviewMessage] = useState('');
   const [waPreviewRecipientName, setWaPreviewRecipientName] = useState('');
 
+  // Vale de Retiro / Autorización state
+  const [isValeOpen, setIsValeOpen] = useState(false);
+  const [authorizedPerson, setAuthorizedPerson] = useState('');
+  const [valeUrl, setValeUrl] = useState('');
+  const [savingVale, setSavingVale] = useState(false);
+
+  const handleSaveVale = async () => {
+    if (!solicitud) return;
+    if (!authorizedPerson.trim() && !valeUrl.trim()) {
+      toast({ variant: 'destructive', title: 'Faltan datos', description: 'Ingresá el nombre/DNI de la persona autorizada o la foto del vale.' });
+      return;
+    }
+
+    setSavingVale(true);
+    try {
+      const payload: any = {
+        authorized_pickup_person: authorizedPerson.trim() || null,
+        vale_url: valeUrl.trim() || null
+      };
+
+      let { error } = await supabase.from('solicitudes').update(payload).eq('id', solicitud.id);
+      if (error) {
+        toast({ variant: 'destructive', title: 'Error', description: error.message });
+      } else {
+        toast({ title: '¡Vale Habilitado!', description: 'Se autorizó la persona/vale para el retiro.' });
+        setSolicitud((prev: any) => ({ ...prev, ...payload }));
+        setIsValeOpen(false);
+      }
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Error al guardar vale', description: err.message });
+    } finally {
+      setSavingVale(false);
+    }
+  };
+
+
   const userRole = profile?.role?.toLowerCase();
   const isLogistica = userRole === 'logistica' || userRole === 'admin';
   const isRequester = solicitud?.requester_id === profile?.id;
@@ -479,6 +515,33 @@ export default function SolicitudDetail() {
             </div>
           )}
 
+          {/* Tarjeta de Vale de Retiro Autorizado */}
+          {solicitud.authorized_pickup_person && (
+            <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
+                  📄 Vale de Retiro Habilitado
+                </span>
+                <span className="text-[10px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full font-bold">Autorizado</span>
+              </div>
+              <p className="text-xs text-amber-900 font-semibold">
+                👤 Persona Autorizada: <strong>{solicitud.authorized_pickup_person}</strong>
+              </p>
+              {solicitud.vale_url && (
+                <div className="pt-1">
+                  <a
+                    href={solicitud.vale_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs font-bold text-peie-blue underline flex items-center gap-1 hover:text-peie-blue/80"
+                  >
+                    📎 Ver Comprobante / Foto del Vale
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ========================================================= */}
           {/* BOTONES SEGUN ROL                                         */}
           {/* ========================================================= */}
@@ -486,7 +549,59 @@ export default function SolicitudDetail() {
           {/* --- ACCIONES DE LOGISTICA / ADMIN --- */}
           {isLogistica && canAct && (
             <div className="pt-4 border-t border-slate-100 space-y-3">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Acciones de Logistica</h4>
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Acciones de Logística</h4>
+
+                {/* Botón para Habilitar / Subir Vale de Retiro */}
+                <Dialog open={isValeOpen} onOpenChange={setIsValeOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100 font-extrabold rounded-xl text-xs h-8 px-3">
+                      📄 Subir / Habilitar Vale
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="rounded-3xl w-[90%] max-w-md">
+                    <DialogHeader>
+                      <DialogTitle className="text-base font-extrabold text-peie-blue flex items-center gap-2">
+                        📄 Habilitar Vale de Retiro / Autorización
+                      </DialogTitle>
+                      <DialogDescription className="text-xs text-slate-500">
+                        Asigná el nombre/DNI de la persona o subí el link/foto del vale para que cualquiera pueda retirar este pedido.
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4 py-2 text-left">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700">Persona Autorizada (Nombre y DNI/Legajo) *</label>
+                        <Input
+                          placeholder="Ej: Juan Pérez (DNI 35.123.456) u Operario de Obra"
+                          value={authorizedPerson}
+                          onChange={(e) => setAuthorizedPerson(e.target.value)}
+                          className="rounded-xl h-11 text-sm font-semibold"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700">Link o Foto del Vale (Opcional):</label>
+                        <Input
+                          placeholder="Ej: https://... o link de foto del vale"
+                          value={valeUrl}
+                          onChange={(e) => setValeUrl(e.target.value)}
+                          className="rounded-xl h-11 text-xs"
+                        />
+                      </div>
+
+                      <Button
+                        onClick={handleSaveVale}
+                        disabled={savingVale || (!authorizedPerson && !valeUrl)}
+                        className="w-full h-12 bg-amber-600 hover:bg-amber-700 text-white font-extrabold rounded-2xl text-sm mt-3 shadow-md"
+                      >
+                        {savingVale ? 'Guardando...' : '💾 Habilitar Vale de Retiro'}
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
               <div className="flex flex-col gap-2">
                 {solicitud.status === 'Pendiente' && (
                   <Button 

@@ -198,7 +198,7 @@ export default function AppLayout() {
     { name: 'Personal', path: '/personal', icon: HardHat, show: true },
     { name: 'Órdenes', path: '/ordenes', icon: ClipboardList, show: false },
     { name: 'Logística', path: '/logistica', icon: Truck, show: isLogistica || isAdmin },
-    { name: 'Compras', path: '/compras', icon: ShoppingCart, show: false },
+    { name: 'Registro de Compras', path: '/compras', icon: ShoppingCart, show: !isMobile },
     { name: 'Obras (Admin)', path: '/obras', icon: Building, show: isAdmin },
     { name: 'Usuarios', path: '/usuarios', icon: Users, show: isAdmin },
   ].filter(item => item.show);

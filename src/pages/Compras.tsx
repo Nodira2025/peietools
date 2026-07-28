@@ -23,9 +23,12 @@ interface Compra {
   requester_id: string;
   status: string;
   created_at: string;
+  raw_whatsapp_text?: string | null;
+  requested_employee?: string | null;
   obras?: { name: string } | null;
   profiles?: { full_name: string } | null;
 }
+
 
 interface Obra {
   id: string;
@@ -352,10 +355,25 @@ ${APP_URL}/compras/${compra.id}`;
                 <CardTitle className="text-lg line-clamp-1">{compra.tool_name}</CardTitle>
                 <p className="text-sm font-medium text-peie-blue">Cant: {compra.quantity} | {compra.priority}</p>
               </CardHeader>
-              <CardContent className="text-sm space-y-2 mt-2 text-muted-foreground">
-                <p><strong>Solicita:</strong> {compra.profiles?.full_name}</p>
-                <p><strong>Obra:</strong> {compra.obras?.name || 'N/A'}</p>
-                <p className="line-clamp-2" title={compra.justification || ''}><strong>Motivo:</strong> {compra.justification}</p>
+              <CardContent className="text-sm space-y-2 mt-2 text-slate-700">
+                <p><strong>Cargado por:</strong> {compra.profiles?.full_name || 'Logística'}</p>
+                {compra.requested_employee && (
+                  <p><strong>Empleado solicitante:</strong> <span className="font-bold text-amber-900">{compra.requested_employee}</span></p>
+                )}
+                <p><strong>Obra:</strong> {compra.obras?.name || 'Inventario Base / Sin Obra'}</p>
+                {compra.description && (
+                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-xs whitespace-pre-line font-medium text-slate-800">
+                    <span className="font-bold text-peie-blue block mb-1">📋 Detalle Estructurado por IA:</span>
+                    {compra.description}
+                  </div>
+                )}
+                {compra.raw_whatsapp_text && (
+                  <div className="bg-emerald-50/60 p-2 rounded-xl border border-emerald-100 text-[11px] text-emerald-900 italic">
+                    <span className="font-bold not-italic block mb-0.5">💬 Texto WhatsApp copiado:</span>
+                    "{compra.raw_whatsapp_text}"
+                  </div>
+                )}
+
                 
                 <div className="pt-4 flex flex-wrap gap-2">
                   <Button size="sm" variant="outline" className="flex-1 w-full" onClick={() => handleResendWhatsApp(compra)}>
