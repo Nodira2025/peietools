@@ -51,7 +51,8 @@ export default function Compras() {
   const [filterDate, setFilterDate] = useState('');
   const [visibleCount, setVisibleCount] = useState(6);
 
-  const isComprasRole = profile?.role === 'compras' || profile?.role === 'admin';
+  const canManageStatus = profile?.role === 'compras' || profile?.role === 'admin' || profile?.role === 'logistica' || profile?.role === 'encargado' || profile?.role === 'solicitante';
+
 
   // Form State para nueva solicitud
   const [toolName, setToolName] = useState('');
@@ -212,12 +213,13 @@ ${APP_URL}/compras/${compra.id}`;
       case 'En evaluación': return <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-semibold flex items-center"><AlertCircle className="w-3 h-3 mr-1"/> En evaluación</span>;
       case 'Aprobada': return <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-semibold flex items-center"><CheckCircle className="w-3 h-3 mr-1"/> Aprobada</span>;
       case 'Rechazada': return <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs font-semibold flex items-center"><AlertCircle className="w-3 h-3 mr-1"/> Rechazada</span>;
-      case 'Comprada': return <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs font-semibold flex items-center"><ShoppingCart className="w-3 h-3 mr-1"/> Comprada</span>;
+      case 'Comprada': return <span className="bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-1 rounded-full text-xs font-black flex items-center shadow-sm"><ShoppingCart className="w-3.5 h-3.5 mr-1 text-amber-700"/> 🛍️ Comprada</span>;
       case 'Recibida': return <span className="bg-peie-light/20 text-peie-blue px-2 py-1 rounded text-xs font-semibold flex items-center"><CheckCircle className="w-3 h-3 mr-1"/> Recibida</span>;
       case 'Cerrada': return <span className="bg-gray-200 text-gray-800 px-2 py-1 rounded text-xs font-semibold flex items-center"><CheckCircle className="w-3 h-3 mr-1"/> Cerrada</span>;
       default: return <span className="bg-gray-100 px-2 py-1 rounded text-xs">{status}</span>;
     }
   };
+
 
   const handleResendWhatsApp = async (compra: any) => {
     const recipient = await getWhatsAppRecipient();
@@ -375,26 +377,49 @@ ${APP_URL}/compras/${compra.id}`;
                 )}
 
                 
-                <div className="pt-4 flex flex-wrap gap-2">
-                  <Button size="sm" variant="outline" className="flex-1 w-full" onClick={() => handleResendWhatsApp(compra)}>
-                    <MessageCircle className="w-3 h-3 mr-2" /> Reenviar
-                  </Button>
-                  
-                  {isComprasRole && compra.status !== 'Cerrada' && (
-                    <>
-                      {compra.status === 'Pendiente' && <Button size="sm" variant="outline" className="flex-1" onClick={() => updateStatus(compra.id, 'En evaluación')}>Evaluar</Button>}
-                      {compra.status === 'En evaluación' && <Button size="sm" variant="outline" className="flex-1 text-green-600" onClick={() => updateStatus(compra.id, 'Aprobada')}>Aprobar</Button>}
-                      {(compra.status === 'Pendiente' || compra.status === 'En evaluación') && <Button size="sm" variant="outline" className="flex-1 text-red-600" onClick={() => updateStatus(compra.id, 'Rechazada')}>Rechazar</Button>}
-                      {compra.status === 'Aprobada' && <Button size="sm" variant="outline" className="flex-1 text-purple-600" onClick={() => updateStatus(compra.id, 'Comprada')}>Marcar Comprada</Button>}
-                      {compra.status === 'Comprada' && <Button size="sm" variant="outline" className="flex-1 text-peie-blue" onClick={() => updateStatus(compra.id, 'Recibida')}>Marcar Recibida</Button>}
-                      {compra.status === 'Recibida' && (
-                        <Button size="sm" className="w-full bg-green-600 hover:bg-green-700 text-white mt-2" onClick={() => openToolDialog(compra)}>
-                          <RefreshCw className="w-4 h-4 mr-2" /> Crear en Inventario
-                        </Button>
-                      )}
-                    </>
+                <div className="pt-3 border-t border-slate-100 space-y-2.5">
+                  {canManageStatus && (
+                    <div className="flex items-center justify-between gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200">
+                      <span className="text-[10px] font-extrabold text-slate-500 uppercase">Cambiar Estado:</span>
+                      <select
+                        value={compra.status}
+                        onChange={(e) => updateStatus(compra.id, e.target.value)}
+                        className="h-8 px-2 rounded-lg border border-slate-200 bg-white text-xs font-extrabold text-slate-800 shadow-sm cursor-pointer"
+                      >
+                        <option value="Pendiente">⚡ Pendiente</option>
+                        <option value="En evaluación">🔍 En evaluación</option>
+                        <option value="Aprobada">✅ Aprobada</option>
+                        <option value="Comprada">🛍️ Comprada (Compra Realizada)</option>
+                        <option value="Recibida">📦 Recibida</option>
+                        <option value="Rechazada">❌ Rechazada</option>
+                        <option value="Cerrada">🔒 Cerrada</option>
+                      </select>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="outline" className="flex-1 rounded-xl" onClick={() => handleResendWhatsApp(compra)}>
+                      <MessageCircle className="w-3.5 h-3.5 mr-1.5" /> Reenviar
+                    </Button>
+
+                    {canManageStatus && compra.status !== 'Comprada' && (
+                      <Button
+                        size="sm"
+                        onClick={() => updateStatus(compra.id, 'Comprada')}
+                        className="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-black rounded-xl h-9 text-xs shadow-sm"
+                      >
+                        🛍️ Marcar COMPRADA
+                      </Button>
+                    )}
+                  </div>
+
+                  {compra.status === 'Recibida' && canManageStatus && (
+                    <Button size="sm" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs h-9 mt-1" onClick={() => openToolDialog(compra)}>
+                      <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Crear en Inventario
+                    </Button>
                   )}
                 </div>
+
               </CardContent>
             </Card>
           ))}
