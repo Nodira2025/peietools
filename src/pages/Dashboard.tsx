@@ -697,7 +697,7 @@ export default function Dashboard() {
         {(isAdmin || isLogistica || isCoordinador) && (
           <div className="space-y-2 pt-1">
             <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 px-1">
-              📋 Avisos y Seguimiento
+              📋 Avisos y Registro de Tareas
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <div 
@@ -714,6 +714,22 @@ export default function Dashboard() {
                       <span className="bg-indigo-100 text-indigo-900 text-[8px] font-black px-1.5 py-0.2 rounded uppercase">WhatsApp</span>
                     </div>
                     <p className="text-[10px] text-slate-500 font-medium">Aviso de tarea o compra especial.</p>
+                  </div>
+                </div>
+                <ChevronRight size={16} className="text-slate-400 shrink-0" />
+              </div>
+
+              <div 
+                onClick={() => navigate('/reportes')}
+                className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-sm hover:shadow-md flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-700 flex items-center justify-center shrink-0 border border-rose-200/60">
+                    <AlertTriangle size={20} className="stroke-[2] text-rose-600" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">Registro de Tareas</h3>
+                    <p className="text-[10px] text-slate-500 font-medium">Historial de tareas y excedidos.</p>
                   </div>
                 </div>
                 <ChevronRight size={16} className="text-slate-400 shrink-0" />
@@ -739,6 +755,7 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+
 
         {/* Buscador Visual (Admins y Logística) */}
         {(isAdmin || isLogistica) && (
