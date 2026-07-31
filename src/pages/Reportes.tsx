@@ -122,6 +122,8 @@ export default function Reportes() {
   const [loading, setLoading] = useState(true);
 
 
+  const [topMovedTools, setTopMovedTools] = useState<any[]>([]);
+
   const isAuthorized = profile?.role === 'admin' || profile?.role === 'logistica' || profile?.role === 'solicitante' || profile?.role === 'encargado';
 
   useEffect(() => {
@@ -139,7 +141,46 @@ export default function Reportes() {
         .from('herramientas')
         .select('*, obras(name)')
         .order('name');
-      setHerramientas(hData || []);
+        
+      if (hData) {
+        setHerramientas(hData as Herramienta[]);
+      }
+
+      // Load solicitudes para ranking de traslados
+      const { data: solData } = await supabase
+        .from('solicitudes')
+        .select('*, herramientas(id, code, name, status, category, current_obra_id, obras(name))')
+        .order('created_at', { ascending: false });
+
+      if (solData) {
+        const moveMap = new Map<string, any>();
+        solData.forEach(s => {
+          if (s.herramienta_id && s.herramientas) {
+            const key = s.herramienta_id;
+            const toolObj = Array.isArray(s.herramientas) ? s.herramientas[0] : s.herramientas;
+            if (toolObj) {
+              if (!moveMap.has(key)) {
+                moveMap.set(key, {
+                  id: toolObj.id,
+                  code: toolObj.code,
+                  name: toolObj.name,
+                  status: toolObj.status,
+                  category: toolObj.category,
+                  obra_name: toolObj.obras?.name || 'Base / Depósito',
+                  count: 0,
+                  last_move: s.created_at
+                });
+              }
+              moveMap.get(key).count += 1;
+            }
+          }
+        });
+
+        const sortedTools = Array.from(moveMap.values())
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 10);
+        setTopMovedTools(sortedTools);
+      }
 
       // Load active obras
       const { data: oData } = await supabase
@@ -783,8 +824,97 @@ export default function Reportes() {
         </CardContent>
       </Card>
 
+      {/* 🏆 TABLA RANKING: HERRAMIENTAS MÁS MOVIDAS (COMPRAS & REPUESTOS INTELIGENTES) */}
+      <Card className="rounded-2xl shadow-sm border-indigo-100 bg-white overflow-hidden">
+        <CardHeader className="p-5 pb-3 bg-gradient-to-r from-indigo-50/80 to-blue-50/30 border-b border-indigo-100/60">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Truck className="h-5 w-5 text-peie-blue animate-bounce" />
+                <CardTitle className="text-base font-black text-slate-900">
+                  Ranking de Herramientas Más Movidas
+                </CardTitle>
+                <span className="bg-indigo-100 text-indigo-900 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                  Top Rotación
+                </span>
+              </div>
+              <CardDescription className="text-xs text-slate-500 font-medium">
+                Herramientas con mayor frecuencia de traslados entre obras para anticipar compras de repuestos o duplicar stock.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-0">
+          {topMovedTools.length === 0 ? (
+            <div className="p-8 text-center text-xs text-slate-400">
+              No hay movimientos de herramientas registrados aún para calcular el ranking.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[10px] border-b border-slate-100">
+                  <tr>
+                    <th className="py-3 px-4"># Ranking</th>
+                    <th className="py-3 px-4">Código & Herramienta</th>
+                    <th className="py-3 px-4">Categoría</th>
+                    <th className="py-3 px-4">Total Traslados</th>
+                    <th className="py-3 px-4">Ubicación Actual</th>
+                    <th className="py-3 px-4">Recomendación de Compra / Stock</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                  {topMovedTools.map((t, idx) => {
+                    const badgeMedal = idx === 0 ? '🥇 1°' : idx === 1 ? '🥈 2°' : idx === 2 ? '🥉 3°' : `#${idx + 1}`;
+                    return (
+                      <tr key={t.id} className="hover:bg-indigo-50/30 transition-colors">
+                        <td className="py-3 px-4 font-black text-slate-800 text-sm">{badgeMedal}</td>
+                        <td className="py-3 px-4">
+                          <button 
+                            onClick={() => navigate(`/herramientas/${t.id}`)}
+                            className="font-bold text-peie-blue hover:underline text-left block"
+                          >
+                            <span className="font-mono text-[10px] text-slate-400 mr-1.5 font-normal">[{t.code}]</span>
+                            {t.name}
+                          </button>
+                        </td>
+                        <td className="py-3 px-4 text-slate-600 font-medium">{t.category || 'Otros'}</td>
+                        <td className="py-3 px-4">
+                          <span className="bg-peie-blue/10 text-peie-blue font-black px-2.5 py-1 rounded-full border border-peie-blue/20">
+                            🔄 {t.count} traslados
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 font-semibold text-slate-700">
+                          {t.obra_name}
+                        </td>
+                        <td className="py-3 px-4">
+                          {t.count >= 4 ? (
+                            <span className="bg-rose-50 text-rose-700 font-extrabold px-2.5 py-1 rounded-full text-[10px] border border-rose-200 flex items-center gap-1 w-fit">
+                              <AlertTriangle size={12} /> Alta demanda: Considerar repuesto / compra
+                            </span>
+                          ) : t.count >= 2 ? (
+                            <span className="bg-amber-50 text-amber-700 font-bold px-2.5 py-1 rounded-full text-[10px] border border-amber-200 w-fit block">
+                              ⚡ Movimiento frecuente en obras
+                            </span>
+                          ) : (
+                            <span className="bg-slate-100 text-slate-600 font-semibold px-2.5 py-1 rounded-full text-[10px] w-fit block">
+                              ✅ Rotación normal
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* 📋 TABLA REGISTRO DE REPORTES EXCEDIDOS DE LOGÍSTICA */}
       <Card className="rounded-2xl shadow-sm border-rose-100 bg-white overflow-hidden">
+
         <CardHeader className="p-5 pb-3 bg-gradient-to-r from-rose-50 to-orange-50/30 border-b border-rose-100/60">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1">

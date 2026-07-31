@@ -61,9 +61,37 @@ export default function HerramientaDetail() {
   const isAdmin = profile?.role === 'admin' || profile?.role === 'logistica' || profile?.role === 'compras';
   const canEdit = isAdmin || profile?.role === 'solicitante' || profile?.role === 'encargado';
 
+  const [movimientosList, setMovimientosList] = useState<any[]>([]);
+  const [loadingMovimientos, setLoadingMovimientos] = useState(false);
+
+  const fetchMovimientos = async () => {
+    if (!id) return;
+    setLoadingMovimientos(true);
+    let { data, error } = await supabase
+      .from('solicitudes')
+      .select('*, source_obra:obras!solicitudes_source_obra_id_fkey(name), target_obra:obras!solicitudes_target_obra_id_fkey(name), requester:profiles!solicitudes_requester_id_fkey(full_name)')
+      .eq('herramienta_id', id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      const res = await supabase
+        .from('solicitudes')
+        .select('*')
+        .eq('herramienta_id', id)
+        .order('created_at', { ascending: false });
+      data = res.data;
+    }
+    setMovimientosList(data || []);
+    setLoadingMovimientos(false);
+  };
+
   useEffect(() => {
-    if (id) fetchHerramienta();
+    if (id) {
+      fetchHerramienta();
+      fetchMovimientos();
+    }
   }, [id]);
+
 
   useEffect(() => {
     async function fetchObras() {
@@ -670,6 +698,93 @@ export default function HerramientaDetail() {
           </div>
         </div>
       </div>
+
+      {/* 📋 SECCIÓN: HISTORIAL DE MOVIMIENTOS Y TRASLADOS DE ESTA HERRAMIENTA */}
+      <Card className="rounded-2xl shadow-sm border-slate-200 bg-white overflow-hidden">
+        <CardHeader className="bg-slate-50/70 border-b border-slate-100 p-4 sm:p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+          <div>
+            <CardTitle className="text-base font-black text-slate-800 flex items-center gap-2">
+              <span className="p-1.5 rounded-lg bg-peie-blue/10 text-peie-blue">📋</span> Historial de Movimientos entre Obras
+            </CardTitle>
+            <CardDescription className="text-xs text-slate-500 mt-0.5">
+              Registro completo de traslados, entregas y reubicaciones de esta unidad
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="bg-peie-blue/10 text-peie-blue font-extrabold text-xs px-3 py-1.5 rounded-full border border-peie-blue/20 flex items-center gap-1.5">
+              <Truck size={14} /> {movimientosList.length} Traslados Registrados
+            </span>
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-0">
+          {loadingMovimientos ? (
+            <div className="p-8 text-center text-xs text-slate-400">Cargando historial de traslados...</div>
+          ) : movimientosList.length === 0 ? (
+            <div className="p-8 text-center space-y-1">
+              <p className="text-sm font-bold text-slate-700">Sin movimientos entre obras registrados aún</p>
+              <p className="text-xs text-slate-400">Esta herramienta permanece en su ubicación actual sin traslados recientes.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[10px] border-b border-slate-100">
+                  <tr>
+                    <th className="py-3 px-4">Fecha y Hora</th>
+                    <th className="py-3 px-4">Recorrido (Origen ➔ Destino)</th>
+                    <th className="py-3 px-4">Solicitado / Trasladado Por</th>
+                    <th className="py-3 px-4">Estado</th>
+                    <th className="py-3 px-4">Observaciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                  {movimientosList.map((mov) => {
+                    const fecha = new Date(mov.created_at);
+                    const fechaStr = fecha.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                    const horaStr = fecha.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+                    const origen = mov.source_obra?.name || 'Base / Depósito';
+                    const destino = mov.target_obra?.name || 'Obra Destino';
+                    const usuario = mov.requester?.full_name || 'Personal PEIE';
+
+                    return (
+                      <tr key={mov.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3 px-4 whitespace-nowrap text-slate-500 font-mono">
+                          {fechaStr} <span className="text-[10px] text-slate-400">{horaStr} hs</span>
+                        </td>
+                        <td className="py-3 px-4 font-bold text-slate-900">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-slate-600">{origen}</span>
+                            <span className="text-peie-blue font-black">➔</span>
+                            <span className="text-peie-blue font-extrabold">{destino}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 font-semibold text-slate-600">
+                          {usuario}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border ${
+                            mov.status === 'Confirmada' || mov.status === 'Entregada'
+                              ? 'bg-green-50 text-green-700 border-green-200'
+                              : mov.status === 'En traslado'
+                              ? 'bg-blue-50 text-blue-700 border-blue-200'
+                              : 'bg-slate-100 text-slate-700 border-slate-200'
+                          }`}>
+                            {mov.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-slate-500 max-w-xs truncate">
+                          {mov.comments || mov.justification || 'Sin observaciones.'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
 
       {/* Fullscreen Image Preview Modal */}
       {isImageModalOpen && herramienta?.photo_url && (
