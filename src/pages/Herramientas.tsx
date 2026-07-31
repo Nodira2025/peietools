@@ -244,75 +244,92 @@ export default function Herramientas() {
     toast({ title: 'Éxito', description: 'Inventario completo exportado a Excel correctamente.' });
   };
 
-  // Normalizador inteligente para agrupar herramientas por familias estandarizadas (ej: Escalera 10p, Escalera 10 -> Escalera de 10 Peldaños)
+  // Normalizador inteligente para agrupar herramientas por familias estandarizadas (ej: Pinza de identar + Pinza de indentar -> Pinza de Indentar)
   const getStandardFamilyName = (name: string, category: string | null): string => {
     const clean = name.trim();
-    const lower = clean.toLowerCase();
+    const normalized = clean.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
-    // 1. Escaleras
-    if (category === 'Escaleras' || lower.includes('escalera')) {
-      const matchPeldaños = lower.match(/\b(\d{1,2})\s*(p|peld|peldaño|peldaños)?\b/);
+    // 1. Pinzas de Indentar / Crimpeadoras / Terminales
+    if (normalized.includes('identar') || normalized.includes('indentar') || normalized.includes('crimpead') || normalized.includes('prensa terminal')) {
+      return 'Pinza de Indentar';
+    }
+
+    // 2. Tijeras de Aviación / Hojalatero
+    if (normalized.includes('tijera') && (normalized.includes('aviacion') || normalized.includes('hojalat'))) {
+      return 'Tijera de Aviación';
+    }
+
+    // 3. Tijeras Pelacables
+    if (normalized.includes('tijera') && normalized.includes('pelacable')) {
+      return 'Tijera Pelacables';
+    }
+
+    // 4. Escaleras
+    if (category === 'Escaleras' || normalized.includes('escalera')) {
+      if (normalized.includes('extensib')) return 'Escalera Extensible';
+      const matchPeldaños = normalized.match(/\b(\d{1,2})\s*(p|peld|peldaño|peldaños)?\b/);
       if (matchPeldaños && matchPeldaños[1]) {
         return `Escalera de ${matchPeldaños[1]} Peldaños`;
       }
       return 'Escalera de Obra';
     }
 
-    // 2. Amoladoras
-    if (category === 'Amoladoras' || lower.includes('amoladora')) {
-      if (lower.includes('7') || lower.includes('180') || lower.includes('grande')) {
+    // 5. Amoladoras
+    if (category === 'Amoladoras' || normalized.includes('amoladora')) {
+      if (normalized.includes('7') || normalized.includes('180') || normalized.includes('grande')) {
         return 'Amoladora Angular 7" (180mm)';
       }
-      if (lower.includes('9') || lower.includes('230')) {
+      if (normalized.includes('9') || normalized.includes('230')) {
         return 'Amoladora Angular 9" (230mm)';
       }
       return 'Amoladora Angular 4 1/2" (115mm)';
     }
 
-    // 3. Taladros / Rotomartillos
-    if (category === 'Taladros' || lower.includes('taladro') || lower.includes('roto')) {
-      if (lower.includes('roto') || lower.includes('sds')) {
+    // 6. Taladros / Rotomartillos
+    if (category === 'Taladros' || normalized.includes('taladro') || normalized.includes('roto')) {
+      if (normalized.includes('roto') || normalized.includes('sds')) {
         return 'Rotomartillo SDS Plus';
       }
       return 'Taladro Percutor 13mm';
     }
 
-    // 4. Andamios y Estructuras (Categoría Otros / General)
-    if (lower.includes('andamio') || lower.includes('cuerpo')) {
-      if (lower.includes('tablon') || lower.includes('tablón')) return 'Tablón para Andamio';
-      if (lower.includes('rueda') || lower.includes('garrucha')) return 'Rueda para Andamio';
+    // 7. Andamios y Estructuras
+    if (normalized.includes('andamio') || normalized.includes('cuerpo')) {
+      if (normalized.includes('tablon')) return 'Tablón para Andamio';
+      if (normalized.includes('rueda') || normalized.includes('garrucha')) return 'Rueda para Andamio';
       return 'Cuerpo de Andamio Tubular';
     }
 
-    // 5. Pistolas de Calor y Térmicas
-    if (lower.includes('pistola') && (lower.includes('calor') || lower.includes('termica') || lower.includes('térmica'))) {
+    // 8. Pistolas de Calor y Térmicas
+    if (normalized.includes('pistola') && (normalized.includes('calor') || normalized.includes('termica'))) {
       return 'Pistola de Calor';
     }
 
-    // 6. Alargues / Extensiones Eléctricas
-    if (lower.includes('alargue') || lower.includes('extension') || lower.includes('extensión') || lower.includes('cable prolongador')) {
+    // 9. Alargues / Extensiones Eléctricas
+    if (normalized.includes('alargue') || normalized.includes('extension') || normalized.includes('prolongador')) {
       return 'Alargue / Extensión Eléctrica';
     }
 
-    // 7. Soldadoras y Corte
-    if (lower.includes('soldadora') || lower.includes('inverter') || lower.includes('mma')) {
+    // 10. Soldadoras y Corte
+    if (normalized.includes('soldadora') || normalized.includes('inverter') || normalized.includes('mma')) {
       return 'Soldadora Inverter';
     }
 
-    // 8. Garrafas y Sopletes
-    if (lower.includes('garrafa') || lower.includes('soplete')) {
+    // 11. Garrafas y Sopletes
+    if (normalized.includes('garrafa') || normalized.includes('soplete')) {
       return 'Garrafa / Soplete de Obra';
     }
 
-    // 9. Compresores e Hidrolavadoras
-    if (lower.includes('compresor')) return 'Compresor de Aire';
-    if (lower.includes('hidrolavadora')) return 'Hidrolavadora Industrial';
+    // 12. Compresores e Hidrolavadoras
+    if (normalized.includes('compresor')) return 'Compresor de Aire';
+    if (normalized.includes('hidrolavadora')) return 'Hidrolavadora Industrial';
 
-    // 10. Normalización general de plurales / espacios
+    // 13. Capitalización estándar para nombres genéricos
     return clean
-      .replace(/\s+/g, ' ')
-      .replace(/s$/i, ''); // Remueve 's' final para unificar singular/plural
+      .toLowerCase()
+      .replace(/(?:^|\s)\S/g, (a) => a.toUpperCase());
   };
+
 
   return (
     <div className="space-y-6 pb-safe">
