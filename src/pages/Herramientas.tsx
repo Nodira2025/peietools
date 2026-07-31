@@ -449,61 +449,84 @@ export default function Herramientas() {
       ) : (
         /* VISTA DE HERRAMIENTAS DENTRO DE UNA CATEGORÍA */
         <div className="space-y-4">
-          {/* Buscador e Inputs de Filtrado */}
-          <div className="flex flex-col md:flex-row gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input 
-                placeholder="Buscar por nombre, código o marca..." 
-                value={searchTerm} 
-                onChange={e => setSearchTerm(e.target.value)} 
-                className="pl-10 h-11 rounded-xl border-slate-200" 
-              />
-            </div>
-            <div className="flex items-center gap-2 self-end w-full md:w-auto">
-              <Button 
-                variant="outline"
-                className="h-11 rounded-xl border-slate-200 text-slate-600 font-medium flex-1 md:flex-initial"
-                onClick={() => { setSearchTerm(''); setFilterObra(''); setFilterStatus(''); setFilterEncargado(''); }}
-              >
-                Limpiar Filtros
-              </Button>
-              <Button 
-                variant="outline"
-                onClick={exportToExcel}
-                className="h-11 rounded-xl border-slate-200 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 font-medium flex items-center gap-1.5 flex-1 md:flex-initial"
-              >
-                <Download className="h-4 w-4" /> Exportar Excel
-              </Button>
-              <div className="flex items-center border border-slate-200 rounded-xl p-1 bg-slate-50 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setViewMode('grouped')}
-                  className={`p-1.5 rounded-lg transition-all flex items-center gap-1 text-xs font-bold ${viewMode === 'grouped' ? 'bg-peie-blue text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                  title="Vista Agrupada por Familia/Modelo"
+          {/* Barra de Búsqueda y Botón Agrupar Destacado en Celulares */}
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input 
+                  placeholder="Buscar por nombre, código o marca..." 
+                  value={searchTerm} 
+                  onChange={e => setSearchTerm(e.target.value)} 
+                  className="pl-10 h-11 rounded-xl border-slate-200" 
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline"
+                  className="h-11 rounded-xl border-slate-200 text-slate-600 font-medium flex-1 sm:flex-initial text-xs"
+                  onClick={() => { setSearchTerm(''); setFilterObra(''); setFilterStatus(''); setFilterEncargado(''); }}
                 >
-                  <Layers className="h-4 w-4" />
-                  <span className="hidden sm:inline">Agrupado</span>
-                </button>
+                  Limpiar
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={exportToExcel}
+                  className="h-11 rounded-xl border-slate-200 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 font-medium flex items-center gap-1.5 flex-1 sm:flex-initial text-xs"
+                >
+                  <Download className="h-4 w-4" /> Excel
+                </Button>
+              </div>
+            </div>
+
+            {/* SECTOR DE MODO DE VISTA (BOTÓN AGRUPAR DESTACADO EN CELULARES) */}
+            <div className="flex items-center justify-between bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200/80 shadow-inner">
+              <button
+                type="button"
+                onClick={() => setViewMode('grouped')}
+                className={`flex-1 py-2.5 px-3 rounded-xl font-extrabold text-xs transition-all flex items-center justify-center gap-2 ${
+                  viewMode === 'grouped'
+                    ? 'bg-peie-blue text-white shadow-md scale-[1.01]'
+                    : 'bg-white text-peie-blue border border-slate-200/60 hover:bg-slate-50'
+                }`}
+              >
+                <Layers className="h-4.5 w-4.5" />
+                <span className="text-xs sm:text-sm font-black">📦 Vista Agrupada por Familias</span>
+                {viewMode === 'grouped' && (
+                  <span className="bg-white/20 text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider ml-1">
+                    Activo
+                  </span>
+                )}
+              </button>
+
+              <div className="flex items-center gap-1 pl-2">
                 <button
                   type="button"
                   onClick={() => setViewMode('grid')}
-                  className={`p-1.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white text-peie-blue shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                  title="Vista Grilla"
+                  className={`p-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
+                    viewMode === 'grid' ? 'bg-white text-peie-blue shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                  title="Vista Tarjetas Individuales"
                 >
                   <LayoutGrid className="h-4 w-4" />
+                  <span className="hidden md:inline">Grilla</span>
                 </button>
+
                 <button
                   type="button"
                   onClick={() => setViewMode('list')}
-                  className={`p-1.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white text-peie-blue shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                  title="Vista Lista"
+                  className={`p-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
+                    viewMode === 'list' ? 'bg-white text-peie-blue shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                  title="Vista Lista Tabla"
                 >
                   <List className="h-4 w-4" />
+                  <span className="hidden md:inline">Lista</span>
                 </button>
               </div>
             </div>
           </div>
+
 
           {/* Chips de Estado Rápidos */}
           <div className="flex flex-wrap gap-1.5 py-1 items-center">
