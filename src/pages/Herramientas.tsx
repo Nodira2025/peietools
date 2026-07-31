@@ -21,7 +21,8 @@ import {
   List,
   Download,
   Truck,
-  Camera
+  Camera,
+  Zap
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
