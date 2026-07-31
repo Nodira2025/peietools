@@ -408,10 +408,11 @@ Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Elementos de segur
                         <SelectValue placeholder="Categoría" />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl">
-                        {['Escaleras', 'Amoladoras', 'Taladros', 'Elementos de seguridad', 'Instrumentos de medición', 'Vehículos', 'Otros'].map(cat => (
+                        {['Escaleras', 'Amoladoras', 'Taladros', 'Prensas y Pinzas', 'Elementos de seguridad', 'Instrumentos de medición', 'Vehículos', 'Otros'].map(cat => (
                           <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                         ))}
                       </SelectContent>
+
                     </Select>
                   </div>
 

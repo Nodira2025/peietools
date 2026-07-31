@@ -125,6 +125,7 @@ export default function Herramientas() {
     { name: 'Escaleras', icon: Layers, color: 'from-amber-400 to-orange-500', desc: 'Escaleras telescópicas, tijeras, andamios' },
     { name: 'Amoladoras', icon: Disc, color: 'from-sky-400 to-blue-600', desc: 'Amoladoras angulares, de banco, discos' },
     { name: 'Taladros', icon: Hammer, color: 'from-rose-400 to-red-600', desc: 'Rotopercutores, atornilladores, brocas' },
+    { name: 'Prensas y Pinzas', icon: Zap, color: 'from-indigo-500 to-purple-600', desc: 'Pinzas de indentar, alicates, prensas terminales y ponchadoras' },
     { name: 'Elementos de seguridad', icon: Shield, color: 'from-emerald-400 to-teal-600', desc: 'Cascos, arneses, antiparras, guantes' },
     { name: 'Instrumentos de medición', icon: Ruler, color: 'from-purple-400 to-indigo-600', desc: 'Multímetros, pinzas, niveles, cintas' },
     { name: 'Vehículos', icon: Car, color: 'from-teal-400 to-cyan-600', desc: 'Camionetas, utilitarios, furgones' },
@@ -136,6 +137,7 @@ export default function Herramientas() {
       case 'Escaleras': return <Layers className="h-5 w-5 text-amber-500" />;
       case 'Amoladoras': return <Disc className="h-5 w-5 text-sky-500" />;
       case 'Taladros': return <Hammer className="h-5 w-5 text-rose-500" />;
+      case 'Prensas y Pinzas': return <Zap className="h-5 w-5 text-indigo-500" />;
       case 'Elementos de seguridad': return <Shield className="h-5 w-5 text-emerald-500" />;
       case 'Instrumentos de medición': return <Ruler className="h-5 w-5 text-purple-500" />;
       case 'Vehículos': return <Car className="h-5 w-5 text-teal-500" />;
