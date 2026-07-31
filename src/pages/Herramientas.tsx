@@ -181,9 +181,28 @@ export default function Herramientas() {
     }
   };
 
+  const getEffectiveCategory = (h: Herramienta): string => {
+    const normName = (h.name || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const normCat = (h.category || '').toLowerCase();
+
+    if (
+      normCat === 'prensas y pinzas' ||
+      normName.includes('pinza') ||
+      normName.includes('indentar') ||
+      normName.includes('identar') ||
+      normName.includes('prensa') ||
+      normName.includes('crimpead') ||
+      normName.includes('tijera')
+    ) {
+      return 'Prensas y Pinzas';
+    }
+
+    return h.category || 'Otros';
+  };
+
   // Filtrado de herramientas por la categoría seleccionada y los filtros
   const filtered = herramientas.filter(h => {
-    const catName = h.category || 'Otros';
+    const catName = getEffectiveCategory(h);
     const matchCategory = !selectedCategory || catName === selectedCategory;
     const matchSearch = !searchTerm || 
       h.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -194,6 +213,7 @@ export default function Herramientas() {
     const matchEncargado = !filterEncargado || h.obras?.encargado_name === filterEncargado;
     return matchCategory && matchSearch && matchObra && matchStatus && matchEncargado;
   });
+
 
   const obrasUnicas = [...new Set(herramientas.map(h => h.obras?.name).filter((name): name is string => !!name))].sort();
   const statusUnicos = [...new Set(herramientas.map(h => h.status))].sort();
@@ -414,7 +434,7 @@ export default function Herramientas() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {categoriesList.map((cat) => {
             const Icon = cat.icon;
-            const count = herramientas.filter(h => (h.category || 'Otros') === cat.name).length;
+            const count = herramientas.filter(h => getEffectiveCategory(h) === cat.name).length;
             return (
               <Card 
                 key={cat.name} 
