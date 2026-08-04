@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Plus, Sparkles, Camera, Upload, Trash2, QrCode, ChevronRight, Building } from 'lucide-react';
+import { ArrowLeft, Plus, Sparkles, Camera, Upload, Trash2, QrCode, ChevronRight, Building, Check } from 'lucide-react';
 import { useZxing } from 'react-zxing';
 import { useAuthStore } from '../store/auth';
 import { Textarea } from '@/components/ui/textarea';
