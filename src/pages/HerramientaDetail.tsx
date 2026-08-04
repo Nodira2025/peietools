@@ -549,31 +549,9 @@ export default function HerramientaDetail() {
           </CardContent>
         </Card>
 
-        {/* QR & Actions Card */}
+        {/* Actions Card */}
         <div className="space-y-6">
-          <Card className="shadow-sm flex flex-col items-center justify-center p-6 bg-white">
-            <div className="p-4 bg-white border-2 border-dashed border-gray-200 rounded-lg">
-              <img 
-                src={qrUrl} 
-                alt={`QR ${herramienta.code}`} 
-                width={160} 
-                height={160}
-                className="rounded"
-              />
-            </div>
-            <p className="mt-4 text-xs text-muted-foreground text-center">
-              Escanea para abrir esta ficha
-            </p>
-            <a 
-              href={qrUrl} 
-              download={`QR-${herramienta.code}.png`}
-              className="mt-4 w-full"
-            >
-              <Button variant="outline" className="w-full" size="sm">
-                <Download className="mr-2 h-4 w-4" /> Descargar QR
-              </Button>
-            </a>
-          </Card>
+
 
           <div className="grid grid-cols-1 gap-2">
             {herramienta.status === 'Disponible' && (

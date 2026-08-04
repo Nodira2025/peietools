@@ -395,9 +395,7 @@ export default function Herramientas() {
               <Download className="mr-2 h-4 w-4" /> Exportar Excel
             </Button>
           )}
-          <Button variant="outline" className="flex-1 sm:flex-none h-11 rounded-xl" onClick={() => navigate('/herramientas/scanner')}>
-            <QrCode className="mr-2 h-4 w-4" /> QR
-          </Button>
+
           <Button variant="outline" className="flex-1 sm:flex-none h-11 rounded-xl" onClick={() => navigate('/herramientas/busqueda-visual')}>
             <Camera className="mr-2 h-4 w-4" /> Buscar con Foto
           </Button>

@@ -769,7 +769,7 @@ export default function Dashboard() {
               </div>
               <div className="space-y-0.5">
                 <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">Buscar Herramienta</h3>
-                <p className="text-[10px] text-slate-500 font-medium">Identificá, trasladá o reportá fallas con cámara/QR.</p>
+                <p className="text-[10px] text-slate-500 font-medium">Identificá, trasladá o reportá fallas con cámara de fotos.</p>
               </div>
             </div>
             <ChevronRight size={16} className="text-slate-400 shrink-0" />

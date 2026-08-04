@@ -338,27 +338,14 @@ Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Elementos de segur
                         />
                       </div>
 
-                      <div className="flex gap-2">
                         <Button
                           type="button"
                           onClick={() => setWizardStep('details')}
                           disabled={!code.trim()}
-                          className="flex-1 h-14 bg-peie-blue hover:bg-peie-blue/90 text-white font-black rounded-2xl text-base shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                          className="w-full h-14 bg-peie-blue hover:bg-peie-blue/90 text-white font-black rounded-2xl text-base shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                         >
                           Continuar <ChevronRight size={18} />
                         </Button>
-                        <Button
-                          type="button"
-                          onClick={() => setShowScannerInWizard(true)}
-                          className="h-14 w-14 shrink-0 rounded-2xl bg-emerald-50 text-emerald-700 border-2 border-emerald-200 hover:bg-emerald-100 flex items-center justify-center"
-                          title="Escanear QR de Etiqueta"
-                        >
-                          <QrCode size={24} className="stroke-[2.5]" />
-                        </Button>
-                      </div>
-                      <p className="text-[10px] text-slate-400 font-bold leading-tight px-1 text-center">
-                        Podés escribir el código o presionar el botón del código QR para escanearlo con la cámara.
-                      </p>
                     </>
                   )}
                 </div>
