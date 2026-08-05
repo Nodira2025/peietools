@@ -22,7 +22,8 @@ import {
   Download,
   Truck,
   Camera,
-  Zap
+  Zap,
+  Package
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
@@ -130,6 +131,7 @@ export default function Herramientas() {
     { name: 'Elementos de seguridad', icon: Shield, color: 'from-emerald-400 to-teal-600', desc: 'Cascos, arneses, antiparras, guantes' },
     { name: 'Instrumentos de medición', icon: Ruler, color: 'from-purple-400 to-indigo-600', desc: 'Multímetros, pinzas, niveles, cintas' },
     { name: 'Vehículos', icon: Car, color: 'from-teal-400 to-cyan-600', desc: 'Camionetas, utilitarios, furgones' },
+    { name: 'Insumos y Consumibles', icon: Package, color: 'from-amber-500 to-yellow-600', desc: 'Vaselina, lubricantes, cintas y productos consumibles' },
     { name: 'Otros', icon: Wrench, color: 'from-slate-400 to-slate-600', desc: 'Herramientas menores y accesorios varios' },
   ];
 
@@ -142,6 +144,7 @@ export default function Herramientas() {
       case 'Elementos de seguridad': return <Shield className="h-5 w-5 text-emerald-500" />;
       case 'Instrumentos de medición': return <Ruler className="h-5 w-5 text-purple-500" />;
       case 'Vehículos': return <Car className="h-5 w-5 text-teal-500" />;
+      case 'Insumos y Consumibles': return <Package className="h-5 w-5 text-amber-500" />;
       default: return <Wrench className="h-5 w-5 text-slate-500" />;
     }
   };
@@ -184,6 +187,16 @@ export default function Herramientas() {
   const getEffectiveCategory = (h: Herramienta): string => {
     const normName = (h.name || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     const normCat = (h.category || '').toLowerCase();
+
+    if (
+      normCat === 'insumos y consumibles' ||
+      normCat === 'insumos' ||
+      normCat === 'consumibles' ||
+      normName.includes('vaselina') ||
+      normName.includes('lubricante')
+    ) {
+      return 'Insumos y Consumibles';
+    }
 
     if (
       normCat === 'prensas y pinzas' ||

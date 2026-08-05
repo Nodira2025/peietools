@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Plus, Sparkles, Camera, Upload, Trash2, QrCode, ChevronRight, Building, Check } from 'lucide-react';
+import { ArrowLeft, Plus, Sparkles, Camera, Upload, Trash2, QrCode, ChevronRight, Building, Check, X } from 'lucide-react';
 import { useZxing } from 'react-zxing';
 import { useAuthStore } from '../store/auth';
 import { Textarea } from '@/components/ui/textarea';
@@ -126,7 +126,7 @@ export default function NuevaHerramienta() {
 }
 Texto: "${aiText}"
 
-Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Elementos de seguridad', 'Instrumentos de medición', 'Vehículos', 'Otros'. Si no podés identificar una propiedad, dejala en blanco ("").`;
+Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Prensas y Pinzas', 'Elementos de seguridad', 'Instrumentos de medición', 'Vehículos', 'Insumos y Consumibles', 'Otros'. Si no podés identificar una propiedad, dejala en blanco ("").`;
 
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
@@ -164,7 +164,7 @@ Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Elementos de segur
         if (result.marca) setBrand(result.marca);
         if (result.modelo) setModel(result.modelo);
         if (result.categoria) {
-          const validCats = ['Escaleras', 'Amoladoras', 'Taladros', 'Elementos de seguridad', 'Instrumentos de medición', 'Vehículos', 'Otros'];
+          const validCats = ['Escaleras', 'Amoladoras', 'Taladros', 'Prensas y Pinzas', 'Elementos de seguridad', 'Instrumentos de medición', 'Vehículos', 'Insumos y Consumibles', 'Otros'];
           const matched = validCats.find(c => c.toLowerCase() === result.categoria.toLowerCase());
           if (matched) setCategory(matched);
           else setCategory('Otros');
@@ -177,6 +177,7 @@ Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Elementos de segur
             : result.categoria === 'Amoladoras' ? 'AMO'
             : result.categoria === 'Escaleras' ? 'ESC'
             : result.categoria === 'Instrumentos de medición' ? 'MED'
+            : result.categoria === 'Insumos y Consumibles' ? 'INS'
             : 'HER';
           setCode(`${prefix}-${Math.floor(100 + Math.random() * 900)}`);
         }
@@ -395,7 +396,7 @@ Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Elementos de segur
                         <SelectValue placeholder="Categoría" />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl">
-                        {['Escaleras', 'Amoladoras', 'Taladros', 'Prensas y Pinzas', 'Elementos de seguridad', 'Instrumentos de medición', 'Vehículos', 'Otros'].map(cat => (
+                        {['Escaleras', 'Amoladoras', 'Taladros', 'Prensas y Pinzas', 'Elementos de seguridad', 'Instrumentos de medición', 'Vehículos', 'Insumos y Consumibles', 'Otros'].map(cat => (
                           <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                         ))}
                       </SelectContent>
@@ -788,7 +789,7 @@ Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Elementos de segur
                     <SelectValue placeholder="Selecciona la categoría" />
                   </SelectTrigger>
                   <SelectContent>
-                    {['Escaleras', 'Amoladoras', 'Taladros', 'Elementos de seguridad', 'Instrumentos de medición', 'Vehículos', 'Otros'].map(cat => (
+                    {['Escaleras', 'Amoladoras', 'Taladros', 'Prensas y Pinzas', 'Elementos de seguridad', 'Instrumentos de medición', 'Vehículos', 'Insumos y Consumibles', 'Otros'].map(cat => (
                       <SelectItem key={cat} value={cat}>
                         {cat}
                       </SelectItem>

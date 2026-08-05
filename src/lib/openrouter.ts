@@ -42,7 +42,7 @@ export async function analyzeToolImage(base64Image: string): Promise<AnalyzedToo
   "descripcion_breve": "Descripción técnica muy corta de sus características principales"
 }
 
-Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Elementos de seguridad', 'Instrumentos de medición', 'Vehículos', 'Otros'. Si no podés identificar una propiedad, dejala en blanco ("").`;
+Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Prensas y Pinzas', 'Elementos de seguridad', 'Instrumentos de medición', 'Vehículos', 'Insumos y Consumibles', 'Otros'. Si no podés identificar una propiedad, dejala en blanco ("").`;
 
   console.log('[OpenRouter] Enviando petición a la API con el modelo google/gemini-2.5-flash...');
   
