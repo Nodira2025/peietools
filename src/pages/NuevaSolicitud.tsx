@@ -115,6 +115,7 @@ export default function NuevaSolicitud() {
   const [isToolDropdownOpen, setIsToolDropdownOpen] = useState(false);
   const [logisticaSearch, setLogisticaSearch] = useState('');
   const [isLogisticaDropdownOpen, setIsLogisticaDropdownOpen] = useState(false);
+  const [obraSearch, setObraSearch] = useState('');
 
   // Screen voice listening state
   const [isScreenListening, setIsScreenListening] = useState(false);
@@ -179,8 +180,7 @@ export default function NuevaSolicitud() {
         .eq('active', true)
         .order('name');
       if (obrasData) {
-        const validObras = obrasData.filter(o => typeof o.encargado_name === 'string' && o.encargado_name.trim() !== '');
-        setObras(validObras);
+        setObras(obrasData);
       }
 
       // 3. Cargar Personal de Logística
@@ -350,7 +350,14 @@ export default function NuevaSolicitud() {
     return nameNorm.includes(searchNorm);
   });
 
-  const filteredObras = obras.filter(o => !filterEncargado || o.encargado_name === filterEncargado);
+  const filteredObras = obras.filter(o => {
+    const matchEncargado = !filterEncargado || o.encargado_name === filterEncargado;
+    if (!matchEncargado) return false;
+    const searchNorm = normalizeString(obraSearch);
+    if (!searchNorm) return true;
+    const nameNorm = normalizeString(o.name);
+    return nameNorm.includes(searchNorm);
+  });
   const encargadosUnicos = [...new Set(obras.map(o => o.encargado_name).filter((e): e is string => !!e))].sort();
 
   const handleEncargadoChange = (val: string) => {
@@ -827,20 +834,52 @@ export default function NuevaSolicitud() {
                   </div>
                 )}
 
+                {/* Search bar for Obra with Voice Dictation */}
+                <div className="relative">
+                  <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <Input
+                    placeholder="Buscar obra..."
+                    value={obraSearch}
+                    onChange={(e) => setObraSearch(e.target.value)}
+                    className="pl-10 pr-12 h-12 rounded-2xl border-2 border-slate-200 bg-white text-base font-medium shadow-sm focus-visible:ring-peie-blue"
+                  />
+                  <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                    {obraSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setObraSearch('')}
+                        className="p-1 text-slate-400 hover:text-slate-600 rounded-full"
+                      >
+                        <X size={16} />
+                      </button>
+                    )}
+                    <VoiceInputButton
+                      onTranscript={(text) => setObraSearch(text)}
+                      className="!h-9 !w-9 !rounded-xl"
+                    />
+                  </div>
+                </div>
+
                 {/* Obras lists */}
-                <div className="space-y-2.5 max-h-[50vh] overflow-y-auto">
-                  {obras.map(o => (
-                    <button
-                      key={o.id}
-                      type="button"
-                      onClick={() => handleSelectObraWizard(o.id)}
-                      className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl border-2 border-slate-200 bg-white text-left text-base font-bold text-slate-700 active:scale-[0.97] transition-all hover:border-peie-blue"
-                    >
-                      <MapPin size={20} className="text-peie-blue shrink-0" />
-                      {o.name}
-                      <ChevronRight size={18} className="text-slate-300 ml-auto shrink-0" />
-                    </button>
-                  ))}
+                <div className="space-y-2.5 max-h-[45vh] overflow-y-auto">
+                  {filteredObras.length > 0 ? (
+                    filteredObras.map(o => (
+                      <button
+                        key={o.id}
+                        type="button"
+                        onClick={() => handleSelectObraWizard(o.id)}
+                        className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl border-2 border-slate-200 bg-white text-left text-base font-bold text-slate-700 active:scale-[0.97] transition-all hover:border-peie-blue"
+                      >
+                        <MapPin size={20} className="text-peie-blue shrink-0" />
+                        {o.name}
+                        <ChevronRight size={18} className="text-slate-300 ml-auto shrink-0" />
+                      </button>
+                    ))
+                  ) : (
+                    <div className="p-6 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed text-sm font-medium">
+                      No se encontraron obras con ese nombre
+                    </div>
+                  )}
                 </div>
               </div>
             )}
