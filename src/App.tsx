@@ -34,6 +34,8 @@ import OrdenDetail from './pages/OrdenDetail';
 import NuevoPersonalAsistido from './pages/NuevoPersonalAsistido';
 import Notificaciones from './pages/Notificaciones';
 import SeguimientoTraslado from './pages/SeguimientoTraslado';
+import ReservasHerramientas from './pages/ReservasHerramientas';
+
 
 
 
@@ -73,6 +75,8 @@ export default function App() {
           <Route path="/solicitudes/:id" element={<SolicitudDetail />} />
           <Route path="/solicitudes/:id/seguimiento" element={<SeguimientoTraslado />} />
           <Route path="/notificaciones" element={<Notificaciones />} />
+          <Route path="/reservas" element={<ReservasHerramientas />} />
+
           
           <Route path="/compras" element={<Compras />} />
           <Route path="/compras/:id" element={<CompraDetail />} />

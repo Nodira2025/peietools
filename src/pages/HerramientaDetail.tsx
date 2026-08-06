@@ -4,7 +4,9 @@ import { supabase } from '../lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Edit, Truck, AlertTriangle, MapPin, Navigation, Building2, Download, Camera, CheckCircle, Save, X, Trash2 } from 'lucide-react';
+import { ArrowLeft, Edit, Truck, AlertTriangle, MapPin, Navigation, Building2, Download, Camera, CheckCircle, Save, X, Trash2, Calendar } from 'lucide-react';
+import { ModalNuevaReserva } from '../components/ModalNuevaReserva';
+
 import { useAuthStore } from '../store/auth';
 import { compressImage } from '../lib/imageUtils';
 import { Input } from '@/components/ui/input';
@@ -43,7 +45,9 @@ export default function HerramientaDetail() {
   const [gettingLocation, setGettingLocation] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [isModalReservaOpen, setIsModalReservaOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
 
   // States for editing mode
   const [isEditing, setIsEditing] = useState(false);
@@ -554,11 +558,19 @@ export default function HerramientaDetail() {
 
 
           <div className="grid grid-cols-1 gap-2">
+            <Button
+              className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold h-11 rounded-xl shadow-sm flex items-center justify-center gap-2 text-xs"
+              onClick={() => setIsModalReservaOpen(true)}
+            >
+              <Calendar className="h-4 w-4" /> Reservar con Fecha (Agendar)
+            </Button>
+
             {herramienta.status === 'Disponible' && (
               <Button className="w-full bg-peie-blue hover:bg-peie-blue/90" onClick={() => navigate('/solicitudes/nueva', { state: { herramientaId: herramienta.id }})}>
-                <Truck className="mr-2 h-4 w-4" /> Solicitar Traslado
+                <Truck className="mr-2 h-4 w-4" /> Solicitar Traslado Inmediato
               </Button>
             )}
+
 
             {/* LIBERAR HERRAMIENTA - solo admin/logistica */}
             {isAdmin && (herramienta.status === 'En uso' || herramienta.status === 'Reservada' || herramienta.status === 'En traslado' || herramienta.status === 'En mantenimiento' || herramienta.status === 'Fuera de servicio') && (
@@ -790,6 +802,17 @@ export default function HerramientaDetail() {
           </div>
         </div>
       )}
+
+      {/* Modal Nueva Reserva */}
+      {herramienta && (
+        <ModalNuevaReserva
+          isOpen={isModalReservaOpen}
+          onClose={() => setIsModalReservaOpen(false)}
+          herramientaId={herramienta.id}
+          herramientaNombre={`${herramienta.code} - ${herramienta.name}`}
+        />
+      )}
     </div>
   );
 }
+
