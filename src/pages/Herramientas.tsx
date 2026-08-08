@@ -23,12 +23,16 @@ import {
   Truck,
   Camera,
   Zap,
-  Package
+  Package,
+  FileSpreadsheet
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import FilterBar from '../components/FilterBar';
 import * as XLSX from 'xlsx';
+import ModalGestionCategorias from '../components/ModalGestionCategorias';
+import ModalImportarCategoriasExcel from '../components/ModalImportarCategoriasExcel';
+
 
 interface Herramienta {
   id: string;
@@ -54,6 +58,11 @@ export default function Herramientas() {
   const [filterStatus, setFilterStatus] = useState(location.state?.filterStatus ?? '');
   const [filterEncargado, setFilterEncargado] = useState(location.state?.filterEncargado ?? '');
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'grouped'>(location.state?.viewMode ?? 'grid');
+
+  // Modales de Gestión de Categorías
+  const [isGestionCategoriasOpen, setIsGestionCategoriasOpen] = useState(false);
+  const [isImportarExcelOpen, setIsImportarExcelOpen] = useState(false);
+
 
   const { toast } = useToast();
   const { profile } = useAuthStore();
@@ -413,12 +422,31 @@ export default function Herramientas() {
             <Camera className="mr-2 h-4 w-4" /> Buscar con Foto
           </Button>
           {isAdmin && (
-            <Button className="bg-peie-blue hover:bg-peie-blue/90 flex-1 sm:flex-none h-11 rounded-xl" onClick={() => navigate('/herramientas/nueva')}>
-              <Plus className="mr-2 h-4 w-4" /> Nueva Herramienta
-            </Button>
+            <>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsImportarExcelOpen(true)}
+                className="flex-1 sm:flex-none h-11 rounded-xl border-emerald-200 text-emerald-700 hover:bg-emerald-50 font-bold"
+              >
+                <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-600" />
+                Categorías Excel
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsGestionCategoriasOpen(true)}
+                className="flex-1 sm:flex-none h-11 rounded-xl border-blue-200 text-blue-700 hover:bg-blue-50 font-bold"
+              >
+                <Layers className="mr-2 h-4 w-4 text-blue-600" />
+                Gestionar Categorías
+              </Button>
+              <Button className="bg-peie-blue hover:bg-peie-blue/90 flex-1 sm:flex-none h-11 rounded-xl font-bold" onClick={() => navigate('/herramientas/nueva')}>
+                <Plus className="mr-2 h-4 w-4" /> Nueva Herramienta
+              </Button>
+            </>
           )}
         </div>
       </div>
+
 
       {/* Buscador Global (Solo visible en la vista de categorías) */}
       {!selectedCategory && !loading && searchTerm.trim() === '' && (
@@ -820,7 +848,23 @@ export default function Herramientas() {
             )}
           </div>
         )}
-      </div>
-    );
-  }
+
+      {/* Modales de Gestión e Importación por Excel para Federico Grande y Administradores */}
+      <ModalGestionCategorias
+        open={isGestionCategoriasOpen}
+        onOpenChange={setIsGestionCategoriasOpen}
+        onCategoriesUpdated={fetchHerramientas}
+      />
+
+      <ModalImportarCategoriasExcel
+        open={isImportarExcelOpen}
+        onOpenChange={setIsImportarExcelOpen}
+        herramientas={herramientas}
+        onSuccess={fetchHerramientas}
+      />
+    </div>
+  );
+}
+
+
 
