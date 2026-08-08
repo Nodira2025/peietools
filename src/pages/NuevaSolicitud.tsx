@@ -83,11 +83,13 @@ export default function NuevaSolicitud() {
   
   // Fields State
   const [selectedToolId, setSelectedToolId] = useState(preselectedToolId);
+  const [requestedToolName, setRequestedToolName] = useState('');
   const [targetObraId, setTargetObraId] = useState('');
   const [filterEncargado, setFilterEncargado] = useState('');
   const [selectedLogisticaId, setSelectedLogisticaId] = useState('');
   const [priority, setPriority] = useState('Normal');
   const [comments, setComments] = useState('');
+
   const getDefaultNeededDate = () => {
     const d = new Date();
     d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
@@ -369,11 +371,14 @@ export default function NuevaSolicitud() {
   const executeSubmit = async () => {
     if (!profile) return;
 
-    if (!selectedToolId) {
+    const tool = herramientas.find(h => h.id === selectedToolId);
+    const finalToolName = requestedToolName.trim() || tool?.name || toolSearch.trim();
+
+    if (!tool && !finalToolName) {
       toast({ 
         variant: 'destructive', 
         title: 'Herramienta requerida', 
-        description: 'Por favor seleccioná una herramienta específica del catálogo oficial.' 
+        description: 'Por favor indicá el nombre de la herramienta (dictando por voz o escribiendo).' 
       });
       return;
     }
@@ -384,12 +389,6 @@ export default function NuevaSolicitud() {
         title: 'Obra de destino requerida', 
         description: 'Por favor seleccioná la obra de destino.' 
       });
-      return;
-    }
-
-    const tool = herramientas.find(h => h.id === selectedToolId);
-    if (!tool) {
-      toast({ variant: 'destructive', title: 'Error', description: 'La herramienta seleccionada no es válida.' });
       return;
     }
 
@@ -406,24 +405,16 @@ export default function NuevaSolicitud() {
     // Calcular Fecha de Necesidad ISO
     const neededDateObj = neededDate ? new Date(neededDate) : new Date();
     const neededDateIso = neededDateObj.toISOString();
-    const neededDateLabel = neededDateObj.toLocaleString('es-AR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-
 
     setLoading(true);
     const securityCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const toolDescription = `${tool.name} [${tool.code}]`;
 
     // 1. Guardar la solicitud
     const insertPayload: any = {
       requester_id: profile.id,
-      herramienta_id: tool.id,
-      source_obra_id: tool.current_obra_id,
+      herramienta_id: tool ? tool.id : null,
+      requested_tool_name: finalToolName,
+      source_obra_id: tool ? tool.current_obra_id : null,
       target_obra_id: targetObraId,
       assigned_to: logisticaUser?.id || null,
       priority,
@@ -432,6 +423,7 @@ export default function NuevaSolicitud() {
       needed_date: neededDateIso,
       security_code: securityCode
     };
+
 
     let { data: newSolicitud, error } = await supabase.from('solicitudes').insert([insertPayload]).select().single();
 
@@ -460,6 +452,8 @@ export default function NuevaSolicitud() {
     } else {
       toast({ title: '¡Solicitud Generada!', description: 'Notificando a logística por WhatsApp...' });
       
+      const toolDescription = finalToolName;
+      const origenActual = tool?.obras?.name || 'Pendiente de asignación por Logística';
       const logName = logisticaUser ? logisticaUser.full_name.split(' ')[0] : 'Logística';
       const waMessage = [
         '*NUEVA SOLICITUD DE TRASLADO*',
@@ -468,18 +462,19 @@ export default function NuevaSolicitud() {
         '',
         `- *Solicita:* ${profile.full_name} (${profile.role || 'Solicitante'})`,
         `- *Herramienta:* ${toolDescription}`,
-        `- *Origen actual:* ${tool.obras?.name || 'Base Central'}`,
+        `- *Origen actual:* ${origenActual}`,
         `- *Destino:* ${targetObra.name}`,
-        `- *Fecha de Necesidad:* ${neededDateLabel}`,
+        `- *Fecha requerida:* ${neededDateObj.toLocaleString('es-AR')}`,
         `- *Prioridad:* ${priority}`,
         '',
         `*Notas:* ${comments.trim() || 'Sin especificaciones'}`,
         '',
-        'Aprobar o gestionar el envío desde acá:',
+        'Gestionar el envío desde la app:',
         `${APP_URL}/solicitudes/${newSolicitud.id}`
       ].join('\n');
 
       if (logisticaUser?.whatsapp) {
+
         setWaPreviewPhone(logisticaUser.whatsapp);
         setWaPreviewMessage(waMessage);
         setWaPreviewRecipientName(logisticaUser.full_name);

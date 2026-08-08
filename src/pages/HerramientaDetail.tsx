@@ -4,8 +4,10 @@ import { supabase } from '../lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Edit, Truck, AlertTriangle, MapPin, Navigation, Building2, Download, Camera, CheckCircle, Save, X, Trash2, Calendar } from 'lucide-react';
+import { ArrowLeft, Edit, Truck, AlertTriangle, MapPin, Navigation, Building2, Download, Camera, CheckCircle, Save, X, Trash2, Calendar, FileSpreadsheet } from 'lucide-react';
 import { ModalNuevaReserva } from '../components/ModalNuevaReserva';
+import * as XLSX from 'xlsx';
+
 
 import { useAuthStore } from '../store/auth';
 import { compressImage } from '../lib/imageUtils';
@@ -88,6 +90,46 @@ export default function HerramientaDetail() {
     setMovimientosList(data || []);
     setLoadingMovimientos(false);
   };
+
+  const handleExportHistorialExcel = async () => {
+    if (!herramienta) return;
+
+    const { data: movs } = await supabase
+      .from('movimientos')
+      .select('*, profiles(full_name)')
+      .eq('herramienta_id', herramienta.id)
+      .order('created_at', { ascending: false });
+
+    const sourceData = (movs && movs.length > 0) ? movs : movimientosList;
+
+    if (sourceData.length === 0) {
+      toast({ title: 'Sin historial', description: 'No hay movimientos registrados para exportar.' });
+      return;
+    }
+
+    const exportRows = sourceData.map((m: any, idx: number) => ({
+      'N°': idx + 1,
+      'Código': herramienta.code,
+      'Herramienta': herramienta.name,
+      'Marca/Modelo': `${herramienta.brand || ''} ${herramienta.model || ''}`.trim() || 'S/D',
+      'Fecha y Hora': new Date(m.created_at).toLocaleString('es-AR'),
+      'Evento / Acción': m.action || m.status || 'Traslado de Equipo',
+      'Responsable / Usuario': m.profiles?.full_name || m.requester?.full_name || 'Sistema PEIE',
+      'Obra Origen': m.source_obra?.name || 'Base Central',
+      'Obra Destino': m.target_obra?.name || 'Obra Destino',
+      'Observaciones': m.notes || m.comments || 'Sin observaciones'
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportRows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Historial Movimientos');
+    XLSX.writeFile(
+      workbook,
+      `Historial_Herramienta_${herramienta.code.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`
+    );
+    toast({ title: '¡Excel Generado!', description: 'Se descargó el historial completo del equipo.' });
+  };
+
 
   useEffect(() => {
     if (id) {
@@ -701,10 +743,19 @@ export default function HerramientaDetail() {
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleExportHistorialExcel}
+              className="rounded-xl text-xs gap-1.5 font-bold border-emerald-300 text-emerald-800 hover:bg-emerald-50 shadow-sm"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600" /> Exportar Historial (Excel)
+            </Button>
             <span className="bg-peie-blue/10 text-peie-blue font-extrabold text-xs px-3 py-1.5 rounded-full border border-peie-blue/20 flex items-center gap-1.5">
               <Truck size={14} /> {movimientosList.length} Traslados Registrados
             </span>
           </div>
+
         </CardHeader>
 
         <CardContent className="p-0">
