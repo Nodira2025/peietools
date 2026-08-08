@@ -189,9 +189,11 @@ export default function SolicitudDetail() {
     if (!solicitud || !profile) return;
     
     const payload: any = { status: newStatus };
-    if (newStatus === 'Asignada') {
+    if (newStatus === 'En atención' || newStatus === 'Asignada') {
       payload.assigned_to = profile.id;
+      payload.assigned_logistica_id = profile.id;
     }
+
     if (recipientName) {
       payload.received_by = recipientName;
     }
@@ -605,19 +607,20 @@ export default function SolicitudDetail() {
               <div className="flex flex-col gap-2">
                 {solicitud.status === 'Pendiente' && (
                   <Button 
-                    onClick={() => updateStatus('Asignada')} 
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold w-full h-12 rounded-xl shadow-md text-sm"
+                    onClick={() => updateStatus('En atención')} 
+                    className="bg-amber-500 hover:bg-amber-600 text-white font-bold w-full h-12 rounded-xl shadow-md text-sm flex items-center justify-center gap-2"
                   >
-                    <CheckCircle className="mr-2 h-4 w-4" />
-                    Marcar como Recibido/Leído y Avisar por WhatsApp
+                    <Clock className="mr-2 h-4 w-4" />
+                    Tomar Pedido (Hacerse Cargo / Ocupado)
                   </Button>
                 )}
-                {solicitud.status === 'Asignada' && (
+                {(solicitud.status === 'En atención' || solicitud.status === 'Asignada') && (
                   <Button onClick={() => updateStatus('En traslado')} className="bg-peie-blue hover:bg-peie-blue/90 text-white w-full h-12 rounded-xl text-sm font-bold">
                     <Truck className="mr-2 h-4 w-4" />
-                    Marcar En curso
+                    Marcar En curso / En traslado
                   </Button>
                 )}
+
                 {(solicitud.status === 'En retiro' || solicitud.status === 'En traslado') && (
                   <Dialog open={isValidationOpen} onOpenChange={(open) => { setIsValidationOpen(open); if(!open) setInputSecurityCode(''); }}>
                     <DialogTrigger asChild>

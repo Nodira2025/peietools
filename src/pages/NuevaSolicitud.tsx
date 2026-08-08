@@ -314,13 +314,14 @@ export default function NuevaSolicitud() {
 
   const handleSelectObraWizard = (obraId: string) => {
     setTargetObraId(obraId);
-    goToWizardStep('select_logistica');
+    goToWizardStep('select_priority');
   };
 
   const handleSelectLogisticaWizard = (logisticaId: string) => {
     setSelectedLogisticaId(logisticaId);
     goToWizardStep('select_priority');
   };
+
 
   const handleSelectPriorityWizard = (pri: string) => {
     setPriority(pri);
@@ -416,7 +417,9 @@ export default function NuevaSolicitud() {
       requested_tool_name: finalToolName,
       source_obra_id: tool ? tool.current_obra_id : null,
       target_obra_id: targetObraId,
-      assigned_to: logisticaUser?.id || null,
+      assigned_to: selectedLogisticaId || null,
+      assigned_logistica_id: null,
+
       priority,
       status: 'Pendiente',
       comments: comments.trim() || null,
@@ -951,7 +954,8 @@ export default function NuevaSolicitud() {
             {/* STEP 3: SELECT PRIORITY */}
             {wizardStep === 'select_priority' && (
               <div className="space-y-5">
-                <BackButton onBack={() => goToWizardStep('select_logistica')} />
+                <BackButton onBack={() => goToWizardStep('select_obra')} />
+
                 <StepHeader 
                   title="¿Qué tan urgente es?" 
                   subtitle="Elegí el nivel de prioridad"
