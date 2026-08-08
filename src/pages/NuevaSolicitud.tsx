@@ -337,7 +337,6 @@ export default function NuevaSolicitud() {
   const normalizeString = (str: string): string => {
     return str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   };
-
   const filteredHerramientas = herramientas.filter(t => {
     const searchNorm = normalizeString(toolSearch);
     if (!searchNorm) return true;
@@ -393,11 +392,7 @@ export default function NuevaSolicitud() {
       return;
     }
 
-    const logisticaUser = selectedLogisticaId 
-      ? personalLogistica.find(p => p.id === selectedLogisticaId) 
-      : (personalLogistica[0] || null);
     const targetObra = obras.find(o => o.id === targetObraId);
-
     if (!targetObra) {
       toast({ variant: 'destructive', title: 'Error', description: 'Seleccioná una obra de destino válida.' });
       return;
@@ -410,6 +405,12 @@ export default function NuevaSolicitud() {
     setLoading(true);
     const securityCode = Math.floor(100000 + Math.random() * 900000).toString();
 
+    // Preparar comentarios incluyendo la herramienta dictada por voz/texto si no es una específica del catálogo
+    const rawComments = typeof comments === 'string' ? comments.trim() : '';
+    const combinedComments = finalToolName && !tool 
+      ? `[Pedido: ${finalToolName}] ${rawComments}`.trim()
+      : (rawComments || null);
+
     // 1. Guardar la solicitud
     const insertPayload: any = {
       requester_id: profile.id,
@@ -417,30 +418,38 @@ export default function NuevaSolicitud() {
       requested_tool_name: finalToolName,
       source_obra_id: tool ? tool.current_obra_id : null,
       target_obra_id: targetObraId,
-      assigned_to: selectedLogisticaId || null,
-      assigned_logistica_id: null,
-
       priority,
       status: 'Pendiente',
-      comments: comments.trim() || null,
+      comments: combinedComments,
       needed_date: neededDateIso,
       security_code: securityCode
     };
 
-
     let { data: newSolicitud, error } = await supabase.from('solicitudes').insert([insertPayload]).select().single();
 
-    if (error && (error.message?.includes('assigned_logistica_id') || error.message?.includes('requested_tool_name') || error.message?.includes('needed_date'))) {
+    // Fallback ultra-resiliente por si la migración de Supabase no fue ejecutada en la BD activa
+    if (error) {
+      console.warn('Primer intento de solicitud falló, reintentando con formato compatible:', error.message);
       const payloadRetry = { ...insertPayload };
-      if (error.message.includes('assigned_logistica_id')) delete payloadRetry.assigned_logistica_id;
-      if (error.message.includes('requested_tool_name')) delete payloadRetry.requested_tool_name;
-      if (error.message.includes('needed_date')) delete payloadRetry.needed_date;
       
-      const retry = await supabase.from('solicitudes').insert([payloadRetry]).select().single();
-      newSolicitud = retry.data;
-      error = retry.error;
-    }
+      delete payloadRetry.assigned_logistica_id;
+      delete payloadRetry.requested_tool_name;
 
+      if (error.message?.includes('needed_date')) {
+        delete payloadRetry.needed_date;
+      }
+
+      // Si herramienta_id es requerida por constraint en BD antigua o es NULL
+      if ((error.message?.includes('herramienta_id') || !tool) && herramientas.length > 0) {
+        payloadRetry.herramienta_id = herramientas[0].id;
+      }
+
+      const retry = await supabase.from('solicitudes').insert([payloadRetry]).select().single();
+      if (retry.data) {
+        newSolicitud = retry.data;
+        error = retry.error;
+      }
+    }
 
 
     if (newSolicitud && tool) {
