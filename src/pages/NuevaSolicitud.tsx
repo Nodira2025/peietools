@@ -430,12 +430,17 @@ export default function NuevaSolicitud() {
 
     let { data: newSolicitud, error } = await supabase.from('solicitudes').insert([insertPayload]).select().single();
 
-    if (error && error.message?.includes('needed_date')) {
-      delete insertPayload.needed_date;
-      const retry = await supabase.from('solicitudes').insert([insertPayload]).select().single();
+    if (error && (error.message?.includes('assigned_logistica_id') || error.message?.includes('requested_tool_name') || error.message?.includes('needed_date'))) {
+      const payloadRetry = { ...insertPayload };
+      if (error.message.includes('assigned_logistica_id')) delete payloadRetry.assigned_logistica_id;
+      if (error.message.includes('requested_tool_name')) delete payloadRetry.requested_tool_name;
+      if (error.message.includes('needed_date')) delete payloadRetry.needed_date;
+      
+      const retry = await supabase.from('solicitudes').insert([payloadRetry]).select().single();
       newSolicitud = retry.data;
       error = retry.error;
     }
+
 
 
     if (newSolicitud && tool) {
@@ -724,21 +729,20 @@ export default function NuevaSolicitud() {
           <div className="h-1.5 bg-gradient-to-r from-peie-blue via-peie-light to-peie-blue" />
           <CardContent className="px-5 py-6 space-y-5">
 
-            {/* STEP 0: SELECT TOOL (Catálogo o Dictado Genérico) */}
+            {/* STEP 0: ASISTENTE SIMPLIFICADO DE PEDIDOS (DICTADO POR VOZ / TEXTO) */}
             {wizardStep === 'select_tool' && (
-              <div className="space-y-4">
+              <div className="space-y-5">
                 <BackButton onBack={() => navigate(-1)} />
                 <StepHeader 
                   title="¿Qué herramienta necesitás?" 
-                  subtitle="Escribí, dictá por voz o elegí del catálogo"
+                  subtitle="Escribí o dictá el nombre de la herramienta"
                 />
 
-                {/* Entrada Genérica Rápida / Dictado por Voz */}
-                <div className="p-4 bg-amber-50/90 border border-amber-200 rounded-2xl space-y-3">
+                <div className="p-5 bg-gradient-to-br from-amber-50 to-orange-50/50 border border-amber-200 rounded-3xl space-y-4 shadow-sm">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-amber-600" />
-                      Dictar por voz o escribir (ej: Taladro)
+                    <label className="text-xs font-black text-amber-900 uppercase tracking-wide flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-amber-600 animate-pulse" />
+                      Ingresá o dictá por voz
                     </label>
                     <VoiceInputButton
                       onTranscript={(text) => {
@@ -747,79 +751,33 @@ export default function NuevaSolicitud() {
                       }}
                     />
                   </div>
+
                   <Input
-                    placeholder="Ej: Taladro percutor, Amoladora 7''..."
+                    placeholder="Ej: Taladro, Amoladora 7'', Demoledor..."
                     value={requestedToolName || toolSearch}
                     onChange={(e) => {
                       setRequestedToolName(e.target.value);
                       setToolSearch(e.target.value);
                     }}
-                    className="h-11 rounded-xl bg-white border-amber-200 text-sm font-bold text-slate-800"
+                    className="h-14 rounded-2xl bg-white border-amber-200 text-base font-bold text-slate-800 px-4 shadow-inner"
                   />
-                  {(requestedToolName || toolSearch).trim().length > 0 && (
-                    <Button
-                      type="button"
-                      onClick={() => {
-                        if (!requestedToolName) setRequestedToolName(toolSearch.trim());
-                        goToWizardStep('select_date');
-                      }}
-                      className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold h-11 rounded-xl text-xs shadow-sm flex items-center justify-center gap-2"
-                    >
-                      <span>Usar "{(requestedToolName || toolSearch).trim()}"</span>
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
-                  )}
-                </div>
 
-                <div className="space-y-3 pt-2">
-                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">O elegí una del catálogo oficial:</p>
-                  <div className="relative">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
-                    <Input
-                      placeholder="Buscar por código o nombre..."
-                      value={toolSearch}
-                      onChange={(e) => {
-                        setToolSearch(e.target.value);
-                        setSelectedToolId('');
-                      }}
-                      className="h-12 pl-10 rounded-2xl border-slate-200 focus-visible:ring-peie-blue bg-slate-50/50 text-sm font-semibold"
-                    />
-                  </div>
-
-
-                  <div className="space-y-2.5 max-h-[55vh] overflow-y-auto pr-1">
-                    {filteredHerramientas.slice(0, 20).map(t => (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedToolId(t.id);
-                          setToolSearch(`${t.name} [${t.code}]`);
-                          goToWizardStep('select_date');
-                        }}
-                        className={`w-full flex items-center gap-3 px-5 py-4 rounded-2xl border-2 text-left active:scale-[0.97] transition-all ${
-                          selectedToolId === t.id
-                            ? 'border-peie-blue bg-peie-blue/5'
-                            : 'border-slate-200 bg-white hover:border-peie-blue'
-                        }`}
-                      >
-                        <Wrench size={20} className="text-peie-blue shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-bold text-slate-700 truncate">{t.name}</p>
-                          <p className="text-xs text-slate-400 font-bold">Código: {t.code} • Ubicación: {t.obras?.name || 'Base Central'}</p>
-                        </div>
-                        <ChevronRight size={18} className="text-slate-300 shrink-0" />
-                      </button>
-                    ))}
-                    {filteredHerramientas.length === 0 && (
-                      <div className="text-center py-8 text-slate-400 font-semibold text-sm">
-                        No se encontraron herramientas en el catálogo.
-                      </div>
-                    )}
-                  </div>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      const finalName = (requestedToolName || toolSearch).trim() || 'Herramienta solicitada';
+                      setRequestedToolName(finalName);
+                      goToWizardStep('select_date');
+                    }}
+                    className="w-full bg-peie-blue hover:bg-peie-blue/90 text-white font-black h-14 rounded-2xl text-base shadow-md flex items-center justify-center gap-2"
+                  >
+                    <span>CONTINUAR</span>
+                    <ChevronRight className="w-5 h-5" />
+                  </Button>
                 </div>
               </div>
             )}
+
 
             {/* STEP 1: SELECT FECHA Y HORA DE NECESIDAD EN OBRA */}
             {wizardStep === 'select_date' && (
@@ -1060,8 +1018,9 @@ export default function NuevaSolicitud() {
                     <p>🕒 <strong className="text-slate-500">Fecha de Necesidad:</strong> <span className="font-bold text-amber-800">{neededDate ? new Date(neededDate).toLocaleString('es-AR') : 'No especificada'}</span></p>
                     <p>🚩 <strong className="text-slate-500">Origen:</strong> {toolSelectedObject?.obras?.name || 'A determinar por Logística'}</p>
                     <p>📍 <strong className="text-slate-500">Destino:</strong> {targetObraObject?.name || 'No seleccionada'}</p>
-                    <p>👤 <strong className="text-slate-500">Encargado Logística:</strong> {logisticaUserObject?.full_name || personalLogistica[0]?.full_name || 'Asignación automática'}</p>
+                    <p>👥 <strong className="text-slate-500">Logística:</strong> <span className="font-semibold text-amber-800">Pendiente de tomar por Logística</span></p>
                     <p>🔔 <strong className="text-slate-500">Prioridad:</strong> <span className={priority === 'Urgente' ? 'text-rose-600 font-bold' : 'text-slate-800'}>{priority}</span></p>
+
                     {(typeof comments === 'string' && comments.trim()) ? <p>💬 <strong className="text-slate-500">Nota:</strong> "{comments}"</p> : null}
                   </div>
                 </div>
