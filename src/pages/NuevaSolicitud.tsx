@@ -721,20 +721,59 @@ export default function NuevaSolicitud() {
           <div className="h-1.5 bg-gradient-to-r from-peie-blue via-peie-light to-peie-blue" />
           <CardContent className="px-5 py-6 space-y-5">
 
-            {/* STEP 0: SELECT TOOL (Catálogo Oficial) */}
+            {/* STEP 0: SELECT TOOL (Catálogo o Dictado Genérico) */}
             {wizardStep === 'select_tool' && (
-              <div className="space-y-5">
+              <div className="space-y-4">
                 <BackButton onBack={() => navigate(-1)} />
                 <StepHeader 
                   title="¿Qué herramienta necesitás?" 
-                  subtitle="Elegí la herramienta exacta del catálogo"
+                  subtitle="Escribí, dictá por voz o elegí del catálogo"
                 />
 
-                <div className="space-y-3">
+                {/* Entrada Genérica Rápida / Dictado por Voz */}
+                <div className="p-4 bg-amber-50/90 border border-amber-200 rounded-2xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-amber-600" />
+                      Dictar por voz o escribir (ej: Taladro)
+                    </label>
+                    <VoiceInputButton
+                      onTranscript={(text) => {
+                        setRequestedToolName(text);
+                        setToolSearch(text);
+                      }}
+                    />
+                  </div>
+                  <Input
+                    placeholder="Ej: Taladro percutor, Amoladora 7''..."
+                    value={requestedToolName || toolSearch}
+                    onChange={(e) => {
+                      setRequestedToolName(e.target.value);
+                      setToolSearch(e.target.value);
+                    }}
+                    className="h-11 rounded-xl bg-white border-amber-200 text-sm font-bold text-slate-800"
+                  />
+                  {(requestedToolName || toolSearch).trim().length > 0 && (
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        if (!requestedToolName) setRequestedToolName(toolSearch.trim());
+                        goToWizardStep('select_date');
+                      }}
+                      className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold h-11 rounded-xl text-xs shadow-sm flex items-center justify-center gap-2"
+                    >
+                      <span>Usar "{(requestedToolName || toolSearch).trim()}"</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+
+                <div className="space-y-3 pt-2">
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">O elegí una del catálogo oficial:</p>
                   <div className="relative">
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
                     <Input
-                      placeholder="Buscar por código, nombre o medida (ej: Amoladora 7)..."
+                      placeholder="Buscar por código o nombre..."
                       value={toolSearch}
                       onChange={(e) => {
                         setToolSearch(e.target.value);
@@ -743,6 +782,7 @@ export default function NuevaSolicitud() {
                       className="h-12 pl-10 rounded-2xl border-slate-200 focus-visible:ring-peie-blue bg-slate-50/50 text-sm font-semibold"
                     />
                   </div>
+
 
                   <div className="space-y-2.5 max-h-[55vh] overflow-y-auto pr-1">
                     {filteredHerramientas.slice(0, 20).map(t => (
