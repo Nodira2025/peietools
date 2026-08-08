@@ -5,13 +5,15 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { HardHat, Search, Clock, Camera, Plus, Trash2, Edit2, Check, Download } from 'lucide-react';
+import { HardHat, Search, Clock, Camera, Plus, Trash2, Edit2, Check, Download, FileImage, FileSpreadsheet } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { compressImage } from '../lib/imageUtils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import * as XLSX from 'xlsx';
+import html2canvas from 'html2canvas';
+
 
 interface Empleado {
   id: string;
@@ -105,6 +107,11 @@ export default function Personal() {
     obra_id: ''
   });
   const [addSaving, setAddSaving] = useState(false);
+
+  // Image & Excel export state
+  const imageExportRef = useRef<HTMLDivElement>(null);
+  const [isExportingImage, setIsExportingImage] = useState(false);
+
 
   const handleOpenProfile = (emp: Empleado) => {
     setSelectedEmpForProfile(emp);
@@ -544,21 +551,88 @@ export default function Personal() {
       return;
     }
 
-    const data = filteredEmpleados.map(e => ({
-      'Nombre Completo': e.full_name,
-      'Especialidad': e.specialty || 'Electricista',
-      'WhatsApp': e.whatsapp || 'No registrado',
-      'Estado': e.status,
-      'Obra Asignada': e.obras?.name || 'Sin Asignar',
-      'Coordinador de Obra': e.obras?.encargado_name || 'N/A'
-    }));
+    // Agrupar por Obra Asignada
+    const groupedMap = new Map<string, Empleado[]>();
+    filteredEmpleados.forEach((emp) => {
+      const obraName = emp.obras?.name || (emp.status === 'Trabajando' ? 'Obra Sin Nombre' : 'AUSENTES / LIC. MEDICA');
+      if (!groupedMap.has(obraName)) {
+        groupedMap.set(obraName, []);
+      }
+      groupedMap.get(obraName)!.push(emp);
+    });
 
-    const worksheet = XLSX.utils.json_to_sheet(data);
+    const sortedObraNames = Array.from(groupedMap.keys()).sort((a, b) => a.localeCompare(b));
+
+    const excelRows: any[] = [];
+    const merges: any[] = [];
+    let currentIndex = 1;
+    let currentExcelRow = 1; // Fila 0 es el encabezado
+
+    sortedObraNames.forEach((obraName) => {
+      const empList = groupedMap.get(obraName)!;
+      empList.sort((a, b) => a.full_name.localeCompare(b.full_name));
+
+      const startRowIndex = currentExcelRow;
+      const count = empList.length;
+
+      empList.forEach((emp) => {
+        excelRows.push({
+          '#': currentIndex,
+          'Nombre Completo': emp.full_name,
+          'Obra Asignada': obraName,
+          'Cantidad': count
+        });
+        currentIndex++;
+        currentExcelRow++;
+      });
+
+      if (count > 1) {
+        // Combinar celda de Obra Asignada (Columna 2 / índice C)
+        merges.push({ s: { r: startRowIndex, c: 2 }, e: { r: startRowIndex + count - 1, c: 2 } });
+        // Combinar celda de Cantidad (Columna 3 / índice D)
+        merges.push({ s: { r: startRowIndex, c: 3 }, e: { r: startRowIndex + count - 1, c: 3 } });
+      }
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(excelRows);
+    worksheet['!merges'] = merges;
+    worksheet['!cols'] = [{ wch: 6 }, { wch: 38 }, { wch: 30 }, { wch: 12 }];
+
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Personal");
-    XLSX.writeFile(workbook, `Reporte_Personal_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    toast({ title: 'Éxito', description: 'Listado de personal exportado a Excel correctamente.' });
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Matriz Personal");
+    XLSX.writeFile(workbook, `Reporte_Personal_Matriz_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast({ title: '¡Excel Generado!', description: 'Listado de personal exportado en el formato matriz por obras.' });
   };
+
+  const exportToImage = async () => {
+    if (!imageExportRef.current) return;
+    if (filteredEmpleados.length === 0) {
+      toast({ variant: 'destructive', title: 'Sin datos', description: 'No hay personal filtrado para exportar.' });
+      return;
+    }
+
+    setIsExportingImage(true);
+    try {
+      const canvas = await html2canvas(imageExportRef.current, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        useCORS: true,
+        logging: false
+      });
+      const image = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.href = image;
+      link.download = `Matriz_Personal_Imagen_${new Date().toISOString().slice(0, 10)}.png`;
+      link.click();
+      toast({ title: '¡Imagen Generada!', description: 'Se descargó la matriz de personal como imagen PNG.' });
+    } catch (e: any) {
+      console.error('Error al exportar imagen:', e);
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo generar la imagen.' });
+    } finally {
+      setIsExportingImage(false);
+    }
+  };
+
 
   return (
     <div className="space-y-5 pb-safe">
@@ -690,17 +764,30 @@ export default function Personal() {
           </div>
 
           {activeTab === 'staff' && (
-            <div className="flex items-center gap-2 ml-auto sm:ml-0">
+            <div className="flex items-center gap-2 ml-auto sm:ml-0 flex-wrap">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={exportToExcel}
-                className="h-9 rounded-xl border-slate-200 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 font-semibold shadow-sm flex items-center gap-1.5"
+                className="h-9 rounded-xl border-emerald-200 text-emerald-700 hover:bg-emerald-50 font-bold shadow-sm flex items-center gap-1.5"
               >
-                <Download className="h-4 w-4" />
+                <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
                 <span>Exportar Excel</span>
               </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={exportToImage}
+                disabled={isExportingImage}
+                className="h-9 rounded-xl border-blue-200 text-blue-700 hover:bg-blue-50 font-bold shadow-sm flex items-center gap-1.5"
+              >
+                <FileImage className="h-4 w-4 text-blue-600" />
+                <span>{isExportingImage ? 'Generando...' : 'Exportar Imagen'}</span>
+              </Button>
+
               {isAdmin && (
+
                 <Button
                   size="sm"
                   onClick={() => setIsAddOpen(true)}
@@ -1272,6 +1359,73 @@ export default function Personal() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Contenedor de captura para Exportar a Imagen - Estilo Matriz Exacto */}
+      <div className="overflow-hidden h-0 w-0 pointer-events-none fixed top-[-9999px] left-[-9999px]">
+        <div ref={imageExportRef} className="p-6 bg-white w-[780px] font-sans text-slate-900 border border-slate-400">
+          <div className="mb-4 text-center border-b border-slate-900 pb-3">
+            <h2 className="text-xl font-black text-slate-900 uppercase tracking-wide">Distribución de Personal por Obra</h2>
+            <p className="text-xs text-slate-600 font-bold mt-1">PEIE Tools • {new Date().toLocaleDateString('es-AR')}</p>
+          </div>
+
+          <table className="w-full border-collapse border border-slate-900 text-xs">
+            <thead>
+              <tr className="bg-slate-800 text-white font-bold text-center">
+                <th className="border border-slate-900 px-3 py-2 w-12 text-center">#</th>
+                <th className="border border-slate-900 px-3 py-2 text-left">Nombre Completo</th>
+                <th className="border border-slate-900 px-3 py-2 text-center w-56">Obra Asignada</th>
+                <th className="border border-slate-900 px-3 py-2 text-center w-24">Cantidad</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(() => {
+                const groupedMap = new Map<string, Empleado[]>();
+                filteredEmpleados.forEach((emp) => {
+                  const obraName = emp.obras?.name || (emp.status === 'Trabajando' ? 'Obra Sin Nombre' : 'AUSENTES / LIC. MEDICA');
+                  if (!groupedMap.has(obraName)) groupedMap.set(obraName, []);
+                  groupedMap.get(obraName)!.push(emp);
+                });
+                const sortedObraNames = Array.from(groupedMap.keys()).sort((a, b) => a.localeCompare(b));
+                let globalIdx = 1;
+
+                return sortedObraNames.map((obraName) => {
+                  const empList = groupedMap.get(obraName)!;
+                  empList.sort((a, b) => a.full_name.localeCompare(b.full_name));
+
+                  return empList.map((emp, empIdx) => {
+                    const isFirstInObra = empIdx === 0;
+                    const currentRowIdx = globalIdx++;
+
+                    return (
+                      <tr key={emp.id} className="border-b border-slate-900 text-slate-900 font-medium">
+                        <td className="border border-slate-900 px-3 py-1.5 text-center font-bold">{currentRowIdx}</td>
+                        <td className="border border-slate-900 px-3 py-1.5 text-left font-bold">{emp.full_name}</td>
+                        {isFirstInObra && (
+                          <td
+                            rowSpan={empList.length}
+                            className="border border-slate-900 px-3 py-1.5 text-center font-black uppercase bg-slate-50 align-middle"
+                          >
+                            {obraName}
+                          </td>
+                        )}
+                        {isFirstInObra && (
+                          <td
+                            rowSpan={empList.length}
+                            className="border border-slate-900 px-3 py-1.5 text-center font-black bg-slate-50 align-middle text-sm"
+                          >
+                            {empList.length}
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  });
+                });
+              })()}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }
+
