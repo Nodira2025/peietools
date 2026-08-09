@@ -471,7 +471,11 @@ export default function NuevaSolicitud() {
       
       const toolDescription = finalToolName;
       const origenActual = tool?.obras?.name || 'Pendiente de asignación por Logística';
-      const logName = logisticaUser ? logisticaUser.full_name.split(' ')[0] : 'Logística';
+      const targetLogisticaUser = selectedLogisticaId 
+        ? personalLogistica.find(p => p.id === selectedLogisticaId) 
+        : (personalLogistica[0] || null);
+
+      const logName = targetLogisticaUser ? targetLogisticaUser.full_name.split(' ')[0] : 'Logística';
       const waMessage = [
         '*NUEVA SOLICITUD DE TRASLADO*',
         '',
@@ -484,21 +488,21 @@ export default function NuevaSolicitud() {
         `- *Fecha requerida:* ${neededDateObj.toLocaleString('es-AR')}`,
         `- *Prioridad:* ${priority}`,
         '',
-        `*Notas:* ${comments.trim() || 'Sin especificaciones'}`,
+        `*Notas:* ${typeof comments === 'string' && comments.trim() ? comments.trim() : 'Sin especificaciones'}`,
         '',
         'Gestionar el envío desde la app:',
         `${APP_URL}/solicitudes/${newSolicitud.id}`
       ].join('\n');
 
-      if (logisticaUser?.whatsapp) {
-
-        setWaPreviewPhone(logisticaUser.whatsapp);
+      if (targetLogisticaUser?.whatsapp) {
+        setWaPreviewPhone(targetLogisticaUser.whatsapp);
         setWaPreviewMessage(waMessage);
-        setWaPreviewRecipientName(logisticaUser.full_name);
+        setWaPreviewRecipientName(targetLogisticaUser.full_name);
         setWaPreviewOpen(true);
       } else {
         navigate('/solicitudes/' + newSolicitud.id);
       }
+
     }
   };
 
