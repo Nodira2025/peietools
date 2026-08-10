@@ -53,6 +53,7 @@ export default function Usuarios() {
     switch (roleName?.toLowerCase()) {
       case 'admin': return 'Administrador';
       case 'solicitante': return 'Coordinador';
+      case 'encargado': return 'Coordinador';
       case 'logistica': return 'Logística';
       default: return roleName;
     }

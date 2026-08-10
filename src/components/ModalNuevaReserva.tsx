@@ -15,6 +15,9 @@ interface ModalNuevaReservaProps {
   onClose: () => void;
   herramientaId?: string;
   herramientaNombre?: string;
+  obraIdInicial?: string;
+  fechaInicioInicial?: string;
+  notasIniciales?: string;
   onReservaCreada?: () => void;
 }
 
@@ -39,6 +42,9 @@ export function ModalNuevaReserva({
   onClose,
   herramientaId,
   herramientaNombre,
+  obraIdInicial,
+  fechaInicioInicial,
+  notasIniciales,
   onReservaCreada,
 }: ModalNuevaReservaProps) {
   const { toast } = useToast();
@@ -65,20 +71,24 @@ export function ModalNuevaReserva({
       if (herramientaId) {
         setSelectedHerramientaId(herramientaId);
       }
-      // Set default dates: inicio = mañana a las 08:00, fin = pasado mañana a las 18:00
-      const manana = new Date();
-      manana.setDate(manana.getDate() + 1);
-      manana.setHours(8, 0, 0, 0);
+      const inicio = fechaInicioInicial ? new Date(fechaInicioInicial) : new Date();
+      if (!fechaInicioInicial) {
+        inicio.setDate(inicio.getDate() + 1);
+        inicio.setHours(8, 0, 0, 0);
+      }
+      const fin = new Date(inicio.getTime() + 8 * 60 * 60 * 1000);
+      const toLocalInput = (date: Date) => {
+        const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+        return local.toISOString().slice(0, 16);
+      };
 
-      const fin = new Date(manana);
-      fin.setDate(fin.getDate() + 2);
-      fin.setHours(18, 0, 0, 0);
-
-      setFechaInicio(manana.toISOString().slice(0, 16));
-      setFechaFin(fin.toISOString().slice(0, 16));
+      setFechaInicio(toLocalInput(inicio));
+      setFechaFin(toLocalInput(fin));
+      setObraId(obraIdInicial || '');
+      setNotas(notasIniciales || '');
       setDisponible(null);
     }
-  }, [isOpen, herramientaId]);
+  }, [isOpen, herramientaId, obraIdInicial, fechaInicioInicial, notasIniciales]);
 
   const cargarOpciones = async () => {
     try {

@@ -71,7 +71,7 @@ export default function Solicitudes() {
       let { data: toolsData, error: toolsError } = await supabase
         .from('solicitudes')
         .select(`
-          id, requester_id, priority, status, created_at, needed_date,
+          id, requester_id, priority, status, created_at, needed_date, requested_tool_name,
           profiles!solicitudes_requester_id_fkey(full_name, whatsapp),
           herramientas!solicitudes_herramienta_id_fkey(name, code, obras!herramientas_current_obra_id_fkey(name)),
           target_obra:obras!solicitudes_target_obra_id_fkey(name),
@@ -82,7 +82,7 @@ export default function Solicitudes() {
         const fallback = await supabase
           .from('solicitudes')
           .select(`
-            id, requester_id, priority, status, created_at,
+            id, requester_id, priority, status, created_at, requested_tool_name,
             profiles!solicitudes_requester_id_fkey(full_name, whatsapp),
             herramientas!solicitudes_herramienta_id_fkey(name, code, obras!herramientas_current_obra_id_fkey(name)),
             target_obra:obras!solicitudes_target_obra_id_fkey(name),
@@ -118,10 +118,10 @@ export default function Solicitudes() {
           status: s.status,
           created_at: s.created_at,
           needed_date: s.needed_date,
-          source_name: s.herramientas?.obras?.name || 'Desconocida',
+          source_name: s.herramientas?.obras?.name || 'A determinar por Logística',
           target_name: s.target_obra?.name || 'Desconocida',
-          item_name: s.herramientas?.name,
-          item_code: s.herramientas?.code,
+          item_name: s.herramientas?.name || s.requested_tool_name || 'Herramienta solicitada',
+          item_code: s.herramientas?.code || 'POR ASIGNAR',
           requester_name: s.profiles?.full_name,
           requester_whatsapp: s.profiles?.whatsapp,
           assigned_name: s.assigned?.full_name
@@ -157,6 +157,7 @@ export default function Solicitudes() {
     switch(status) {
       case 'Pendiente': 
         return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200/60 shadow-sm"><Clock className="w-3.5 h-3.5 animate-pulse" /> Pendiente</span>;
+      case 'En atención':
       case 'Asignada': 
         return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/60 shadow-sm"><CheckCircle className="w-3.5 h-3.5" /> Recibido/Leído</span>;
       case 'En retiro': 
@@ -164,9 +165,12 @@ export default function Solicitudes() {
         return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200/60 shadow-sm"><Truck className="w-3.5 h-3.5" /> En curso</span>;
       case 'Entregada': 
       case 'Confirmada': 
+      case 'Confirmado':
         return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 shadow-sm"><CheckCircle className="w-3.5 h-3.5" /> Entregado</span>;
       case 'Cancelada':
+      case 'Cancelado':
       case 'Rechazada':
+      case 'Rechazado':
         return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200/60 shadow-sm"><AlertCircle className="w-3.5 h-3.5" /> {status}</span>;
       default: 
         return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200 shadow-sm">{status}</span>;
@@ -241,17 +245,17 @@ export default function Solicitudes() {
   // Calculate segment counts based on the base filtered list
   const counts = {
     all: baseFiltered.length,
-    pending: baseFiltered.filter(s => ['Pendiente', 'Asignada', 'En retiro', 'En traslado'].includes(s.status)).length,
-    delivered: baseFiltered.filter(s => ['Entregada', 'Confirmada'].includes(s.status)).length,
-    cancelled: baseFiltered.filter(s => ['Cancelada', 'Rechazada'].includes(s.status)).length
+    pending: baseFiltered.filter(s => ['Pendiente', 'En atención', 'Asignada', 'En retiro', 'En traslado'].includes(s.status)).length,
+    delivered: baseFiltered.filter(s => ['Entregada', 'Confirmada', 'Confirmado'].includes(s.status)).length,
+    cancelled: baseFiltered.filter(s => ['Cancelada', 'Cancelado', 'Rechazada', 'Rechazado'].includes(s.status)).length
   };
 
   // Final filtered list to render (applies activeTab status filter)
   const finalFiltered = baseFiltered.filter(s => {
     if (activeTab === 'all') return true;
-    if (activeTab === 'pending') return ['Pendiente', 'Asignada', 'En retiro', 'En traslado'].includes(s.status);
-    if (activeTab === 'delivered') return ['Entregada', 'Confirmada'].includes(s.status);
-    if (activeTab === 'cancelled') return ['Cancelada', 'Rechazada'].includes(s.status);
+    if (activeTab === 'pending') return ['Pendiente', 'En atención', 'Asignada', 'En retiro', 'En traslado'].includes(s.status);
+    if (activeTab === 'delivered') return ['Entregada', 'Confirmada', 'Confirmado'].includes(s.status);
+    if (activeTab === 'cancelled') return ['Cancelada', 'Cancelado', 'Rechazada', 'Rechazado'].includes(s.status);
     return true;
   });
 
@@ -380,8 +384,8 @@ export default function Solicitudes() {
               {/* Indicador superior de estado */}
               <div className={`absolute top-0 left-0 right-0 h-[4px] transition-colors ${
                 solicitud.status === 'Pendiente' ? 'bg-amber-400' :
-                ['Asignada', 'En retiro', 'En traslado'].includes(solicitud.status) ? 'bg-peie-blue' :
-                ['Entregada', 'Confirmada'].includes(solicitud.status) ? 'bg-emerald-500' : 'bg-rose-400'
+                ['En atención', 'Asignada', 'En retiro', 'En traslado'].includes(solicitud.status) ? 'bg-peie-blue' :
+                ['Entregada', 'Confirmada', 'Confirmado'].includes(solicitud.status) ? 'bg-emerald-500' : 'bg-rose-400'
               }`} />
               
               <CardHeader className="pb-2 pt-5 px-5">

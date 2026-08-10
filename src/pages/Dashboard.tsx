@@ -124,7 +124,7 @@ export default function Dashboard() {
             target_obra:obras!traslados_personal_target_obra_id_fkey(encargado_name)
           `).eq('status', 'Pendiente'),
           // Tools in transit or assigned
-          supabase.from('solicitudes').select('id, requester_id, assigned_to, status').in('status', ['Asignada', 'En retiro', 'En traslado']),
+          supabase.from('solicitudes').select('id, requester_id, assigned_to, status').in('status', ['En atención', 'Asignada', 'En retiro', 'En traslado']),
           // Available tools
           supabase.from('herramientas').select('id', { count: 'exact', head: true }).eq('status', 'Disponible'),
           // Active sites in DB
@@ -214,7 +214,7 @@ export default function Dashboard() {
         const pTools = filteredPendingTools.length;
         const pPersonal = filteredPendingPersonal.length;
         const aTools = filteredActiveTools.length;
-        const transitToolsCount = filteredActiveTools.filter((s: any) => s.status !== 'Asignada').length;
+        const transitToolsCount = filteredActiveTools.filter((s: any) => !['En atención', 'Asignada'].includes(s.status)).length;
 
         setCounts({
           pendingTools: pTools,
@@ -884,7 +884,7 @@ export default function Dashboard() {
                 <DropdownMenuLabel className="px-2.5 py-2 text-xs">
                   <p className="font-bold text-slate-800 truncate">{profile?.full_name || 'Usuario'}</p>
                   <p className="text-[10px] text-slate-400 capitalize mt-0.5">
-                    {profile?.role === 'solicitante' ? 'Coordinador' : (profile?.role === 'logistica' ? 'Logística' : 'Administrador')}
+                    {profile && ['solicitante', 'encargado'].includes(profile.role) ? 'Coordinador' : (profile?.role === 'logistica' ? 'Logística' : 'Administrador')}
                   </p>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-slate-100 my-1" />

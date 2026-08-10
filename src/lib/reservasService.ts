@@ -71,7 +71,7 @@ export async function verificarDisponibilidadHerramienta(
 
   if (error) {
     console.error('Error consultando disponibilidad:', error);
-    return true; // Asumir libre si falla la consulta para no bloquear erróneamente salvo que sea tabla inexistente
+    return false; // Ante una falla no se confirma una reserva que podría superponerse.
   }
 
   if (!data || data.length === 0) return true;

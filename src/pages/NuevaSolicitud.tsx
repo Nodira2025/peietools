@@ -57,6 +57,9 @@ interface PersonalLogistica {
   role: string;
 }
 
+const ACTIVE_TOOL_REQUEST_STATUSES = ['Pendiente', 'En atención', 'Asignada', 'En retiro', 'En traslado', 'Entregada'];
+const REQUESTABLE_TOOL_STATUSES = ['Disponible', 'En uso'];
+
 type WizardStep = 
   | 'select_tool'      // "¿Qué herramienta querés trasladar?"
   | 'select_date'      // "¿Para cuándo se necesita en obra?"
@@ -98,6 +101,7 @@ export default function NuevaSolicitud() {
 
   const [neededDate, setNeededDate] = useState(getDefaultNeededDate());
   const [loading, setLoading] = useState(false);
+  const [dataReady, setDataReady] = useState(false);
 
 
 
@@ -128,7 +132,11 @@ export default function NuevaSolicitud() {
 
   useEffect(() => {
     const checkSize = () => {
-      setIsMobile(window.innerWidth < 768);
+      const selectedDeviceMode = localStorage.getItem('login_device_mode');
+      setIsMobile(
+        selectedDeviceMode === 'mobile' ||
+        (selectedDeviceMode !== 'desktop' && window.innerWidth < 768)
+      );
     };
     checkSize();
     window.addEventListener('resize', checkSize);
@@ -139,36 +147,60 @@ export default function NuevaSolicitud() {
 
   useEffect(() => {
     async function fetchData() {
+      setDataReady(false);
+
       // Cargar caché local en 0ms
       const cached = localStorage.getItem('peie_cache_herramientas');
       if (cached) {
         try {
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setHerramientas(parsed);
+            setHerramientas(parsed.filter((tool: Herramienta) => REQUESTABLE_TOOL_STATUSES.includes(tool.status)));
           }
         } catch (e) {
           console.error('Error al leer caché', e);
         }
       }
 
-      // 1. Cargar todas las herramientas en segundo plano
-      const { data: toolsData } = await supabase
-        .from('herramientas')
-        .select('id, name, code, current_obra_id, status, obras(name)')
-        .order('name');
-      if (toolsData) {
-        setHerramientas(toolsData as unknown as Herramienta[]);
+      // 1. Cargar herramientas aptas y excluir las que ya tienen un pedido activo
+      const [toolsResult, activeRequestsResult] = await Promise.all([
+        supabase
+          .from('herramientas')
+          .select('id, name, code, current_obra_id, status, obras(name)')
+          .in('status', REQUESTABLE_TOOL_STATUSES)
+          .order('name'),
+        supabase
+          .from('solicitudes')
+          .select('herramienta_id')
+          .in('status', ACTIVE_TOOL_REQUEST_STATUSES)
+          .not('herramienta_id', 'is', null)
+      ]);
+
+      const toolsData = toolsResult.data;
+      const activeRequests = activeRequestsResult.data;
+      if (toolsResult.error || activeRequestsResult.error) {
+        console.error('Error al cargar disponibilidad de herramientas', toolsResult.error || activeRequestsResult.error);
+        setHerramientas([]);
+        setSelectedToolId('');
+      } else if (toolsData) {
+        const activeToolIds = new Set((activeRequests || []).map(request => request.herramienta_id));
+        const requestableTools = (toolsData as unknown as Herramienta[])
+          .filter(tool => !activeToolIds.has(tool.id));
+
+        setHerramientas(requestableTools);
         try {
-          localStorage.setItem('peie_cache_herramientas', JSON.stringify(toolsData));
+          localStorage.setItem('peie_cache_herramientas', JSON.stringify(requestableTools));
         } catch (storageError) {
           console.warn('QuotaExceededError ignorado en NuevaSolicitud', storageError);
         }
         if (preselectedToolId) {
-          const preTool = toolsData.find(h => h.id === preselectedToolId);
+          const preTool = requestableTools.find(h => h.id === preselectedToolId);
           if (preTool) {
             setToolSearch(`${preTool.name} [${preTool.code}]`);
             setWizardStep('select_obra');
+          } else {
+            setSelectedToolId('');
+            setToolSearch('');
           }
         } else if (!wizardStep) {
           setWizardStep('select_tool');
@@ -182,7 +214,28 @@ export default function NuevaSolicitud() {
         .eq('active', true)
         .order('name');
       if (obrasData) {
-        setObras(obrasData);
+        const canViewAllObras = profile?.role === 'admin' || profile?.role === 'logistica';
+        const userFullName = (profile?.full_name || '').toLowerCase().trim();
+        const userParts = userFullName.split(/\s+/).filter(Boolean);
+
+        const visibleObras = canViewAllObras ? obrasData : obrasData.filter((obra) => {
+          if (!profile) return false;
+          if (profile.obra_id === obra.id) return true;
+
+          const managerName = (obra.encargado_name || '').toLowerCase().trim();
+          if (!userParts.length || !managerName) return false;
+
+          const managerParts = managerName.split(/\s+/).filter(Boolean);
+          const cleanName = (name: string) => name.replace(/h/g, '');
+          const firstNameMatch = userParts[0] === managerParts[0] ||
+            userParts[0].startsWith(managerParts[0]) ||
+            managerParts[0].startsWith(userParts[0]) ||
+            cleanName(userParts[0]) === cleanName(managerParts[0]);
+
+          return firstNameMatch || userFullName.includes(managerName) || managerName.includes(userFullName);
+        });
+
+        setObras(visibleObras);
       }
 
       // 3. Cargar Personal de Logística
@@ -193,6 +246,8 @@ export default function NuevaSolicitud() {
         .eq('role', 'logistica')
         .order('full_name');
       if (logisticaData) setPersonalLogistica(logisticaData as PersonalLogistica[]);
+
+      setDataReady(true);
     }
 
     fetchData();
@@ -204,7 +259,7 @@ export default function NuevaSolicitud() {
     return () => {
       stopSpeaking();
     };
-  }, [preselectedToolId]);
+  }, [preselectedToolId, profile]);
 
   // ─── Voice Guide ─────────────────────────────────────────────────────────
 
@@ -223,12 +278,13 @@ export default function NuevaSolicitud() {
   useEffect(() => {
     if (!isMobile) return;
     const messages: Record<WizardStep, string> = {
-      select_tool: '¿Qué herramienta deseás trasladar? Buscala por su nombre o código en la lista.',
+      select_tool: '¿Qué herramienta necesitás? Escribí, por ejemplo, taladro.',
+      select_date: '¿Para qué día y hora la necesitás en obra?',
       select_obra: '¿Hacia qué obra debe enviarse la herramienta? Seleccioná la obra de destino.',
       select_logistica: '¿Quién es el encargado de logística que transportará la herramienta?',
       select_priority: '¿Qué tan urgente es el traslado? Elegí prioridad baja, normal o urgente.',
       enter_comments: '¿Querés agregar algún comentario o especificación para el viaje? Hablá o presioná continuar.',
-      confirm_request: 'Por favor, confirmá la solicitud de traslado para notificar por WhatsApp al encargado.',
+      confirm_request: 'Revisá herramienta, fecha y destino. Si está correcto, confirmá el pedido.',
     };
     if (messages[wizardStep]) {
       const timer = setTimeout(() => guideSpeak(messages[wizardStep]), 400);
@@ -272,7 +328,7 @@ export default function NuevaSolicitud() {
     if (wizardStep === 'select_priority') {
       if (command.includes('normal') || command.includes('azul')) {
         setPriority('Normal');
-        goToWizardStep('enter_comments');
+        goToWizardStep('select_obra');
       } else if (command.includes('urgente') || command.includes('rojo') || command.includes('rápido') || command.includes('rapido')) {
         setPriority('Urgente');
         goToWizardStep('enter_comments');
@@ -299,7 +355,7 @@ export default function NuevaSolicitud() {
     const isInteractive = target.closest('button') || target.closest('a') || target.closest('input') || target.closest('textarea') || target.closest('label');
     if (isInteractive) return;
 
-    const voiceActiveSteps: WizardStep[] = ['select_priority', 'confirm_request'];
+    const voiceActiveSteps: WizardStep[] = ['confirm_request'];
     if (voiceActiveSteps.includes(wizardStep)) {
       listenForScreenCommand();
     }
@@ -314,7 +370,8 @@ export default function NuevaSolicitud() {
 
   const handleSelectObraWizard = (obraId: string) => {
     setTargetObraId(obraId);
-    goToWizardStep('select_priority');
+    setPriority('Normal');
+    goToWizardStep('confirm_request');
   };
 
   const handleSelectLogisticaWizard = (logisticaId: string) => {
@@ -371,7 +428,16 @@ export default function NuevaSolicitud() {
   const executeSubmit = async () => {
     if (!profile) return;
 
-    const tool = herramientas.find(h => h.id === selectedToolId);
+    if (!isMobile && !dataReady) {
+      toast({
+        variant: 'destructive',
+        title: 'Inventario en verificación',
+        description: 'Esperá unos segundos mientras se valida la disponibilidad.'
+      });
+      return;
+    }
+
+    const tool = isMobile ? undefined : herramientas.find(h => h.id === selectedToolId);
     const finalToolName = requestedToolName.trim() || tool?.name || toolSearch.trim();
 
     if (!tool && !finalToolName) {
@@ -403,13 +469,34 @@ export default function NuevaSolicitud() {
     const neededDateIso = neededDateObj.toISOString();
 
     setLoading(true);
+
+    // Revalidar inmediatamente antes de crear para evitar pedidos duplicados.
+    if (tool) {
+      const { data: conflictingRequest, error: conflictError } = await supabase
+        .from('solicitudes')
+        .select('id')
+        .eq('herramienta_id', tool.id)
+        .in('status', ACTIVE_TOOL_REQUEST_STATUSES)
+        .limit(1)
+        .maybeSingle();
+
+      if (conflictError || conflictingRequest) {
+        setLoading(false);
+        toast({
+          variant: 'destructive',
+          title: conflictError ? 'No se pudo validar la herramienta' : 'Herramienta no disponible',
+          description: conflictError
+            ? conflictError.message
+            : 'La herramienta ya tiene una solicitud activa. Actualizá el inventario y elegí otra.'
+        });
+        return;
+      }
+    }
+
     const securityCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // Preparar comentarios incluyendo la herramienta dictada por voz/texto si no es una específica del catálogo
+    // En móvil se solicita una familia de herramienta. Logística asigna la unidad exacta después.
     const rawComments = typeof comments === 'string' ? comments.trim() : '';
-    const combinedComments = finalToolName && !tool 
-      ? `[Pedido: ${finalToolName}] ${rawComments}`.trim()
-      : (rawComments || null);
 
     // 1. Guardar la solicitud
     const insertPayload: any = {
@@ -420,36 +507,12 @@ export default function NuevaSolicitud() {
       target_obra_id: targetObraId,
       priority,
       status: 'Pendiente',
-      comments: combinedComments,
+      comments: rawComments || null,
       needed_date: neededDateIso,
       security_code: securityCode
     };
 
-    let { data: newSolicitud, error } = await supabase.from('solicitudes').insert([insertPayload]).select().single();
-
-    // Fallback ultra-resiliente por si la migración de Supabase no fue ejecutada en la BD activa
-    if (error) {
-      console.warn('Primer intento de solicitud falló, reintentando con formato compatible:', error.message);
-      const payloadRetry = { ...insertPayload };
-      
-      delete payloadRetry.assigned_logistica_id;
-      delete payloadRetry.requested_tool_name;
-
-      if (error.message?.includes('needed_date')) {
-        delete payloadRetry.needed_date;
-      }
-
-      // Si herramienta_id es requerida por constraint en BD antigua o es NULL
-      if ((error.message?.includes('herramienta_id') || !tool) && herramientas.length > 0) {
-        payloadRetry.herramienta_id = herramientas[0].id;
-      }
-
-      const retry = await supabase.from('solicitudes').insert([payloadRetry]).select().single();
-      if (retry.data) {
-        newSolicitud = retry.data;
-        error = retry.error;
-      }
-    }
+    const { data: newSolicitud, error } = await supabase.from('solicitudes').insert([insertPayload]).select().single();
 
 
     if (newSolicitud && tool) {
@@ -467,6 +530,15 @@ export default function NuevaSolicitud() {
     if (error) {
       toast({ variant: 'destructive', title: 'Error al solicitar', description: error.message });
     } else {
+      if (isMobile) {
+        toast({
+          title: '¡Pedido enviado!',
+          description: 'Ya está visible para el equipo de Logística. Te avisaremos cuando alguien lo tome.'
+        });
+        navigate('/pedidos-herramientas');
+        return;
+      }
+
       toast({ title: '¡Solicitud Generada!', description: 'Notificando a logística por WhatsApp...' });
       
       const toolDescription = finalToolName;
@@ -722,7 +794,7 @@ export default function NuevaSolicitud() {
 
               <Button
                 type="submit"
-                disabled={loading || !selectedToolId || !targetObraId || !selectedLogisticaId}
+                disabled={loading || !dataReady || !selectedToolId || !targetObraId || !selectedLogisticaId}
                 className="w-full h-12 bg-peie-blue hover:bg-peie-blue/90 font-bold rounded-xl flex items-center justify-center gap-2 mt-6 text-white"
               >
                 {loading ? 'Generando solicitud...' : (
@@ -829,7 +901,7 @@ export default function NuevaSolicitud() {
             {/* STEP 1: SELECT OBRA */}
             {wizardStep === 'select_obra' && (
               <div className="space-y-5">
-                <BackButton onBack={() => goToWizardStep('select_tool')} />
+                <BackButton onBack={() => goToWizardStep('select_date')} />
                 <StepHeader 
                   title="¿Hacia dónde debe enviarse?" 
                   subtitle="Seleccioná la obra de destino"
@@ -1027,15 +1099,13 @@ export default function NuevaSolicitud() {
                   </div>
 
                   <div className="space-y-2 text-sm text-slate-700 font-medium">
-                    <p>📦 <strong className="text-slate-500">Herramienta:</strong> {toolSelectedObject ? `${toolSelectedObject.name} [${toolSelectedObject.code}]` : (toolSearch.trim() || 'Herramienta solicitada')}</p>
+                    <p>📦 <strong className="text-slate-500">Herramienta:</strong> {requestedToolName.trim() || toolSearch.trim() || 'Herramienta solicitada'}</p>
                     <p>🕒 <strong className="text-slate-500">Fecha de Necesidad:</strong> <span className="font-bold text-amber-800">{neededDate ? new Date(neededDate).toLocaleString('es-AR') : 'No especificada'}</span></p>
-                    <p>🚩 <strong className="text-slate-500">Origen:</strong> {toolSelectedObject?.obras?.name || 'A determinar por Logística'}</p>
                     <p>📍 <strong className="text-slate-500">Destino:</strong> {targetObraObject?.name || 'No seleccionada'}</p>
-                    <p>👥 <strong className="text-slate-500">Logística:</strong> <span className="font-semibold text-amber-800">Pendiente de tomar por Logística</span></p>
-                    <p>🔔 <strong className="text-slate-500">Prioridad:</strong> <span className={priority === 'Urgente' ? 'text-rose-600 font-bold' : 'text-slate-800'}>{priority}</span></p>
-
-                    {(typeof comments === 'string' && comments.trim()) ? <p>💬 <strong className="text-slate-500">Nota:</strong> "{comments}"</p> : null}
                   </div>
+                  <p className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-xl p-3">
+                    Logística tomará el pedido y elegirá la unidad disponible más cercana.
+                  </p>
                 </div>
 
                 {/* Yes/No Buttons */}
@@ -1043,7 +1113,7 @@ export default function NuevaSolicitud() {
                   <button
                     type="button"
                     onClick={handleConfirmSubmit}
-                    disabled={loading}
+                    disabled={loading || !requestedToolName.trim() || !neededDate || !targetObraId}
                     className="flex flex-col items-center justify-center gap-2 h-24 rounded-2xl bg-emerald-500 text-white font-black text-lg active:scale-[0.95] transition-all shadow-lg disabled:opacity-50"
                   >
                     <Check size={32} />
@@ -1051,7 +1121,7 @@ export default function NuevaSolicitud() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => goToWizardStep('enter_comments')}
+                    onClick={() => goToWizardStep('select_obra')}
                     disabled={loading}
                     className="flex flex-col items-center justify-center gap-2 h-24 rounded-2xl bg-rose-500 text-white font-black text-lg active:scale-[0.95] transition-all shadow-lg disabled:opacity-50"
                   >
@@ -1137,4 +1207,3 @@ function BackButton({ onBack }: { onBack: () => void }) {
     </button>
   );
 }
-

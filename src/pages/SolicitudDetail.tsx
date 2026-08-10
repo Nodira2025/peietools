@@ -11,6 +11,10 @@ import { WhatsAppPreviewModal } from '../components/WhatsAppPreviewModal';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { ToolAvailabilityAssistant } from '../components/ToolAvailabilityAssistant';
+
+const ACTIVE_TOOL_REQUEST_STATUSES = ['Pendiente', 'En atención', 'Asignada', 'En retiro', 'En traslado', 'Entregada'];
+const ASSIGNABLE_TOOL_STATUSES = ['Disponible', 'En uso'];
 
 export default function SolicitudDetail() {
   const { id } = useParams();
@@ -90,8 +94,30 @@ export default function SolicitudDetail() {
   }, [id]);
 
   const fetchAllHerramientas = async () => {
-    const { data } = await supabase.from('herramientas').select('id, name, code, brand, model, current_obra_id, obras(name)').order('name');
-    if (data) setAllHerramientas(data);
+    if (!id) return;
+
+    const [toolsResult, activeRequestsResult] = await Promise.all([
+      supabase
+        .from('herramientas')
+        .select('id, name, code, brand, model, status, current_obra_id, obras(name)')
+        .in('status', ASSIGNABLE_TOOL_STATUSES)
+        .order('name'),
+      supabase
+        .from('solicitudes')
+        .select('herramienta_id')
+        .neq('id', id)
+        .in('status', ACTIVE_TOOL_REQUEST_STATUSES)
+        .not('herramienta_id', 'is', null)
+    ]);
+
+    if (toolsResult.error || activeRequestsResult.error) {
+      console.error('Error al cargar herramientas asignables', toolsResult.error || activeRequestsResult.error);
+      setAllHerramientas([]);
+      return;
+    }
+
+    const activeToolIds = new Set((activeRequestsResult.data || []).map(request => request.herramienta_id));
+    setAllHerramientas((toolsResult.data || []).filter(tool => !activeToolIds.has(tool.id)));
   };
 
   const handleChangeTool = async (newToolId: string) => {
@@ -99,6 +125,24 @@ export default function SolicitudDetail() {
     setChangingTool(true);
     try {
       const selectedToolObj = allHerramientas.find(h => h.id === newToolId);
+      if (!selectedToolObj || !ASSIGNABLE_TOOL_STATUSES.includes(selectedToolObj.status)) {
+        throw new Error('La herramienta seleccionada ya no está disponible para asignación.');
+      }
+
+      const { data: conflictingRequest, error: conflictError } = await supabase
+        .from('solicitudes')
+        .select('id')
+        .eq('herramienta_id', newToolId)
+        .neq('id', solicitud.id)
+        .in('status', ACTIVE_TOOL_REQUEST_STATUSES)
+        .limit(1)
+        .maybeSingle();
+
+      if (conflictError) throw conflictError;
+      if (conflictingRequest) {
+        throw new Error('La herramienta seleccionada ya tiene una solicitud activa.');
+      }
+
       const { error } = await supabase
         .from('solicitudes')
         .update({
@@ -108,6 +152,24 @@ export default function SolicitudDetail() {
         .eq('id', solicitud.id);
 
       if (error) throw error;
+
+      if (solicitud.herramienta_id && solicitud.herramienta_id !== newToolId) {
+        const { data: previousTool } = await supabase
+          .from('herramientas')
+          .select('current_obra_id')
+          .eq('id', solicitud.herramienta_id)
+          .maybeSingle();
+        await supabase
+          .from('herramientas')
+          .update({ status: previousTool?.current_obra_id ? 'En uso' : 'Disponible' })
+          .eq('id', solicitud.herramienta_id);
+      }
+
+      if (solicitud.status === 'Asignada' || solicitud.status === 'En atención' || solicitud.status === 'En retiro') {
+        await supabase.from('herramientas').update({ status: 'Reservada' }).eq('id', newToolId);
+      } else if (solicitud.status === 'En traslado') {
+        await supabase.from('herramientas').update({ status: 'En traslado' }).eq('id', newToolId);
+      }
 
       await supabase.from('movimientos').insert([{
         herramienta_id: newToolId,
@@ -154,8 +216,8 @@ export default function SolicitudDetail() {
       .select(`
         *,
         profiles!solicitudes_requester_id_fkey(full_name, whatsapp),
-        herramientas!solicitudes_herramienta_id_fkey(name, code, brand, model, obras!herramientas_current_obra_id_fkey(name)),
-        target_obra:obras!solicitudes_target_obra_id_fkey(name),
+        herramientas!solicitudes_herramienta_id_fkey(name, code, brand, model, obras!herramientas_current_obra_id_fkey(name, latitude, longitude, encargado_name)),
+        target_obra:obras!solicitudes_target_obra_id_fkey(id, name, latitude, longitude),
         assigned:profiles!solicitudes_assigned_to_fkey(full_name, whatsapp)
       `)
       .eq('id', id)
@@ -174,6 +236,7 @@ export default function SolicitudDetail() {
   const getStatusBadge = (status: string) => {
     switch(status) {
       case 'Pendiente': return <span className="flex items-center text-orange-600 bg-orange-100 px-3 py-1.5 rounded-full text-xs font-bold"><Clock className="w-3 h-3 mr-1" /> Pendiente</span>;
+      case 'En atención':
       case 'Asignada': return <span className="flex items-center text-blue-600 bg-blue-100 px-3 py-1.5 rounded-full text-xs font-bold"><CheckCircle className="w-3 h-3 mr-1" /> Recibido/Leído</span>;
       case 'En retiro':
       case 'En traslado': return <span className="flex items-center text-peie-blue bg-peie-light/20 px-3 py-1.5 rounded-full text-xs font-bold"><Truck className="w-3 h-3 mr-1" /> En curso</span>;
@@ -198,10 +261,25 @@ export default function SolicitudDetail() {
       payload.received_by = recipientName;
     }
 
-    const { error } = await supabase.from('solicitudes').update(payload).eq('id', solicitud.id);
+    let updateQuery = supabase.from('solicitudes').update(payload).eq('id', solicitud.id);
+    if (newStatus === 'Asignada') {
+      updateQuery = updateQuery.eq('status', 'Pendiente');
+    }
+
+    const { data: updatedRows, error } = await updateQuery.select('id');
     
     if (error) {
       toast({ variant: 'destructive', title: 'Error', description: error.message });
+      return;
+    }
+
+    if (newStatus === 'Asignada' && (!updatedRows || updatedRows.length === 0)) {
+      toast({
+        variant: 'destructive',
+        title: 'El pedido ya fue tomado',
+        description: 'Otra persona de Logística se hizo cargo antes. Se actualizaron los datos.'
+      });
+      fetchSolicitud();
       return;
     }
 
@@ -250,7 +328,7 @@ export default function SolicitudDetail() {
           'Hola *' + solicitud.profiles.full_name.split(' ')[0] + '*!',
           'Tu solicitud de traslado fue autorizada por Logistica:',
           '',
-          '- *Equipo:* ' + (solicitud.herramientas?.name || solicitud.comments || 'Herramienta solicitada'),
+          '- *Equipo:* ' + (solicitud.herramientas?.name || solicitud.requested_tool_name || solicitud.comments || 'Herramienta solicitada'),
           '- *Codigo:* ' + (solicitud.herramientas?.code || 'LIBRE'),
           '- *Responsable:* ' + profile.full_name,
           '- *Destino:* ' + solicitud.target_obra.name,
@@ -275,7 +353,7 @@ export default function SolicitudDetail() {
           '',
           `*${profile.full_name}* confirmo la recepcion de:`,
           '',
-          '- *Equipo:* ' + (solicitud.herramientas?.name || solicitud.comments || 'Herramienta solicitada'),
+          '- *Equipo:* ' + (solicitud.herramientas?.name || solicitud.requested_tool_name || solicitud.comments || 'Herramienta solicitada'),
           '- *Codigo:* ' + (solicitud.herramientas?.code || 'LIBRE'),
           '- *Destino:* ' + solicitud.target_obra.name,
           '- *Recibio:* ' + finalRecipient,
@@ -325,11 +403,13 @@ export default function SolicitudDetail() {
       notes: 'Motivo: ' + rejectionReason
     }]);
 
-    // Devolver herramienta a En uso (si está en obra) o Disponible
-    const { data: hData } = await supabase.from('herramientas').select('current_obra_id').eq('id', solicitud.herramienta_id).single();
-    await supabase.from('herramientas')
-      .update({ status: hData?.current_obra_id ? 'En uso' : 'Disponible' })
-      .eq('id', solicitud.herramienta_id);
+    // Devolver la unidad asignada, si ya existía una.
+    if (solicitud.herramienta_id) {
+      const { data: hData } = await supabase.from('herramientas').select('current_obra_id').eq('id', solicitud.herramienta_id).single();
+      await supabase.from('herramientas')
+        .update({ status: hData?.current_obra_id ? 'En uso' : 'Disponible' })
+        .eq('id', solicitud.herramienta_id);
+    }
 
     toast({ title: 'Solicitud Rechazada', description: 'Notificando al encargado...' });
 
@@ -339,7 +419,7 @@ export default function SolicitudDetail() {
         '*SOLICITUD RECHAZADA*',
         '',
         'Hola *' + solicitud.profiles.full_name.split(' ')[0] + '*!',
-        'Tu solicitud de traslado para *' + solicitud.herramientas.name + '* fue rechazada.',
+        'Tu solicitud de traslado para *' + (solicitud.herramientas?.name || solicitud.requested_tool_name || 'la herramienta solicitada') + '* fue rechazada.',
         '',
         '*Motivo:* ' + rejectionReason,
         '',
@@ -400,6 +480,12 @@ export default function SolicitudDetail() {
 
   const canAct = solicitud.status !== 'Confirmada' && solicitud.status !== 'Cancelada' && solicitud.status !== 'Rechazada';
   const isAdminOrLogistica = profile?.role === 'admin' || profile?.role === 'logistica';
+  const isAssignedToMe = solicitud.assigned_to === profile?.id || solicitud.assigned_logistica_id === profile?.id;
+  const canManageLogistics = isLogistica && (
+    solicitud.status === 'Pendiente'
+    || profile?.role === 'admin'
+    || isAssignedToMe
+  );
   const canDelete = isAdminOrLogistica || (isRequester && solicitud?.status === 'Pendiente');
 
   return (
@@ -427,13 +513,13 @@ export default function SolicitudDetail() {
           <div className="flex justify-between items-start">
             <div>
               <CardTitle className="text-xl font-bold text-peie-blue">
-                {solicitud.herramientas?.name || solicitud.comments || 'Herramienta solicitada'}
+                {solicitud.herramientas?.name || solicitud.requested_tool_name || solicitud.comments || 'Herramienta solicitada'}
               </CardTitle>
               <div className="flex items-center gap-2 mt-1">
                 <CardDescription className="text-sm font-mono bg-slate-100 px-2 py-1 rounded">
                   {solicitud.herramientas?.code || 'SIN CÓDIGO'}
                 </CardDescription>
-                {isAdminOrLogistica && canAct && (
+                {canManageLogistics && canAct && solicitud.status !== 'Pendiente' && (
                   <Button
                     size="sm"
                     variant="outline"
@@ -496,6 +582,24 @@ export default function SolicitudDetail() {
             )}
           </div>
 
+          {isLogistica && solicitud.status !== 'Pendiente' && canAct && (
+            <ToolAvailabilityAssistant
+              requestId={solicitud.id}
+              requestedToolName={solicitud.requested_tool_name || solicitud.herramientas?.name || 'Herramienta'}
+              neededDate={solicitud.needed_date}
+              targetObra={solicitud.target_obra}
+              currentToolId={solicitud.herramienta_id}
+              canAssign={canManageLogistics && (solicitud.status === 'Asignada' || solicitud.status === 'En atención')}
+              onAssign={handleChangeTool}
+            />
+          )}
+
+          {isLogistica && canAct && solicitud.status !== 'Pendiente' && !canManageLogistics && (
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+              Este pedido ya está a cargo de <strong>{solicitud.assigned?.full_name || 'otra persona de Logística'}</strong>. Podés consultar el estado, pero solo esa persona puede operarlo.
+            </div>
+          )}
+
           {/* Tarjeta de seguimiento en tiempo real */}
           {solicitud.status === 'En traslado' && (
             <div className="p-4 bg-gradient-to-r from-peie-blue to-peie-light text-white rounded-2xl flex items-center justify-between shadow-md">
@@ -549,7 +653,7 @@ export default function SolicitudDetail() {
           {/* ========================================================= */}
 
           {/* --- ACCIONES DE LOGISTICA / ADMIN --- */}
-          {isLogistica && canAct && (
+          {isLogistica && canAct && canManageLogistics && (
             <div className="pt-4 border-t border-slate-100 space-y-3">
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Acciones de Logística</h4>
@@ -607,7 +711,7 @@ export default function SolicitudDetail() {
               <div className="flex flex-col gap-2">
                 {solicitud.status === 'Pendiente' && (
                   <Button 
-                    onClick={() => updateStatus('En atención')} 
+                    onClick={() => updateStatus('Asignada')}
                     className="bg-amber-500 hover:bg-amber-600 text-white font-bold w-full h-12 rounded-xl shadow-md text-sm flex items-center justify-center gap-2"
                   >
                     <Clock className="mr-2 h-4 w-4" />
@@ -615,10 +719,21 @@ export default function SolicitudDetail() {
                   </Button>
                 )}
                 {(solicitud.status === 'En atención' || solicitud.status === 'Asignada') && (
-                  <Button onClick={() => updateStatus('En traslado')} className="bg-peie-blue hover:bg-peie-blue/90 text-white w-full h-12 rounded-xl text-sm font-bold">
-                    <Truck className="mr-2 h-4 w-4" />
-                    Marcar En curso / En traslado
-                  </Button>
+                  <div className="space-y-2">
+                    {!solicitud.herramienta_id && (
+                      <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">
+                        Elegí una unidad en el asistente antes de iniciar el traslado.
+                      </p>
+                    )}
+                    <Button
+                      onClick={() => updateStatus('En traslado')}
+                      disabled={!solicitud.herramienta_id}
+                      className="bg-peie-blue hover:bg-peie-blue/90 text-white w-full h-12 rounded-xl text-sm font-bold disabled:opacity-40"
+                    >
+                      <Truck className="mr-2 h-4 w-4" />
+                      Marcar En curso / En traslado
+                    </Button>
+                  </div>
                 )}
 
                 {(solicitud.status === 'En retiro' || solicitud.status === 'En traslado') && (
@@ -700,7 +815,7 @@ export default function SolicitudDetail() {
                               toast({ variant: 'destructive', title: 'Código Incorrecto', description: 'El código ingresado no coincide con el código de seguridad del solicitante.' });
                               return;
                             }
-                            updateStatus('Confirmada', selectedEmpleado);
+                            updateStatus('Entregada', selectedEmpleado);
                           }}
                           disabled={!selectedEmpleado || (solicitud.security_code && inputSecurityCode.length !== 6)}
                           className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl"
@@ -754,7 +869,7 @@ export default function SolicitudDetail() {
           )}
 
           {/* --- ACCIONES DEL ENCARGADO (solicitante) --- */}
-          {!isLogistica && canAct && (
+          {isRequester && canAct && (
             <div className="pt-4 border-t border-slate-100 space-y-3">
               <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Tus Acciones</h4>
               <div className="flex flex-col gap-2">
@@ -815,10 +930,10 @@ export default function SolicitudDetail() {
                   <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-center">
                     <Clock className="mx-auto h-8 w-8 text-orange-400 mb-2" />
                     <p className="text-sm font-semibold text-orange-700">Esperando confirmacion de Logistica</p>
-                    <p className="text-xs text-orange-500 mt-1">El responsable asignado recibio tu solicitud por WhatsApp</p>
+                    <p className="text-xs text-orange-500 mt-1">El pedido está visible en la bandeja del equipo de Logística</p>
                   </div>
                 )}
-                {(solicitud.status === 'Asignada' || solicitud.status === 'En retiro' || solicitud.status === 'En traslado') && (
+                {(solicitud.status === 'En atención' || solicitud.status === 'Asignada' || solicitud.status === 'En retiro' || solicitud.status === 'En traslado') && (
                   <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
                     <Truck className="mx-auto h-8 w-8 text-blue-400 mb-2" />
                     <p className="text-sm font-semibold text-blue-700">Herramienta en camino</p>
@@ -831,7 +946,7 @@ export default function SolicitudDetail() {
                   variant="outline"
                   onClick={() => {
                     const logisticaPhone = solicitud.assigned?.whatsapp || '5493814015738';
-                    const toolName = solicitud.herramientas?.name || (solicitud.comments ? solicitud.comments.replace(/^Pedido libre:\s*/i, '').trim() : 'Herramienta solicitada');
+                    const toolName = solicitud.herramientas?.name || solicitud.requested_tool_name || (solicitud.comments ? solicitud.comments.replace(/^Pedido libre:\s*/i, '').trim() : 'Herramienta solicitada');
                     const toolCode = solicitud.herramientas?.code || 'PEDIDO LIBRE';
 
                     const msg = [
@@ -906,7 +1021,7 @@ export default function SolicitudDetail() {
                   <div className="space-y-3 text-sm">
                     <div className="flex justify-between">
                       <span className="text-slate-400 text-xs">Herramienta</span>
-                      <span className="font-bold text-slate-800">{solicitud.herramientas?.name || solicitud.comments || 'Herramienta solicitada'}</span>
+                      <span className="font-bold text-slate-800">{solicitud.herramientas?.name || solicitud.requested_tool_name || solicitud.comments || 'Herramienta solicitada'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400 text-xs">Codigo</span>
@@ -1039,7 +1154,7 @@ export default function SolicitudDetail() {
                 className="w-full h-12 rounded-xl border border-slate-200 px-3 text-sm font-semibold bg-white focus:ring-2 focus:ring-peie-blue"
               >
                 <option value="">-- Seleccionar Herramienta --</option>
-                {allHerramientas.map(h => (
+                {allHerramientas.filter(h => h.id !== solicitud.herramienta_id).map(h => (
                   <option key={h.id} value={h.id}>
                     {h.name} [{h.code}] - Ubicación: {h.obras?.name || 'Base Central'}
                   </option>

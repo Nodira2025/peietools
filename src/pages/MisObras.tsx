@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Building2, Wrench, MapPin, ChevronRight, Search, HardHat, Camera, Image, Plus, Trash2, X } from 'lucide-react';
+import { Building2, Wrench, MapPin, ChevronRight, Search, HardHat, Camera, Image, Plus, Trash2, X, Navigation, ExternalLink } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { compressImage } from '../lib/imageUtils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -18,6 +18,8 @@ interface Obra {
   encargado_name: string | null;
   active: boolean;
   photo_url?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   toolCount?: number;
   empCount?: number;
   isDinamicaActiva?: boolean;
@@ -74,7 +76,7 @@ export default function MisObras() {
     setLoading(true);
     const { data: obrasData, error } = await supabase
       .from('obras')
-      .select('id, name, address, encargado_name, active, photo_url')
+      .select('id, name, address, encargado_name, active, photo_url, latitude, longitude')
       .order('name');
     
     if (error) {
@@ -231,6 +233,20 @@ export default function MisObras() {
 
   const encargadosUnicos = [...new Set(obras.map(o => o.encargado_name).filter(Boolean))].sort();
   if (selectedObra) {
+    const mapsEmbedApiKey = import.meta.env.VITE_GOOGLE_MAPS_EMBED_API_KEY?.trim();
+    const hasCoordinates = selectedObra.latitude != null && selectedObra.longitude != null;
+    const locationQuery = hasCoordinates
+      ? `${selectedObra.latitude},${selectedObra.longitude}`
+      : `${selectedObra.address || selectedObra.name}, Tucumán, Argentina`;
+    const encodedLocation = encodeURIComponent(locationQuery);
+    const embeddedLocationUrl = mapsEmbedApiKey
+      ? hasCoordinates
+        ? `https://www.google.com/maps/embed/v1/streetview?key=${encodeURIComponent(mapsEmbedApiKey)}&location=${encodedLocation}&pitch=0&fov=85`
+        : `https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(mapsEmbedApiKey)}&q=${encodedLocation}`
+      : null;
+    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodedLocation}`;
+    const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodedLocation}`;
+
     return (
       <div className="space-y-6 pb-safe">
         {/* Header con boton volver */}
@@ -241,11 +257,36 @@ export default function MisObras() {
           <ChevronRight className="h-4 w-4 rotate-180" /> Volver a obras
         </button>
 
-        {/* Info de la obra en degradado premium */}
-        <div className="relative bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-800 text-white rounded-[24px] p-6 shadow-md overflow-hidden flex flex-col justify-between">
-          <div className="absolute top-0 right-0 w-36 h-36 bg-white/5 rounded-full translate-x-8 -translate-y-8" />
-          
-          <div className="flex justify-between items-start gap-4">
+        {/* Ubicación e información principal de la obra */}
+        <div className="rounded-[24px] shadow-md overflow-hidden bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-800 text-white">
+          <div className="relative h-[200px] bg-blue-950">
+            {embeddedLocationUrl ? (
+              <iframe
+                title={`Ubicación de ${selectedObra.name}`}
+                src={embeddedLocationUrl}
+                loading="lazy"
+                allowFullScreen
+                referrerPolicy="strict-origin-when-cross-origin"
+                className="absolute inset-0 w-full h-full border-0 pointer-events-none"
+              />
+            ) : selectedObra.photo_url ? (
+              <img
+                src={selectedObra.photo_url}
+                alt={`Vista de ${selectedObra.name}`}
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+            ) : (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-blue-200">
+                <Building2 className="h-9 w-9" />
+                <span className="text-xs font-bold">Ubicación todavía no configurada</span>
+              </div>
+            )}
+          </div>
+
+          <div className="relative p-5">
+            <div className="absolute top-0 right-0 w-36 h-36 bg-white/5 rounded-full translate-x-8 -translate-y-8" />
+
+            <div className="relative flex justify-between items-start gap-4">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-white shrink-0">
                 <Building2 className="h-6 w-6" />
@@ -266,16 +307,36 @@ export default function MisObras() {
             <span className="text-[9px] font-black uppercase tracking-wider bg-white/15 px-3 py-1 rounded-full border border-white/10 text-white shrink-0">
               {selectedObra.active ? 'Activa' : 'Inactiva'}
             </span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 mt-6 border-t border-white/10 pt-4">
-            <div className="text-center border-r border-white/10">
-              <p className="text-2xl font-black text-white">{herramientas.length}</p>
-              <p className="text-[9px] font-bold uppercase tracking-wider text-blue-100">Herramientas</p>
             </div>
-            <div className="text-center">
-              <p className="text-2xl font-black text-white">{empleados.length}</p>
-              <p className="text-[9px] font-bold uppercase tracking-wider text-blue-100">Personal</p>
+
+            <div className="relative flex flex-wrap gap-2 mt-5">
+              <a
+                href={mapsUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-white/15 hover:bg-white/25 border border-white/20 px-3 py-2 text-[10px] font-black uppercase tracking-wide transition-colors"
+              >
+                <ExternalLink className="h-3.5 w-3.5" /> Ver ubicación
+              </a>
+              <a
+                href={directionsUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-white text-[#071b4d] hover:bg-blue-50 px-3 py-2 text-[10px] font-black uppercase tracking-wide shadow-sm transition-colors"
+              >
+                <Navigation className="h-3.5 w-3.5" /> Cómo llegar
+              </a>
+            </div>
+
+            <div className="relative grid grid-cols-2 gap-4 mt-5 border-t border-white/15 pt-4">
+              <div className="text-center border-r border-white/10">
+                <p className="text-2xl font-black text-white">{herramientas.length}</p>
+                <p className="text-[9px] font-bold uppercase tracking-wider text-blue-100">Herramientas</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-black text-white">{empleados.length}</p>
+                <p className="text-[9px] font-bold uppercase tracking-wider text-blue-100">Personal</p>
+              </div>
             </div>
           </div>
         </div>

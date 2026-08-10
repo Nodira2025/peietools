@@ -209,7 +209,7 @@ export default function AppLayout() {
   ].filter(item => item.show);
 
   const wrapperClass = deviceMode === 'mobile'
-    ? 'min-h-[100svh] bg-peie-bg text-foreground flex flex-col w-full overflow-x-hidden'
+    ? 'min-h-[100svh] bg-peie-bg text-foreground flex flex-col w-full max-w-[480px] mx-auto overflow-x-hidden shadow-xl'
     : deviceMode === 'desktop'
       ? 'min-h-[100svh] bg-peie-bg text-foreground flex flex-row w-full overflow-x-hidden'
       : 'min-h-[100svh] bg-peie-bg text-foreground flex flex-col md:flex-row w-full overflow-x-hidden';
@@ -241,7 +241,7 @@ export default function AppLayout() {
   const navClass = deviceMode === 'desktop'
     ? 'hidden'
     : deviceMode === 'mobile'
-      ? 'fixed bottom-0 left-0 right-0 bg-[#031530] text-white shadow-[0_-8px_30px_rgba(0,0,0,0.2)] rounded-t-[32px] z-40 flex overflow-x-auto no-scrollbar justify-around pb-safe pt-3 px-2 border-t border-slate-800/20'
+      ? 'fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] bg-[#031530] text-white shadow-[0_-8px_30px_rgba(0,0,0,0.2)] rounded-t-[32px] z-40 flex overflow-x-auto no-scrollbar justify-around pb-safe pt-3 px-2 border-t border-slate-800/20'
       : 'md:hidden fixed bottom-0 left-0 right-0 bg-[#031530] text-white shadow-[0_-8px_30px_rgba(0,0,0,0.2)] rounded-t-[32px] z-40 flex overflow-x-auto no-scrollbar justify-around pb-safe pt-3 px-2 border-t border-slate-800/20';
 
   const bottomSheetOverlayClass = deviceMode === 'desktop'
@@ -304,7 +304,7 @@ export default function AppLayout() {
             <div className="min-w-0 flex-1">
               <p className="text-xs font-bold text-slate-800 truncate">{profile.full_name}</p>
               <span className="inline-block px-2 py-0.5 mt-0.5 text-[10px] bg-peie-light/10 text-peie-blue font-semibold rounded capitalize">
-                {profile.role === 'solicitante' ? 'Coordinador' : (profile.role === 'logistica' ? 'Logística' : 'Administrador')}
+                {['solicitante', 'encargado'].includes(profile.role) ? 'Coordinador' : (profile.role === 'logistica' ? 'Logística' : 'Administrador')}
               </span>
             </div>
           </div>
@@ -368,7 +368,7 @@ export default function AppLayout() {
             <div className="flex flex-col text-right">
               <span className="text-xs font-black text-white leading-tight">{profile.full_name?.split(' ')[0]}</span>
               <span className="text-[9px] text-sky-400 font-black capitalize leading-none mt-0.5">
-                {profile.role === 'solicitante' ? 'Coordinador' : (profile.role === 'logistica' ? 'Logística' : 'Admin')}
+                {['solicitante', 'encargado'].includes(profile.role) ? 'Coordinador' : (profile.role === 'logistica' ? 'Logística' : 'Admin')}
               </span>
             </div>
             

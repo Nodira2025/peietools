@@ -345,23 +345,23 @@ export default function Logistica() {
       let { data: toolsData, error: toolsError } = await supabase
         .from('solicitudes')
         .select(`
-          id, status, priority, created_at, needed_date, comments,
+          id, status, priority, created_at, needed_date, comments, requested_tool_name,
           herramientas!solicitudes_herramienta_id_fkey(name, code, obras!herramientas_current_obra_id_fkey(name)),
           target_obra:obras!solicitudes_target_obra_id_fkey(name),
           profiles!solicitudes_requester_id_fkey(full_name)
         `)
-        .in('status', ['Pendiente', 'Asignada', 'En retiro', 'En traslado', 'Entregada']);
+        .in('status', ['Pendiente', 'En atención', 'Asignada', 'En retiro', 'En traslado', 'Entregada']);
 
       if (toolsError && toolsError.message?.includes('needed_date')) {
         const fallback = await supabase
           .from('solicitudes')
           .select(`
-            id, status, priority, created_at, comments,
+            id, status, priority, created_at, comments, requested_tool_name,
             herramientas!solicitudes_herramienta_id_fkey(name, code, obras!herramientas_current_obra_id_fkey(name)),
             target_obra:obras!solicitudes_target_obra_id_fkey(name),
             profiles!solicitudes_requester_id_fkey(full_name)
           `)
-          .in('status', ['Pendiente', 'Asignada', 'En retiro', 'En traslado', 'Entregada']);
+          .in('status', ['Pendiente', 'En atención', 'Asignada', 'En retiro', 'En traslado', 'Entregada']);
         toolsData = fallback.data;
         toolsError = fallback.error;
       }
@@ -395,8 +395,8 @@ export default function Logistica() {
             priority: s.priority,
             created_at: s.created_at,
             needed_date: s.needed_date,
-            item_name: s.herramientas?.name || cleanComment || 'Herramienta solicitada',
-            item_code: s.herramientas?.code || 'LIBRE',
+            item_name: s.herramientas?.name || s.requested_tool_name || cleanComment || 'Herramienta solicitada',
+            item_code: s.herramientas?.code || 'POR ASIGNAR',
             source_name: s.herramientas?.obras?.name || 'A determinar por Logística',
             target_name: s.target_obra?.name,
             requester_name: s.profiles?.full_name
@@ -426,6 +426,7 @@ export default function Logistica() {
   const getStatusStyle = (status: string) => {
     switch(status) {
       case 'Pendiente': return { bg: 'bg-orange-50 border-orange-200', icon: <Clock className="h-6 w-6 text-orange-500" />, color: 'text-orange-600', label: 'PENDIENTE' };
+      case 'En atención':
       case 'Asignada': return { bg: 'bg-blue-50 border-blue-200', icon: <CheckCircle className="h-6 w-6 text-blue-500" />, color: 'text-blue-600', label: 'RECIBIDO/LEÍDO' };
       case 'En retiro':
       case 'En traslado': return { bg: 'bg-sky-50 border-sky-200', icon: <Truck className="h-6 w-6 text-sky-500" />, color: 'text-sky-600', label: 'EN CURSO' };
