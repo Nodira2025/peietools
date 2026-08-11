@@ -325,7 +325,8 @@ export default function SolicitudDetail() {
         const msg = [
           '*PEDIDO ACEPTADO*',
           '',
-          'Hola *' + solicitud.profiles.full_name.split(' ')[0] + '*!',
+          'Hola *' + (solicitud.profiles?.full_name || 'Solicitante').split(' ')[0] + '*!',
+
           'Tu solicitud de traslado fue autorizada por Logistica:',
           '',
           '- *Equipo:* ' + (solicitud.herramientas?.name || solicitud.requested_tool_name || solicitud.comments || 'Herramienta solicitada'),
@@ -418,7 +419,8 @@ export default function SolicitudDetail() {
       const msg = [
         '*SOLICITUD RECHAZADA*',
         '',
-        'Hola *' + solicitud.profiles.full_name.split(' ')[0] + '*!',
+        'Hola *' + (solicitud.profiles?.full_name || 'Solicitante').split(' ')[0] + '*!',
+
         'Tu solicitud de traslado para *' + (solicitud.herramientas?.name || solicitud.requested_tool_name || 'la herramienta solicitada') + '* fue rechazada.',
         '',
         '*Motivo:* ' + rejectionReason,

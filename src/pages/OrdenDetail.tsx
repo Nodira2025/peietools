@@ -94,7 +94,8 @@ export default function OrdenDetail() {
         const msg = [
           `*ACTUALIZACIÓN DE ORDEN #${orden.id.slice(0, 8)}*`,
           '',
-          `Hola *${recipient.full_name?.split(' ')[0]}*!`,
+          `Hola *${recipient.full_name?.split(' ')[0] || 'Usuario'}*!`,
+
           `La tarea "*${orden.title}*" cambió su estado a: *${newStatus}*`,
           '',
           `Ver detalles: ${window.location.origin}/ordenes/${orden.id}`
@@ -353,7 +354,7 @@ export default function OrdenDetail() {
                </div>
                <CardContent className="p-6 relative z-10">
                  <h4 className="font-bold mb-1">WhatsApp Directo</h4>
-                 <p className="text-xs text-green-50 mb-4">¿Necesitas coordinar con {orden.assigned.full_name?.split(' ')[0]}?</p>
+                 <p className="text-xs text-green-50 mb-4">¿Necesitas coordinar con {orden.assigned?.full_name?.split(' ')[0] || 'el responsable'}?</p>
                  <Button 
                    onClick={sendWhatsApp}
                    className="w-full bg-white text-green-600 hover:bg-green-50 font-bold rounded-xl"

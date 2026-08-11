@@ -253,7 +253,8 @@ export default function NuevoTrasladoPersonal() {
         const msg = [
           '*SOLICITUD DE TRASLADO DE PERSONAL (APROBACIÓN REQUERIDA)*',
           '',
-          `Hola *${sourceProfileData.full_name.split(' ')[0]}*!`,
+          `Hola *${(sourceProfileData.full_name || 'Encargado').split(' ')[0]}*!`,
+
           `*${profile.full_name}* solicita trasladar a *${empleado.full_name}* (actualmente en tu obra *${empleado.obras?.name || 'Base'}*) hacia la obra *${targetObra?.name}*.`,
           '',
           'Ingresá al siguiente link para validar y aprobar el traslado:',

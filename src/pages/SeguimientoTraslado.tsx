@@ -194,7 +194,7 @@ export default function SeguimientoTraslado() {
         waMsg = [
           '*ACTUALIZACIÓN DE ENTREGA: ETA ACTUALIZADO*',
           '',
-          `Hola *${solicitud.profiles?.full_name?.split(' ')[0]}*!`,
+          `Hola *${(solicitud.profiles?.full_name || 'Solicitante').split(' ')[0]}*!`,
           `Se actualizó el tiempo estimado de llegada de tu herramienta *${solicitud.herramientas?.name}*:`,
           '',
           `- *Nuevo ETA:* ${etaInput}`,
@@ -212,8 +212,9 @@ export default function SeguimientoTraslado() {
         waMsg = [
           '*ALERTA DE DEMORA EN TRASLADO*',
           '',
-          `Hola *${solicitud.profiles?.full_name?.split(' ')[0]}*!`,
+          `Hola *${(solicitud.profiles?.full_name || 'Solicitante').split(' ')[0]}*!`,
           `El traslado de tu herramienta *${solicitud.herramientas?.name}* presenta un retraso:`,
+
           '',
           `- *Motivo:* ${selectedDelay}`,
           solicitud.eta ? `- *ETA estimado:* ${solicitud.eta}` : '',

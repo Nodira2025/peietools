@@ -167,7 +167,8 @@ export default function TrasladoPersonalDetail() {
       const msg = [
         '*TRASLADO DE PERSONAL RECHAZADO*',
         '',
-        'Hola *' + traslado.requester.full_name.split(' ')[0] + '*!',
+        'Hola *' + (traslado.requester?.full_name || 'Solicitante').split(' ')[0] + '*!',
+
         'La solicitud de traslado para *' + traslado.empleados.full_name + '* fue rechazada.',
         '',
         '*Motivo:* ' + rejectionReason,

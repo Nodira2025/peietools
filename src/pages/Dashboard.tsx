@@ -473,7 +473,8 @@ export default function Dashboard() {
     const waMsg = [
       '*⚠️ REPORTAR TAREA EXCEDIDA DE LOGÍSTICA*',
       '',
-      `Hola *${recipientName.split(' ')[0]}*, me encomendaron una tarea que excede la logística habitual:`,
+      `Hola *${(recipientName || 'Coordinación').split(' ')[0]}*, me encomendaron una tarea que excede la logística habitual:`,
+
       '',
       `- *Persona que encomendó la tarea:* ${personaNombre}`,
       reportTarea.trim() ? `- *Tarea / Pedido solicitado:* ${reportTarea}` : '',

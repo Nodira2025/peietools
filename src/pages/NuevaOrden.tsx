@@ -89,7 +89,8 @@ export default function NuevaOrden() {
         const msg = [
           '*NUEVA ORDEN DE TRABAJO*',
           '',
-          `Hola *${assignedUser.full_name.split(' ')[0]}*!`,
+          `Hola *${(assignedUser.full_name || 'Operador').split(' ')[0]}*!`,
+
           `Se te ha asignado una nueva tarea: *${formData.title}*`,
           '',
           `*Objetivo:* ${formData.objective}`,
