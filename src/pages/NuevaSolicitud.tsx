@@ -437,8 +437,9 @@ export default function NuevaSolicitud() {
       return;
     }
 
-    const tool = isMobile ? undefined : herramientas.find(h => h.id === selectedToolId);
-    const finalToolName = requestedToolName.trim() || tool?.name || toolSearch.trim();
+    const tool = herramientas.find(h => h.id === selectedToolId);
+    const finalToolName = requestedToolName.trim() || tool?.name || toolSearch.trim() || 'Herramienta solicitada';
+
 
     if (!tool && !finalToolName) {
       toast({ 
@@ -794,9 +795,10 @@ export default function NuevaSolicitud() {
 
               <Button
                 type="submit"
-                disabled={loading || !dataReady || !selectedToolId || !targetObraId || !selectedLogisticaId}
+                disabled={loading || !targetObraId || !(selectedToolId || requestedToolName.trim() || toolSearch.trim())}
                 className="w-full h-12 bg-peie-blue hover:bg-peie-blue/90 font-bold rounded-xl flex items-center justify-center gap-2 mt-6 text-white"
               >
+
                 {loading ? 'Generando solicitud...' : (
                   <>
                     <MessageCircle size={18} /> Confirmar y Notificar por WhatsApp
@@ -1113,7 +1115,7 @@ export default function NuevaSolicitud() {
                   <button
                     type="button"
                     onClick={handleConfirmSubmit}
-                    disabled={loading || !requestedToolName.trim() || !neededDate || !targetObraId}
+                    disabled={loading || !(requestedToolName.trim() || toolSearch.trim() || selectedToolId) || !targetObraId}
                     className="flex flex-col items-center justify-center gap-2 h-24 rounded-2xl bg-emerald-500 text-white font-black text-lg active:scale-[0.95] transition-all shadow-lg disabled:opacity-50"
                   >
                     <Check size={32} />
@@ -1129,6 +1131,7 @@ export default function NuevaSolicitud() {
                     MODIFICAR
                   </button>
                 </div>
+
               </div>
             )}
 
