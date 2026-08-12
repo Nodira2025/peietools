@@ -28,6 +28,8 @@ import {
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
+import { useCategories } from '../lib/useCategories';
+
 import FilterBar from '../components/FilterBar';
 import * as XLSX from 'xlsx';
 import ModalGestionCategorias from '../components/ModalGestionCategorias';
@@ -132,17 +134,54 @@ export default function Herramientas() {
     fetchHerramientas();
   }, []);
 
-  const categoriesList = [
-    { name: 'Escaleras', icon: Layers, color: 'from-amber-400 to-orange-500', desc: 'Escaleras telescópicas, tijeras, andamios' },
-    { name: 'Amoladoras', icon: Disc, color: 'from-sky-400 to-blue-600', desc: 'Amoladoras angulares, de banco, discos' },
-    { name: 'Taladros', icon: Hammer, color: 'from-rose-400 to-red-600', desc: 'Rotopercutores, atornilladores, brocas' },
-    { name: 'Prensas y Pinzas', icon: Zap, color: 'from-indigo-500 to-purple-600', desc: 'Pinzas de indentar, alicates, prensas terminales y ponchadoras' },
-    { name: 'Elementos de seguridad', icon: Shield, color: 'from-emerald-400 to-teal-600', desc: 'Cascos, arneses, antiparras, guantes' },
-    { name: 'Instrumentos de medición', icon: Ruler, color: 'from-purple-400 to-indigo-600', desc: 'Multímetros, pinzas, niveles, cintas' },
-    { name: 'Vehículos', icon: Car, color: 'from-teal-400 to-cyan-600', desc: 'Camionetas, utilitarios, furgones' },
-    { name: 'Insumos y Consumibles', icon: Package, color: 'from-amber-500 to-yellow-600', desc: 'Vaselina, lubricantes, cintas y productos consumibles' },
-    { name: 'Otros', icon: Wrench, color: 'from-slate-400 to-slate-600', desc: 'Herramientas menores y accesorios varios' },
+  const { categories: dynamicCategoryNames } = useCategories();
+
+  const categoryMetaMap: Record<string, { icon: any; color: string; desc: string }> = {
+    'Escaleras': { icon: Layers, color: 'from-amber-400 to-orange-500', desc: 'Escaleras telescópicas, tijeras, andamios' },
+    'Amoladoras': { icon: Disc, color: 'from-sky-400 to-blue-600', desc: 'Amoladoras angulares, de banco, discos' },
+    'Taladros': { icon: Hammer, color: 'from-rose-400 to-red-600', desc: 'Rotopercutores, atornilladores, brocas' },
+    'Taladros / Rotomartillos': { icon: Hammer, color: 'from-rose-400 to-red-600', desc: 'Rotopercutores, atornilladores, brocas' },
+    'Prensas y Pinzas': { icon: Zap, color: 'from-indigo-500 to-purple-600', desc: 'Pinzas de indentar, alicates, prensas terminales y ponchadoras' },
+    'Elementos de seguridad': { icon: Shield, color: 'from-emerald-400 to-teal-600', desc: 'Cascos, arneses, antiparras, guantes' },
+    'Seguridad y Protección': { icon: Shield, color: 'from-emerald-400 to-teal-600', desc: 'Cascos, arneses, antiparras, guantes' },
+    'Instrumentos de medición': { icon: Ruler, color: 'from-purple-400 to-indigo-600', desc: 'Multímetros, pinzas, niveles, cintas' },
+    'Medición y Prueba': { icon: Ruler, color: 'from-purple-400 to-indigo-600', desc: 'Multímetros, pinzas, niveles, cintas' },
+    'Vehículos': { icon: Car, color: 'from-teal-400 to-cyan-600', desc: 'Camionetas, utilitarios, furgones' },
+    'Insumos y Consumibles': { icon: Package, color: 'from-amber-500 to-yellow-600', desc: 'Vaselina, lubricantes, cintas y productos consumibles' },
+    'Otros': { icon: Wrench, color: 'from-slate-400 to-slate-600', desc: 'Herramientas menores y accesorios varios' },
+  };
+
+  const categoryColors = [
+    'from-sky-400 to-blue-600',
+    'from-amber-400 to-orange-500',
+    'from-rose-400 to-red-600',
+    'from-indigo-500 to-purple-600',
+    'from-emerald-400 to-teal-600',
+    'from-purple-400 to-indigo-600',
+    'from-teal-400 to-cyan-600',
+    'from-amber-500 to-yellow-600',
+    'from-slate-400 to-slate-600',
   ];
+
+  const allCatNames = Array.from(new Set([
+    ...dynamicCategoryNames,
+    ...herramientas.map(h => h.category).filter((c): c is string => !!c)
+  ])).sort((a, b) => a.localeCompare(b));
+
+  const categoriesList = allCatNames.map((name, idx) => {
+    const meta = categoryMetaMap[name] || {
+      icon: Wrench,
+      color: categoryColors[idx % categoryColors.length],
+      desc: `Herramientas y equipos de ${name}`
+    };
+    return {
+      name,
+      icon: meta.icon,
+      color: meta.color,
+      desc: meta.desc
+    };
+  });
+
 
   const getCategoryIcon = (category: string | null) => {
     switch(category) {

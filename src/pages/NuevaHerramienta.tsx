@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { compressImage } from '../lib/imageUtils';
 import { analyzeToolImage } from '../lib/openrouter';
 import VoiceInputButton from '../components/VoiceInputButton';
+import { useCategories } from '../lib/useCategories';
 
 interface Obra {
   id: string;
@@ -24,6 +25,8 @@ export default function NuevaHerramienta() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { profile } = useAuthStore();
+  const { categories: dynamicCategories } = useCategories();
+
   
   const [obras, setObras] = useState<Obra[]>([]);
   const [code, setCode] = useState('');
@@ -396,10 +399,11 @@ Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Prensas y Pinzas',
                         <SelectValue placeholder="Categoría" />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl">
-                        {['Escaleras', 'Amoladoras', 'Taladros', 'Prensas y Pinzas', 'Elementos de seguridad', 'Instrumentos de medición', 'Vehículos', 'Insumos y Consumibles', 'Otros'].map(cat => (
+                        {dynamicCategories.map(cat => (
                           <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                         ))}
                       </SelectContent>
+
 
                     </Select>
                   </div>
@@ -789,12 +793,13 @@ Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Prensas y Pinzas',
                     <SelectValue placeholder="Selecciona la categoría" />
                   </SelectTrigger>
                   <SelectContent>
-                    {['Escaleras', 'Amoladoras', 'Taladros', 'Prensas y Pinzas', 'Elementos de seguridad', 'Instrumentos de medición', 'Vehículos', 'Insumos y Consumibles', 'Otros'].map(cat => (
+                    {dynamicCategories.map(cat => (
                       <SelectItem key={cat} value={cat}>
                         {cat}
                       </SelectItem>
                     ))}
                   </SelectContent>
+
                 </Select>
               </div>
 

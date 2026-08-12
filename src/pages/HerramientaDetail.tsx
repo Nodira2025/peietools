@@ -14,8 +14,10 @@ import { compressImage } from '../lib/imageUtils';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useCategories } from '../lib/useCategories';
 
 interface Herramienta {
+
   id: string;
   code: string;
   qr_code: string | null;
@@ -42,7 +44,9 @@ export default function HerramientaDetail() {
   const location = useLocation();
   const { toast } = useToast();
   const { profile } = useAuthStore();
+  const { categories: dynamicCategories } = useCategories();
   const [herramienta, setHerramienta] = useState<Herramienta | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [gettingLocation, setGettingLocation] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -460,10 +464,11 @@ export default function HerramientaDetail() {
                         <SelectValue placeholder="Categoría" />
                       </SelectTrigger>
                       <SelectContent>
-                        {['Escaleras', 'Amoladoras', 'Taladros', 'Prensas y Pinzas', 'Elementos de seguridad', 'Instrumentos de medición', 'Vehículos', 'Insumos y Consumibles', 'Otros'].map(cat => (
+                        {dynamicCategories.map(cat => (
                           <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                         ))}
                       </SelectContent>
+
                     </Select>
                   </div>
                   <div className="space-y-1.5">
