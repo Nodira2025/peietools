@@ -25,13 +25,15 @@ import {
   AlertTriangle,
   ChevronRight,
   Wrench,
-  Clock
+  Clock,
+  Layers
 } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { buildWhatsAppLink, APP_URL } from '../lib/whatsapp';
 import { WhatsAppPreviewModal } from '../components/WhatsAppPreviewModal';
 import { speak, stopSpeaking, setVoiceEnabled, isSpeechSupported } from '../lib/voiceGuide';
 import VoiceInputButton from '../components/VoiceInputButton';
+import { useCategories } from '../lib/useCategories';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -43,8 +45,10 @@ interface Obra {
 
 interface Herramienta {
   id: string;
-  name: string;
   code: string;
+  name: string;
+  category?: string | null;
+  brand?: string | null;
   current_obra_id: string | null;
   status: string;
   obras?: { name: string } | null;
@@ -166,7 +170,8 @@ export default function NuevaSolicitud() {
       const [toolsResult, activeRequestsResult] = await Promise.all([
         supabase
           .from('herramientas')
-          .select('id, name, code, current_obra_id, status, obras(name)')
+          .select('id, name, code, category, brand, current_obra_id, status, obras(name)')
+
           .in('status', REQUESTABLE_TOOL_STATUSES)
           .order('name'),
         supabase
@@ -391,9 +396,36 @@ export default function NuevaSolicitud() {
 
   // ─── Actions & Submissions ───────────────────────────────────────────────
 
+  const { categories: dynamicCategories } = useCategories();
+
   const normalizeString = (str: string): string => {
     return str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   };
+
+  const currentToolQuery = (requestedToolName || toolSearch || '').trim();
+  const queryNorm = normalizeString(currentToolQuery);
+
+  const matchedCategories = queryNorm.length >= 1 ? dynamicCategories.filter(cat => {
+    return normalizeString(cat).includes(queryNorm);
+  }).map(cat => {
+    const catNorm = normalizeString(cat);
+    const totalInCat = herramientas.filter(h => normalizeString(h.category || '').includes(catNorm)).length;
+    const availableInCat = herramientas.filter(h => normalizeString(h.category || '').includes(catNorm) && h.status === 'Disponible').length;
+    return {
+      name: cat,
+      total: totalInCat,
+      available: availableInCat
+    };
+  }) : [];
+
+  const matchedTools = queryNorm.length >= 1 ? herramientas.filter(t => {
+    const nameNorm = normalizeString(t.name);
+    const codeNorm = normalizeString(t.code);
+    const catNorm = normalizeString(t.category || '');
+    const brandNorm = normalizeString(t.brand || '');
+    return nameNorm.includes(queryNorm) || codeNorm.includes(queryNorm) || catNorm.includes(queryNorm) || brandNorm.includes(queryNorm);
+  }).slice(0, 10) : [];
+
   const filteredHerramientas = herramientas.filter(t => {
     const searchNorm = normalizeString(toolSearch);
     if (!searchNorm) return true;
@@ -401,6 +433,7 @@ export default function NuevaSolicitud() {
     const codeNorm = normalizeString(t.code);
     return nameNorm.includes(searchNorm) || codeNorm.includes(searchNorm);
   });
+
 
   const filteredLogistica = personalLogistica.filter(p => {
     const searchNorm = normalizeString(logisticaSearch);
@@ -650,24 +683,75 @@ export default function NuevaSolicitud() {
                     </span>
                   )}
                 </div>
-                {isToolDropdownOpen && filteredHerramientas.length > 0 && (
-                  <div className="absolute z-50 w-full bg-white border border-slate-100 rounded-xl shadow-lg mt-1 max-h-48 overflow-y-auto">
-                    {filteredHerramientas.map(t => (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedToolId(t.id);
-                          setToolSearch(`${t.name} [${t.code}]`);
-                          setIsToolDropdownOpen(false);
-                        }}
-                        className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm font-semibold text-slate-700"
-                      >
-                        {t.name} <span className="text-xs text-slate-400">[{t.code}]</span>
-                      </button>
-                    ))}
+                {isToolDropdownOpen && queryNorm.length >= 1 && (matchedCategories.length > 0 || matchedTools.length > 0) && (
+                  <div className="absolute z-50 w-full bg-white border border-slate-200 rounded-2xl shadow-xl mt-1.5 max-h-72 overflow-y-auto divide-y divide-slate-100">
+                    {/* Sección 1: Categorías Coincidentes */}
+                    {matchedCategories.length > 0 && (
+                      <div className="p-2 bg-slate-50/80">
+                        <p className="px-2 py-1 text-[11px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <Layers className="w-3.5 h-3.5 text-peie-blue" /> Categorías coincidentes
+                        </p>
+                        <div className="space-y-1 mt-1">
+                          {matchedCategories.map(cat => (
+                            <button
+                              key={cat.name}
+                              type="button"
+                              onClick={() => {
+                                setRequestedToolName(cat.name);
+                                setToolSearch(cat.name);
+                                setSelectedToolId('');
+                                setIsToolDropdownOpen(false);
+                              }}
+                              className="w-full text-left px-3 py-2 hover:bg-peie-blue/5 rounded-xl transition-all flex items-center justify-between text-sm font-bold text-slate-800"
+                            >
+                              <span>{cat.name}</span>
+                              <span className="text-xs bg-slate-200/70 text-slate-700 font-semibold px-2 py-0.5 rounded-full">
+                                {cat.available} disp. / {cat.total} total
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Sección 2: Herramientas del Catálogo */}
+                    {matchedTools.length > 0 && (
+                      <div className="p-2 bg-white">
+                        <p className="px-2 py-1 text-[11px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <Wrench className="w-3.5 h-3.5 text-amber-500" /> Herramientas del Catálogo
+                        </p>
+                        <div className="space-y-1 mt-1">
+                          {matchedTools.map(t => (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedToolId(t.id);
+                                setRequestedToolName(t.name);
+                                setToolSearch(`${t.name} [${t.code}]`);
+                                setIsToolDropdownOpen(false);
+                              }}
+                              className="w-full text-left px-3 py-2.5 hover:bg-amber-50/70 rounded-xl transition-all flex items-center justify-between group"
+                            >
+                              <div>
+                                <p className="text-sm font-bold text-slate-800 group-hover:text-peie-blue">{t.name} <span className="text-xs text-slate-400 font-medium">[{t.code}]</span></p>
+                                <p className="text-xs text-slate-500">{t.category || 'Sin categoría'} • Obra: {t.obras?.name || 'Base'}</p>
+                              </div>
+                              <span className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border ${
+                                t.status === 'Disponible' 
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                  : 'bg-amber-50 text-amber-700 border-amber-200'
+                              }`}>
+                                {t.status}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
+
               </div>
 
               {/* Encargado Filter */}
@@ -839,15 +923,91 @@ export default function NuevaSolicitud() {
                     />
                   </div>
 
-                  <Input
-                    placeholder="Ej: Taladro, Amoladora 7'', Demoledor..."
-                    value={requestedToolName || toolSearch}
-                    onChange={(e) => {
-                      setRequestedToolName(e.target.value);
-                      setToolSearch(e.target.value);
-                    }}
-                    className="h-14 rounded-2xl bg-white border-amber-200 text-base font-bold text-slate-800 px-4 shadow-inner"
-                  />
+                  <div className="relative">
+                    <Input
+                      placeholder="Ej: Taladro, Amoladora 7'', Demoledor..."
+                      value={requestedToolName || toolSearch}
+                      onChange={(e) => {
+                        setRequestedToolName(e.target.value);
+                        setToolSearch(e.target.value);
+                        setSelectedToolId('');
+                        setIsToolDropdownOpen(true);
+                      }}
+                      onFocus={() => setIsToolDropdownOpen(true)}
+                      className="h-14 rounded-2xl bg-white border-amber-200 text-base font-bold text-slate-800 px-4 shadow-inner"
+                    />
+
+                    {/* Sugerencias en tiempo real (Móvil) */}
+                    {isToolDropdownOpen && queryNorm.length >= 1 && (matchedCategories.length > 0 || matchedTools.length > 0) && (
+                      <div className="absolute z-50 w-full bg-white border border-amber-200 rounded-2xl shadow-xl mt-1.5 max-h-72 overflow-y-auto divide-y divide-slate-100">
+                        {/* Sección 1: Categorías Coincidentes */}
+                        {matchedCategories.length > 0 && (
+                          <div className="p-2 bg-amber-50/40">
+                            <p className="px-2 py-1 text-[11px] font-black text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
+                              <Layers className="w-3.5 h-3.5 text-amber-600" /> Categorías coincidentes
+                            </p>
+                            <div className="space-y-1 mt-1">
+                              {matchedCategories.map(cat => (
+                                <button
+                                  key={cat.name}
+                                  type="button"
+                                  onClick={() => {
+                                    setRequestedToolName(cat.name);
+                                    setToolSearch(cat.name);
+                                    setSelectedToolId('');
+                                    setIsToolDropdownOpen(false);
+                                  }}
+                                  className="w-full text-left px-3 py-2 hover:bg-amber-100/60 rounded-xl transition-all flex items-center justify-between text-sm font-bold text-slate-800"
+                                >
+                                  <span>{cat.name}</span>
+                                  <span className="text-xs bg-amber-200/60 text-amber-950 font-black px-2 py-0.5 rounded-full">
+                                    {cat.available} disp. / {cat.total} total
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Sección 2: Herramientas del Catálogo */}
+                        {matchedTools.length > 0 && (
+                          <div className="p-2 bg-white">
+                            <p className="px-2 py-1 text-[11px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                              <Wrench className="w-3.5 h-3.5 text-peie-blue" /> Herramientas del Catálogo
+                            </p>
+                            <div className="space-y-1 mt-1">
+                              {matchedTools.map(t => (
+                                <button
+                                  key={t.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedToolId(t.id);
+                                    setRequestedToolName(t.name);
+                                    setToolSearch(`${t.name} [${t.code}]`);
+                                    setIsToolDropdownOpen(false);
+                                  }}
+                                  className="w-full text-left px-3 py-2.5 hover:bg-peie-blue/5 rounded-xl transition-all flex items-center justify-between group"
+                                >
+                                  <div>
+                                    <p className="text-sm font-bold text-slate-800 group-hover:text-peie-blue">{t.name} <span className="text-xs text-slate-400 font-medium">[{t.code}]</span></p>
+                                    <p className="text-xs text-slate-500">{t.category || 'Sin categoría'} • Obra: {t.obras?.name || 'Base'}</p>
+                                  </div>
+                                  <span className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border ${
+                                    t.status === 'Disponible' 
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                      : 'bg-amber-50 text-amber-700 border-amber-200'
+                                  }`}>
+                                    {t.status}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
 
                   <Button
                     type="button"
