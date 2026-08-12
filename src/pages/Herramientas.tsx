@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -163,24 +164,26 @@ export default function Herramientas() {
     'from-slate-400 to-slate-600',
   ];
 
-  const allCatNames = Array.from(new Set([
-    ...dynamicCategoryNames,
-    ...herramientas.map(h => h.category).filter((c): c is string => !!c)
-  ])).sort((a, b) => a.localeCompare(b));
+  const categoriesList = useMemo(() => {
+    const allCatNames = Array.from(new Set([
+      ...dynamicCategoryNames,
+      ...herramientas.map(h => h.category).filter((c): c is string => !!c)
+    ])).sort((a, b) => a.localeCompare(b));
 
-  const categoriesList = allCatNames.map((name, idx) => {
-    const meta = categoryMetaMap[name] || {
-      icon: Wrench,
-      color: categoryColors[idx % categoryColors.length],
-      desc: `Herramientas y equipos de ${name}`
-    };
-    return {
-      name,
-      icon: meta.icon,
-      color: meta.color,
-      desc: meta.desc
-    };
-  });
+    return allCatNames.map((name, idx) => {
+      const meta = categoryMetaMap[name] || {
+        icon: Wrench,
+        color: categoryColors[idx % categoryColors.length],
+        desc: `Herramientas y equipos de ${name}`
+      };
+      return {
+        name,
+        icon: meta.icon,
+        color: meta.color,
+        desc: meta.desc
+      };
+    });
+  }, [dynamicCategoryNames, herramientas]);
 
 
   const getCategoryIcon = (category: string | null) => {
@@ -220,65 +223,51 @@ export default function Herramientas() {
         dot: 'bg-orange-500'
       };
       case 'En mantenimiento': return {
-        badge: 'bg-red-100 text-red-800 border-red-200',
-        border: 'border-l-red-500 border-l-4 md:border-red-100 md:hover:border-red-500',
-        dot: 'bg-red-500'
+        badge: 'bg-purple-100 text-purple-800 border-purple-200',
+        border: 'border-l-purple-500 border-l-4 md:border-purple-100 md:hover:border-purple-500',
+        dot: 'bg-purple-500'
       };
       default: return {
-        badge: 'bg-red-100 text-red-900 border-red-200',
-        border: 'border-l-red-600 border-l-4 md:border-red-200 md:hover:border-red-600',
+        badge: 'bg-red-100 text-red-800 border-red-200',
+        border: 'border-l-red-500 border-l-4 md:border-red-100 md:hover:border-red-500',
         dot: 'bg-red-600'
       };
     }
   };
 
   const getEffectiveCategory = (h: Herramienta): string => {
+    // Si la herramienta tiene una categoría asignada en base de datos, SE RESPETA 100%
+    if (h.category && h.category.trim()) {
+      return h.category.trim();
+    }
+    // Fallback únicamente si el campo category en la DB viene nulo o vacío
     const normName = (h.name || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    const normCat = (h.category || '').toLowerCase();
-
-    if (
-      normCat === 'insumos y consumibles' ||
-      normCat === 'insumos' ||
-      normCat === 'consumibles' ||
-      normName.includes('vaselina') ||
-      normName.includes('lubricante')
-    ) {
-      return 'Insumos y Consumibles';
-    }
-
-    if (
-      normCat === 'prensas y pinzas' ||
-      normName.includes('pinza') ||
-      normName.includes('indentar') ||
-      normName.includes('identar') ||
-      normName.includes('prensa') ||
-      normName.includes('crimpead') ||
-      normName.includes('tijera')
-    ) {
-      return 'Prensas y Pinzas';
-    }
-
-    return h.category || 'Otros';
+    if (normName.includes('vaselina') || normName.includes('lubricante')) return 'Insumos y Consumibles';
+    if (normName.includes('pinza') || normName.includes('prensa') || normName.includes('crimpead')) return 'Prensas y Pinzas';
+    return 'Otros';
   };
 
-  // Filtrado de herramientas por la categoría seleccionada y los filtros
-  const filtered = herramientas.filter(h => {
-    const catName = getEffectiveCategory(h);
-    const matchCategory = !selectedCategory || catName === selectedCategory;
-    const matchSearch = !searchTerm || 
-      h.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      h.code.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      (h.brand || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchObra = !filterObra || h.obras?.name === filterObra;
-    const matchStatus = !filterStatus || h.status === filterStatus;
-    const matchEncargado = !filterEncargado || h.obras?.encargado_name === filterEncargado;
-    return matchCategory && matchSearch && matchObra && matchStatus && matchEncargado;
-  });
+  // Filtrado optimizado memoizado
+  const filtered = useMemo(() => {
+    const searchLower = searchTerm.trim().toLowerCase();
+    return herramientas.filter(h => {
+      const catName = getEffectiveCategory(h);
+      const matchCategory = !selectedCategory || catName === selectedCategory;
+      const matchSearch = !searchLower || 
+        h.name.toLowerCase().includes(searchLower) || 
+        h.code.toLowerCase().includes(searchLower) || 
+        (h.brand || '').toLowerCase().includes(searchLower);
+      const matchObra = !filterObra || h.obras?.name === filterObra;
+      const matchStatus = !filterStatus || h.status === filterStatus;
+      const matchEncargado = !filterEncargado || h.obras?.encargado_name === filterEncargado;
+      return matchCategory && matchSearch && matchObra && matchStatus && matchEncargado;
+    });
+  }, [herramientas, selectedCategory, searchTerm, filterObra, filterStatus, filterEncargado]);
 
+  const obrasUnicas = useMemo(() => [...new Set(herramientas.map(h => h.obras?.name).filter((name): name is string => !!name))].sort(), [herramientas]);
+  const statusUnicos = useMemo(() => [...new Set(herramientas.map(h => h.status))].sort(), [herramientas]);
+  const encargadosUnicos = useMemo(() => [...new Set(herramientas.map(h => h.obras?.encargado_name).filter((name): name is string => !!name))].sort(), [herramientas]);
 
-  const obrasUnicas = [...new Set(herramientas.map(h => h.obras?.name).filter((name): name is string => !!name))].sort();
-  const statusUnicos = [...new Set(herramientas.map(h => h.status))].sort();
-  const encargadosUnicos = [...new Set(herramientas.map(h => h.obras?.encargado_name).filter((name): name is string => !!name))].sort();
 
   const exportToExcel = () => {
     if (filtered.length === 0) {
