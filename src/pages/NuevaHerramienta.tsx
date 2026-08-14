@@ -28,16 +28,29 @@ export default function NuevaHerramienta() {
   const { categories: dynamicCategories } = useCategories();
 
   
+  const DRAFT_KEY = 'draft_nueva_herramienta';
+
+  const getInitialDraft = () => {
+    try {
+      const saved = sessionStorage.getItem(DRAFT_KEY);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const initialDraft = getInitialDraft();
+
   const [obras, setObras] = useState<Obra[]>([]);
-  const [code, setCode] = useState('');
-  const [name, setName] = useState('');
-  const [brand, setBrand] = useState('');
-  const [model, setModel] = useState('');
-  const [description, setDescription] = useState('');
-  const [currentObraId, setCurrentObraId] = useState('');
-  const [category, setCategory] = useState('Otros');
+  const [code, setCode] = useState(initialDraft?.code || '');
+  const [name, setName] = useState(initialDraft?.name || '');
+  const [brand, setBrand] = useState(initialDraft?.brand || '');
+  const [model, setModel] = useState(initialDraft?.model || '');
+  const [description, setDescription] = useState(initialDraft?.description || '');
+  const [currentObraId, setCurrentObraId] = useState(initialDraft?.currentObraId || '');
+  const [category, setCategory] = useState(initialDraft?.category || 'Otros');
   const [loading, setLoading] = useState(false);
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(initialDraft?.photoUrl || null);
 
   // AI Assistant state
   const [aiText, setAiText] = useState('');
@@ -46,8 +59,21 @@ export default function NuevaHerramienta() {
 
   // Mobile Wizard state
   const [isMobile, setIsMobile] = useState(false);
-  const [wizardStep, setWizardStep] = useState<'name' | 'code' | 'details' | 'obra' | 'photo' | 'confirm'>('name');
+  const [wizardStep, setWizardStep] = useState<'name' | 'code' | 'details' | 'obra' | 'photo' | 'confirm'>(
+    initialDraft?.wizardStep || 'name'
+  );
   const [showScannerInWizard, setShowScannerInWizard] = useState(false);
+
+  // Guardar borrador reactivamente
+  useEffect(() => {
+    if (code || name || brand || model || photoUrl || currentObraId || wizardStep !== 'name') {
+      try {
+        sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
+          code, name, brand, model, description, currentObraId, category, photoUrl, wizardStep
+        }));
+      } catch {}
+    }
+  }, [code, name, brand, model, description, currentObraId, category, photoUrl, wizardStep]);
 
   const { ref: wizardScannerRef } = useZxing({
     paused: !showScannerInWizard,
@@ -67,8 +93,9 @@ export default function NuevaHerramienta() {
     },
   });
 
-  // Solo Admin y Logística pueden crear herramientas
-  const isAuthorized = profile?.role === 'admin' || profile?.role === 'logistica';
+  // Admin, Logística y Encargados pueden crear herramientas
+  const isAuthorized = profile?.role === 'admin' || profile?.role === 'logistica' || profile?.role === 'encargado' || profile?.role === 'solicitante';
+
 
   useEffect(() => {
     async function fetchObras() {
@@ -240,10 +267,12 @@ Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Prensas y Pinzas',
         description: error.code === '23505' ? 'Ya existe una herramienta con ese código.' : error.message 
       });
     } else {
+      sessionStorage.removeItem(DRAFT_KEY);
       toast({ title: '¡Herramienta Creada!', description: 'El producto se integró correctamente al inventario.' });
       navigate(`/herramientas/${data.id}`);
     }
   };
+
 
   if (!isAuthorized) {
     return (
