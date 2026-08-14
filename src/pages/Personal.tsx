@@ -566,7 +566,7 @@ export default function Personal() {
     const excelRows: any[] = [];
     const merges: any[] = [];
     let currentIndex = 1;
-    let currentExcelRow = 1; // Fila 0 es el encabezado
+    let currentExcelRow = 1; // Fila 1 es el primer registro (Fila 0 es el encabezado)
 
     sortedObraNames.forEach((obraName) => {
       const empList = groupedMap.get(obraName)!;
@@ -575,18 +575,18 @@ export default function Personal() {
       const startRowIndex = currentExcelRow;
       const count = empList.length;
 
-      empList.forEach((emp) => {
+      empList.forEach((emp, empIdx) => {
         excelRows.push({
           '#': currentIndex,
           'Nombre Completo': emp.full_name,
-          'Obra Asignada': obraName,
-          'Cantidad': count
+          'Obra Asignada': empIdx === 0 ? obraName : '',
+          'Cantidad': empIdx === 0 ? count : ''
         });
         currentIndex++;
         currentExcelRow++;
       });
 
-      if (count > 1) {
+      if (count >= 1) {
         // Combinar celda de Obra Asignada (Columna 2 / índice C)
         merges.push({ s: { r: startRowIndex, c: 2 }, e: { r: startRowIndex + count - 1, c: 2 } });
         // Combinar celda de Cantidad (Columna 3 / índice D)
@@ -594,15 +594,27 @@ export default function Personal() {
       }
     });
 
+    // Fila final de TOTAL PERSONAL
+    const totalRowIndex = currentExcelRow;
+    excelRows.push({
+      '#': '',
+      'Nombre Completo': 'TOTAL PERSONAL EN OBRAS',
+      'Obra Asignada': '',
+      'Cantidad': filteredEmpleados.length
+    });
+    // Combinar celdas de título del Total (#, Nombre Completo, Obra Asignada)
+    merges.push({ s: { r: totalRowIndex, c: 0 }, e: { r: totalRowIndex, c: 2 } });
+
     const worksheet = XLSX.utils.json_to_sheet(excelRows);
     worksheet['!merges'] = merges;
-    worksheet['!cols'] = [{ wch: 6 }, { wch: 38 }, { wch: 30 }, { wch: 12 }];
+    worksheet['!cols'] = [{ wch: 8 }, { wch: 42 }, { wch: 34 }, { wch: 18 }];
 
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Matriz Personal");
     XLSX.writeFile(workbook, `Reporte_Personal_Matriz_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    toast({ title: '¡Excel Generado!', description: 'Listado de personal exportado en el formato matriz por obras.' });
+    toast({ title: '¡Excel Generado!', description: 'Listado de personal exportado en el formato matriz unificado por obras.' });
   };
+
 
   const exportToImage = async () => {
     if (!imageExportRef.current) return;
