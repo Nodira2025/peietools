@@ -92,8 +92,12 @@ export default function BusquedaPersonal() {
   // Final selection
   const [activeEmployee, setActiveEmployee] = useState<Empleado | null>(null);
 
+  // Full size photo lightbox
+  const [fullSizePhoto, setFullSizePhoto] = useState<{ url: string; name: string; specialty?: string; obra?: string } | null>(null);
+
   // Screen voice listening state
   const [isScreenListening, setIsScreenListening] = useState(false);
+
 
   // ─── Data Loading ────────────────────────────────────────────────────────
 
@@ -679,7 +683,13 @@ export default function BusquedaPersonal() {
               <div className="bg-white border-2 border-peie-blue/20 rounded-2xl p-4">
                 <div className="flex items-center gap-4">
                   {activeEmployee.photo_url ? (
-                    <img src={activeEmployee.photo_url} alt={activeEmployee.full_name} className="w-24 h-24 object-cover rounded-xl shrink-0" />
+                    <img 
+                      src={activeEmployee.photo_url} 
+                      alt={activeEmployee.full_name} 
+                      onClick={() => activeEmployee.photo_url && setFullSizePhoto({ url: activeEmployee.photo_url, name: activeEmployee.full_name, specialty: activeEmployee.specialty, obra: activeEmployee.obras?.name })}
+                      className="w-24 h-24 object-cover rounded-xl shrink-0 cursor-pointer hover:scale-105 transition-transform border-2 border-peie-blue/30 shadow-md" 
+                      title="Tocar para ver a tamaño completo"
+                    />
                   ) : (
                     <div className="w-24 h-24 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 shrink-0">
                       <User size={32} />
@@ -722,12 +732,19 @@ export default function BusquedaPersonal() {
 
               <div className="bg-peie-blue/5 rounded-xl p-3 flex items-center gap-3 border border-peie-blue/10">
                 {activeEmployee.photo_url ? (
-                  <img src={activeEmployee.photo_url} alt={activeEmployee.full_name} className="w-12 h-12 object-cover rounded-lg shrink-0" />
+                  <img 
+                    src={activeEmployee.photo_url} 
+                    alt={activeEmployee.full_name} 
+                    onClick={() => activeEmployee.photo_url && setFullSizePhoto({ url: activeEmployee.photo_url, name: activeEmployee.full_name, specialty: activeEmployee.specialty, obra: activeEmployee.obras?.name })}
+                    className="w-12 h-12 object-cover rounded-lg shrink-0 cursor-pointer hover:scale-105 transition-transform" 
+                    title="Tocar para ver a tamaño completo"
+                  />
                 ) : (
                   <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 shrink-0">
                     <User size={18} />
                   </div>
                 )}
+
                 <div>
                   <p className="text-sm font-bold text-slate-800">{activeEmployee.full_name}</p>
                   <p className="text-xs text-peie-blue font-semibold">{activeEmployee.obras?.name || 'Libre / Base Central'}</p>
@@ -820,9 +837,47 @@ export default function BusquedaPersonal() {
           </Button>
         </div>
       )}
+
+      {/* Lightbox / Modal de Foto a Tamaño Completo */}
+      {fullSizePhoto && (
+        <div 
+          className="fixed inset-0 z-[120] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setFullSizePhoto(null)}
+        >
+          <button
+            type="button"
+            onClick={() => setFullSizePhoto(null)}
+            className="absolute top-4 right-4 z-[130] bg-white/15 hover:bg-white/30 active:scale-95 text-white rounded-full p-2.5 backdrop-blur-sm transition-all border border-white/20"
+            title="Cerrar (Esc)"
+          >
+            <X size={24} />
+          </button>
+
+          <div 
+            className="max-w-4xl max-h-[85vh] overflow-hidden rounded-2xl border border-white/15 shadow-2xl relative bg-slate-950 flex flex-col items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img 
+              src={fullSizePhoto.url} 
+              alt={fullSizePhoto.name} 
+              className="max-h-[75vh] w-auto max-w-full object-contain mx-auto"
+            />
+            <div className="w-full bg-gradient-to-t from-black via-black/80 to-transparent p-4 text-white text-center">
+              <p className="text-base font-extrabold text-white">{fullSizePhoto.name}</p>
+              {fullSizePhoto.specialty && (
+                <p className="text-xs text-blue-300 font-bold uppercase tracking-wider mt-0.5">{fullSizePhoto.specialty}</p>
+              )}
+              {fullSizePhoto.obra && (
+                <p className="text-[11px] text-slate-300 font-medium mt-0.5">Obra: {fullSizePhoto.obra}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
 
 // ─── Module-scoped Subcomponents ──────────────────────────────────────────
 

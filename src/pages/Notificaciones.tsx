@@ -305,13 +305,7 @@ export default function Notificaciones() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            onClick={() => navigate('/reservas')}
-            className="text-xs gap-1.5 font-bold bg-amber-500 hover:bg-amber-600 text-white rounded-xl shadow-sm"
-          >
-            <Calendar className="h-3.5 w-3.5" /> Reservas de Herramientas
-          </Button>
+
 
           <Button
             size="sm"

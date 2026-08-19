@@ -193,8 +193,8 @@ export default function AppLayout() {
     { name: 'Notificaciones', path: '/notificaciones', icon: Bell, show: true, badge: pendingCount },
     { name: 'Reportes', path: '/reportes', icon: BarChart3, show: isLogistica || isAdmin },
     { name: 'Movimiento de Herramientas', path: '/pedidos-herramientas', icon: FileText, show: true },
-    { name: 'Reservas por Fecha', path: '/reservas', icon: Calendar, show: true },
     { name: 'Movimiento de Personal', path: '/pedidos-personal', icon: HardHat, show: true },
+
 
     { name: 'Herramientas', path: '/herramientas', icon: Wrench, show: true },
     { name: 'Mis Obras', path: '/mis-obras', icon: Building, show: true },

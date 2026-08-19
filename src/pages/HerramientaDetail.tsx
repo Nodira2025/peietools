@@ -5,8 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Edit, Truck, AlertTriangle, MapPin, Navigation, Building2, Download, Camera, CheckCircle, Save, X, Trash2, Calendar, FileSpreadsheet } from 'lucide-react';
-import { ModalNuevaReserva } from '../components/ModalNuevaReserva';
 import * as XLSX from 'xlsx';
+
 
 
 import { useAuthStore } from '../store/auth';
@@ -51,8 +51,8 @@ export default function HerramientaDetail() {
   const [gettingLocation, setGettingLocation] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
-  const [isModalReservaOpen, setIsModalReservaOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
 
 
   // States for editing mode
@@ -858,17 +858,8 @@ export default function HerramientaDetail() {
           </div>
         </div>
       )}
-
-      {/* Modal Nueva Reserva */}
-      {herramienta && (
-        <ModalNuevaReserva
-          isOpen={isModalReservaOpen}
-          onClose={() => setIsModalReservaOpen(false)}
-          herramientaId={herramienta.id}
-          herramientaNombre={`${herramienta.code} - ${herramienta.name}`}
-        />
-      )}
     </div>
   );
 }
+
 

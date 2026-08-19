@@ -5,7 +5,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { HardHat, Search, Clock, Camera, Plus, Trash2, Edit2, Check, Download, FileImage, FileSpreadsheet } from 'lucide-react';
+import { HardHat, Search, Clock, Camera, Plus, Trash2, Edit2, Check, Download, FileImage, FileSpreadsheet, X, Maximize2 } from 'lucide-react';
+
 import { useAuthStore } from '../store/auth';
 import { compressImage } from '../lib/imageUtils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -75,7 +76,11 @@ export default function Personal() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedEmpId, setSelectedEmpId] = useState<string | null>(null);
 
+  // Full-size photo lightbox state
+  const [fullSizePhoto, setFullSizePhoto] = useState<{ url: string; name: string; specialty?: string; obra?: string } | null>(null);
+
   const isAdmin = profile?.role === 'admin' || profile?.role === 'logistica';
+
 
   // Profile modal state
   const [selectedEmpForProfile, setSelectedEmpForProfile] = useState<Empleado | null>(null);
@@ -876,7 +881,11 @@ export default function Personal() {
                             <div className="flex items-center gap-3 min-w-0 flex-1">
                               {/* Avatar */}
                               <div className="relative shrink-0">
-                                <div className="w-10 h-10 rounded-full overflow-hidden bg-blue-50 border border-slate-100 flex items-center justify-center">
+                                <div 
+                                  onClick={() => emp.photo_url && setFullSizePhoto({ url: emp.photo_url, name: emp.full_name, specialty: emp.specialty || undefined, obra: emp.obras?.name || undefined })}
+                                  className={`w-10 h-10 rounded-full overflow-hidden bg-blue-50 border border-slate-150 flex items-center justify-center ${emp.photo_url ? 'cursor-pointer hover:ring-2 hover:ring-blue-500 hover:scale-105 transition-all shadow-sm group' : ''}`}
+                                  title={emp.photo_url ? "Ver foto a tamaño completo" : undefined}
+                                >
                                   {emp.photo_url ? (
                                     <img src={emp.photo_url} alt={emp.full_name} className="w-full h-full object-cover" />
                                   ) : (
@@ -885,8 +894,9 @@ export default function Personal() {
                                 </div>
                                 {isAdmin && (
                                   <button 
-                                    onClick={() => { setSelectedEmpId(emp.id); fileInputRef.current?.click(); }}
-                                    className="absolute -bottom-1 -right-1 bg-blue-600 text-white rounded-full p-1 shadow hover:bg-blue-700 border border-white"
+                                    onClick={(e) => { e.stopPropagation(); setSelectedEmpId(emp.id); fileInputRef.current?.click(); }}
+                                    className="absolute -bottom-1 -right-1 bg-blue-600 text-white rounded-full p-1 shadow hover:bg-blue-700 border border-white z-10"
+                                    title="Cambiar Foto"
                                   >
                                     <Camera className="h-2.5 w-2.5" />
                                   </button>
@@ -959,7 +969,11 @@ export default function Personal() {
                       <div className="flex items-center gap-3 min-w-0 flex-1">
                         {/* Avatar */}
                         <div className="relative shrink-0">
-                          <div className="w-10 h-10 rounded-full overflow-hidden bg-blue-50 border border-slate-100 flex items-center justify-center">
+                          <div 
+                            onClick={() => emp.photo_url && setFullSizePhoto({ url: emp.photo_url, name: emp.full_name, specialty: emp.specialty || undefined, obra: emp.obras?.name || undefined })}
+                            className={`w-10 h-10 rounded-full overflow-hidden bg-blue-50 border border-slate-150 flex items-center justify-center ${emp.photo_url ? 'cursor-pointer hover:ring-2 hover:ring-blue-500 hover:scale-105 transition-all shadow-sm group' : ''}`}
+                            title={emp.photo_url ? "Ver foto a tamaño completo" : undefined}
+                          >
                             {emp.photo_url ? (
                               <img src={emp.photo_url} alt={emp.full_name} className="w-full h-full object-cover" />
                             ) : (
@@ -968,8 +982,9 @@ export default function Personal() {
                           </div>
                           {isAdmin && (
                             <button 
-                              onClick={() => { setSelectedEmpId(emp.id); fileInputRef.current?.click(); }}
-                              className="absolute -bottom-1 -right-1 bg-blue-600 text-white rounded-full p-1 shadow hover:bg-blue-700 border border-white"
+                              onClick={(e) => { e.stopPropagation(); setSelectedEmpId(emp.id); fileInputRef.current?.click(); }}
+                              className="absolute -bottom-1 -right-1 bg-blue-600 text-white rounded-full p-1 shadow hover:bg-blue-700 border border-white z-10"
+                              title="Cambiar Foto"
                             >
                               <Camera className="h-2.5 w-2.5" />
                             </button>
@@ -978,6 +993,7 @@ export default function Personal() {
 
                         {/* Detalles */}
                         <div className="min-w-0 space-y-0.5">
+
                           <p 
                             className="font-extrabold text-xs text-[#031530] truncate cursor-pointer hover:underline hover:text-blue-600 transition-colors"
                             onClick={() => handleOpenProfile(emp)}
@@ -1150,7 +1166,11 @@ export default function Personal() {
             {/* Avatar en cabecera */}
             <div className="absolute -bottom-10 right-6">
               <div className="relative group">
-                <div className="w-20 h-20 rounded-2xl overflow-hidden bg-slate-50 border-4 border-white shadow-md flex items-center justify-center">
+                <div 
+                  onClick={() => profileForm.photo_url && setFullSizePhoto({ url: profileForm.photo_url, name: profileForm.full_name, specialty: profileForm.specialty })}
+                  className={`w-20 h-20 rounded-2xl overflow-hidden bg-slate-50 border-4 border-white shadow-md flex items-center justify-center ${profileForm.photo_url ? 'cursor-pointer hover:ring-2 hover:ring-blue-400 hover:scale-105 transition-all' : ''}`}
+                  title={profileForm.photo_url ? "Ver foto a tamaño completo" : undefined}
+                >
                   {profileForm.photo_url ? (
                     <img src={profileForm.photo_url} alt={profileForm.full_name} className="w-full h-full object-cover" />
                   ) : (
@@ -1165,6 +1185,7 @@ export default function Personal() {
                 >
                   <Camera className="h-3 w-3" />
                 </button>
+
                 <input
                   type="file"
                   ref={profilePhotoInputRef}
@@ -1437,7 +1458,45 @@ export default function Personal() {
           </table>
         </div>
       </div>
+
+      {/* Lightbox / Modal de Foto a Tamaño Completo */}
+      {fullSizePhoto && (
+        <div 
+          className="fixed inset-0 z-[120] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setFullSizePhoto(null)}
+        >
+          <button
+            type="button"
+            onClick={() => setFullSizePhoto(null)}
+            className="absolute top-4 right-4 z-[130] bg-white/15 hover:bg-white/30 active:scale-95 text-white rounded-full p-2.5 backdrop-blur-sm transition-all border border-white/20"
+            title="Cerrar (Esc)"
+          >
+            <X size={24} />
+          </button>
+
+          <div 
+            className="max-w-4xl max-h-[85vh] overflow-hidden rounded-2xl border border-white/15 shadow-2xl relative bg-slate-950 flex flex-col items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img 
+              src={fullSizePhoto.url} 
+              alt={fullSizePhoto.name} 
+              className="max-h-[75vh] w-auto max-w-full object-contain mx-auto"
+            />
+            <div className="w-full bg-gradient-to-t from-black via-black/80 to-transparent p-4 text-white text-center">
+              <p className="text-base font-extrabold text-white">{fullSizePhoto.name}</p>
+              {fullSizePhoto.specialty && (
+                <p className="text-xs text-blue-300 font-bold uppercase tracking-wider mt-0.5">{fullSizePhoto.specialty}</p>
+              )}
+              {fullSizePhoto.obra && (
+                <p className="text-[11px] text-slate-300 font-medium mt-0.5">Obra: {fullSizePhoto.obra}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
 

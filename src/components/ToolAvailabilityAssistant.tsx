@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Building2, CalendarClock, CheckCircle2, MapPin, Phone, RefreshCw, Sparkles, Wrench } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Button } from '@/components/ui/button';
-import { ModalNuevaReserva } from './ModalNuevaReserva';
+
 
 interface DestinationObra {
   id: string;
@@ -86,8 +86,8 @@ export function ToolAvailabilityAssistant({
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const [reserveCandidate, setReserveCandidate] = useState<Candidate | null>(null);
   const [assigningId, setAssigningId] = useState('');
+
 
   const requestedStart = useMemo(() => {
     const parsed = neededDate ? new Date(neededDate) : new Date();
@@ -305,33 +305,12 @@ export function ToolAvailabilityAssistant({
                     {assigningId === candidate.id ? 'Asignando…' : 'Asignar esta herramienta'}
                   </Button>
                 ) : null}
-
-                {canAssign && !candidate.available && candidate.nextAvailableAt ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setReserveCandidate(candidate)}
-                    className="w-full mt-3 h-10 rounded-xl border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 text-xs font-black"
-                  >
-                    Reservar desde la próxima fecha
-                  </Button>
-                ) : null}
               </div>
             );
           })}
         </div>
       )}
-
-      <ModalNuevaReserva
-        isOpen={Boolean(reserveCandidate)}
-        onClose={() => setReserveCandidate(null)}
-        herramientaId={reserveCandidate?.id}
-        herramientaNombre={reserveCandidate ? `${reserveCandidate.name} [${reserveCandidate.code}]` : undefined}
-        obraIdInicial={targetObra?.id}
-        fechaInicioInicial={reserveCandidate?.nextAvailableAt || neededDate || undefined}
-        notasIniciales={`Reserva originada desde el pedido ${requestId} (${requestedToolName}).`}
-        onReservaCreada={loadCandidates}
-      />
     </div>
   );
 }
+
