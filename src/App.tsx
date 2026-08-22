@@ -34,6 +34,7 @@ import OrdenDetail from './pages/OrdenDetail';
 import NuevoPersonalAsistido from './pages/NuevoPersonalAsistido';
 import Notificaciones from './pages/Notificaciones';
 import SeguimientoTraslado from './pages/SeguimientoTraslado';
+import Contactos from './pages/Contactos';
 
 
 
@@ -80,6 +81,8 @@ export default function App() {
           
           <Route path="/compras" element={<Compras />} />
           <Route path="/compras/:id" element={<CompraDetail />} />
+          <Route path="/contactos" element={<Contactos />} />
+          <Route path="/proveedores" element={<Navigate to="/contactos" replace />} />
           
           <Route path="/logistica" element={<Logistica />} />
           <Route path="/obras" element={<Obras />} />

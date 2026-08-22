@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Navigate, Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { supabase } from '../lib/supabase';
-import { Home, Wrench, FileText, Truck, Users, Building, LogOut, ShoppingCart, Sparkles, HardHat, ClipboardList, BarChart3, MoreHorizontal, Bell, Key, Eye, EyeOff, DollarSign, Calendar } from 'lucide-react';
+import { Home, Wrench, FileText, Truck, Users, Building, LogOut, ShoppingCart, Sparkles, HardHat, ClipboardList, BarChart3, MoreHorizontal, Bell, Key, Eye, EyeOff, DollarSign, Calendar, PhoneCall } from 'lucide-react';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -199,6 +199,7 @@ export default function AppLayout() {
     { name: 'Herramientas', path: '/herramientas', icon: Wrench, show: true },
     { name: 'Mis Obras', path: '/mis-obras', icon: Building, show: true },
     { name: 'Personal', path: '/personal', icon: HardHat, show: true },
+    { name: 'Contactos', path: '/contactos', icon: PhoneCall, show: true },
     { name: 'Órdenes', path: '/ordenes', icon: ClipboardList, show: false },
     { name: 'Logística', path: '/logistica', icon: Truck, show: isLogistica || isAdmin },
     { name: 'Registro de Compras', path: '/compras', icon: ShoppingCart, show: isLogistica || isAdmin || deviceMode !== 'mobile' },
@@ -510,6 +511,15 @@ export default function AppLayout() {
               >
                 <DollarSign size={24} className="text-emerald-400" />
                 <span className="text-[11px] font-black uppercase tracking-tight text-emerald-300">Registrar Gasto</span>
+              </Link>
+
+              <Link 
+                to="/contactos" 
+                onClick={() => setShowMas(false)}
+                className="flex flex-col items-center justify-center p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:bg-slate-900 transition-all text-center gap-2"
+              >
+                <PhoneCall size={24} className="text-teal-400" />
+                <span className="text-[11px] font-black uppercase tracking-tight">Contactos / Prov.</span>
               </Link>
 
               {isAdmin && (

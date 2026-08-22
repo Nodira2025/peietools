@@ -27,7 +27,8 @@ import {
   DollarSign,
   AlertTriangle,
   ShoppingBag,
-  Clock
+  Clock,
+  PhoneCall
 } from 'lucide-react';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -648,6 +649,25 @@ export default function Dashboard() {
                 </div>
                 <ChevronRight size={16} className="text-slate-400 shrink-0" />
               </div>
+
+              <div 
+                onClick={() => navigate('/contactos')}
+                className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-sm hover:shadow-md flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all group sm:col-span-2"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center shrink-0 border border-teal-200/60">
+                    <PhoneCall size={20} className="stroke-[2.2]" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">Contactos y Proveedores</h3>
+                      <span className="bg-teal-100 text-teal-900 text-[8px] font-black px-1.5 py-0.2 rounded uppercase">WhatsApp</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 font-medium">Directorio de proveedores y ferreterías con envío directo de WhatsApp.</p>
+                  </div>
+                </div>
+                <ChevronRight size={16} className="text-slate-400 shrink-0" />
+              </div>
             </div>
           </div>
         )}
@@ -940,7 +960,7 @@ export default function Dashboard() {
         {/* Acciones Principales (Prioridad 1) */}
         <div className="space-y-4">
           <h3 className="text-xs font-black text-slate-800 tracking-wider uppercase">Acciones Principales</h3>
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             
             {/* Buscar Herramienta */}
             <Card 
@@ -948,16 +968,16 @@ export default function Dashboard() {
               className="bg-white border border-slate-100 hover:border-indigo-500/20 shadow-[0_8px_30px_rgba(0,0,0,0.01)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all cursor-pointer rounded-[24px] p-6 flex items-center justify-between group active:scale-[0.99] duration-150 relative overflow-hidden"
             >
               <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full translate-x-8 -translate-y-8 group-hover:scale-110 transition-transform duration-300" />
-              <div className="flex items-center gap-5 z-10">
-                <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-inner group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
-                  <Search size={24} className="stroke-[2.5]" />
+              <div className="flex items-center gap-4 z-10">
+                <div className="w-13 h-13 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-inner group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
+                  <Search size={22} className="stroke-[2.5]" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider group-hover:text-indigo-600 transition-colors">Buscar Herramienta</h4>
-                  <p className="text-xs text-slate-400 font-semibold mt-1">Consultar inventario general, disponibilidad y estado de herramientas</p>
+                  <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider group-hover:text-indigo-600 transition-colors">Herramientas</h4>
+                  <p className="text-xs text-slate-400 font-semibold mt-0.5 line-clamp-2">Inventario y disponibilidad</p>
                 </div>
               </div>
-              <ArrowRight size={20} className="text-indigo-600 group-hover:translate-x-1 transition-transform z-10" />
+              <ArrowRight size={18} className="text-indigo-600 group-hover:translate-x-1 transition-transform z-10 shrink-0" />
             </Card>
 
             {/* Trasladar Personal */}
@@ -966,16 +986,34 @@ export default function Dashboard() {
               className="bg-white border border-slate-100 hover:border-emerald-500/20 shadow-[0_8px_30px_rgba(0,0,0,0.01)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all cursor-pointer rounded-[24px] p-6 flex items-center justify-between group active:scale-[0.99] duration-150 relative overflow-hidden"
             >
               <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full translate-x-8 -translate-y-8 group-hover:scale-110 transition-transform duration-300" />
-              <div className="flex items-center gap-5 z-10">
-                <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-inner group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300">
-                  <HardHat size={24} className="stroke-[2.5]" />
+              <div className="flex items-center gap-4 z-10">
+                <div className="w-13 h-13 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-inner group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300">
+                  <HardHat size={22} className="stroke-[2.5]" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider group-hover:text-emerald-600 transition-colors">Trasladar Personal</h4>
-                  <p className="text-xs text-slate-400 font-semibold mt-1">Consultar operarios disponibles y gestionar el envío a tus obras</p>
+                  <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider group-hover:text-emerald-600 transition-colors">Personal</h4>
+                  <p className="text-xs text-slate-400 font-semibold mt-0.5 line-clamp-2">Operarios y traslados</p>
                 </div>
               </div>
-              <ArrowRight size={20} className="text-emerald-600 group-hover:translate-x-1 transition-transform z-10" />
+              <ArrowRight size={18} className="text-emerald-600 group-hover:translate-x-1 transition-transform z-10 shrink-0" />
+            </Card>
+
+            {/* Contactos y Proveedores */}
+            <Card 
+              onClick={() => navigate('/contactos')}
+              className="bg-white border border-slate-100 hover:border-teal-500/20 shadow-[0_8px_30px_rgba(0,0,0,0.01)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all cursor-pointer rounded-[24px] p-6 flex items-center justify-between group active:scale-[0.99] duration-150 relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-teal-500/5 rounded-full translate-x-8 -translate-y-8 group-hover:scale-110 transition-transform duration-300" />
+              <div className="flex items-center gap-4 z-10">
+                <div className="w-13 h-13 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center shadow-inner group-hover:bg-teal-600 group-hover:text-white transition-all duration-300">
+                  <PhoneCall size={22} className="stroke-[2.5]" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider group-hover:text-teal-600 transition-colors">Contactos</h4>
+                  <p className="text-xs text-slate-400 font-semibold mt-0.5 line-clamp-2">Directorio y WhatsApp</p>
+                </div>
+              </div>
+              <ArrowRight size={18} className="text-teal-600 group-hover:translate-x-1 transition-transform z-10 shrink-0" />
             </Card>
 
           </div>
