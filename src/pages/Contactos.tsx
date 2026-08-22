@@ -16,11 +16,20 @@ import {
   MessageCircle, 
   Trash2, 
   Sparkles,
-  PhoneCall
+  PhoneCall,
+  Globe,
+  MapPin
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { buildWhatsAppLink } from '../lib/whatsapp';
+
+export interface ContactoSocialLinks {
+  website?: string;
+  instagram?: string;
+  facebook?: string;
+  maps?: string;
+}
 
 export interface ContactoProveedor {
   id: string;
@@ -32,6 +41,7 @@ export interface ContactoProveedor {
   description?: string;
   address?: string;
   isCustom?: boolean;
+  socials?: ContactoSocialLinks;
 }
 
 const DEFAULT_PROVEEDORES: ContactoProveedor[] = [
@@ -42,8 +52,12 @@ const DEFAULT_PROVEEDORES: ContactoProveedor[] = [
     cleanPhone: '5493816820304',
     category: 'ferreteria',
     categoryLabel: 'Ferretería e Insumos',
-    description: 'Proveedor de herramientas, ferretería general, insumos para obra y tornillería.',
-    address: 'Tucumán'
+    description: 'Ferretería y artículos de limpieza / obra con entrega a domicilio (Lamadrid / Más Limpio).',
+    address: 'Lamadrid 1302, San Miguel de Tucumán',
+    socials: {
+      facebook: 'https://www.facebook.com/people/Mas-Limpio/100063717589634/',
+      maps: 'https://maps.google.com/?q=Ferreteria+Lamadrid+Lamadrid+1302+San+Miguel+de+Tucuman'
+    }
   },
   {
     id: 'prov-2',
@@ -52,8 +66,14 @@ const DEFAULT_PROVEEDORES: ContactoProveedor[] = [
     cleanPhone: '5493813012736',
     category: 'comercial',
     categoryLabel: 'Comercial y Materiales',
-    description: 'Materiales de construcción, electricidad, ferretería y suministros de obra.',
-    address: 'Tucumán'
+    description: 'Ferretería industrial, herramientas eléctricas y manuales, andamios, seguridad industrial y materiales de obra.',
+    address: 'Av. Colón 111, San Miguel de Tucumán',
+    socials: {
+      website: 'https://comercialcolon.com.ar',
+      instagram: 'https://www.instagram.com/comercial.colon',
+      facebook: 'https://www.facebook.com/comercial.colon',
+      maps: 'https://maps.google.com/?q=Comercial+Colon+Av+Colon+111+San+Miguel+de+Tucuman'
+    }
   },
   {
     id: 'prov-3',
@@ -62,8 +82,14 @@ const DEFAULT_PROVEEDORES: ContactoProveedor[] = [
     cleanPhone: '5493813195555',
     category: 'vendedor',
     categoryLabel: 'Vendedor BP / Distribuidor',
-    description: 'Atención comercial directa y cotizaciones mayoristas para obras.',
-    address: 'Tucumán'
+    description: 'Venta mayorista y atención técnica en materiales eléctricos e iluminación (BP Soluciones Eléctricas).',
+    address: 'San Martín 1301, San Miguel de Tucumán',
+    socials: {
+      website: 'https://bpsolucioneselectricas.com.ar',
+      instagram: 'https://www.instagram.com/bpsolucioneselectricas',
+      facebook: 'https://www.facebook.com/BPsolucioneselectricas',
+      maps: 'https://maps.google.com/?q=BP+Soluciones+Electricas+San+Martin+1301+San+Miguel+de+Tucuman'
+    }
   }
 ];
 
@@ -91,6 +117,10 @@ export default function Contactos() {
   const [newPhone, setNewPhone] = useState('');
   const [newCategory, setNewCategory] = useState<'ferreteria' | 'comercial' | 'vendedor' | 'otro'>('ferreteria');
   const [newDescription, setNewDescription] = useState('');
+  const [newAddress, setNewAddress] = useState('');
+  const [newWebsite, setNewWebsite] = useState('');
+  const [newInstagram, setNewInstagram] = useState('');
+  const [newFacebook, setNewFacebook] = useState('');
 
   // Modal para mensaje de WhatsApp personalizado
   const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
@@ -105,12 +135,17 @@ export default function Contactos() {
   // Filtro de búsqueda y categoría
   const filteredContacts = useMemo(() => {
     return allContacts.filter(c => {
+      const s = searchTerm.toLowerCase();
       const matchesSearch = 
-        c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.phone.includes(searchTerm) ||
-        c.cleanPhone.includes(searchTerm) ||
-        (c.description && c.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        c.categoryLabel.toLowerCase().includes(searchTerm.toLowerCase());
+        c.name.toLowerCase().includes(s) ||
+        c.phone.includes(s) ||
+        c.cleanPhone.includes(s) ||
+        (c.description && c.description.toLowerCase().includes(s)) ||
+        (c.address && c.address.toLowerCase().includes(s)) ||
+        (c.socials?.website && c.socials.website.toLowerCase().includes(s)) ||
+        (c.socials?.instagram && c.socials.instagram.toLowerCase().includes(s)) ||
+        (c.socials?.facebook && c.socials.facebook.toLowerCase().includes(s)) ||
+        c.categoryLabel.toLowerCase().includes(s);
       
       const matchesCategory = selectedCategory === 'todos' || c.category === selectedCategory;
       return matchesSearch && matchesCategory;
@@ -144,6 +179,22 @@ export default function Contactos() {
     }, 2000);
   };
 
+  const formatUrl = (url: string, type: 'web' | 'ig' | 'fb') => {
+    if (!url || !url.trim()) return '';
+    let clean = url.trim();
+    if (type === 'ig') {
+      if (clean.startsWith('@')) clean = clean.substring(1);
+      if (!clean.includes('instagram.com')) return `https://www.instagram.com/${clean}`;
+    }
+    if (type === 'fb') {
+      if (!clean.includes('facebook.com')) return `https://www.facebook.com/${clean}`;
+    }
+    if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
+      return `https://${clean}`;
+    }
+    return clean;
+  };
+
   const handleAddContact = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim() || !newPhone.trim()) {
@@ -170,6 +221,14 @@ export default function Contactos() {
     else if (newCategory === 'comercial') categoryLabel = 'Comercial y Materiales';
     else if (newCategory === 'vendedor') categoryLabel = 'Vendedor / Asesor';
 
+    const socials: ContactoSocialLinks = {};
+    if (newWebsite.trim()) socials.website = formatUrl(newWebsite, 'web');
+    if (newInstagram.trim()) socials.instagram = formatUrl(newInstagram, 'ig');
+    if (newFacebook.trim()) socials.facebook = formatUrl(newFacebook, 'fb');
+    if (newAddress.trim()) {
+      socials.maps = `https://maps.google.com/?q=${encodeURIComponent(newAddress.trim() + ' Tucuman')}`;
+    }
+
     const newContact: ContactoProveedor = {
       id: `custom-${Date.now()}`,
       name: newName.trim(),
@@ -178,6 +237,8 @@ export default function Contactos() {
       category: newCategory,
       categoryLabel,
       description: newDescription.trim() || undefined,
+      address: newAddress.trim() || undefined,
+      socials: Object.keys(socials).length > 0 ? socials : undefined,
       isCustom: true
     };
 
@@ -198,6 +259,10 @@ export default function Contactos() {
     setNewPhone('');
     setNewCategory('ferreteria');
     setNewDescription('');
+    setNewAddress('');
+    setNewWebsite('');
+    setNewInstagram('');
+    setNewFacebook('');
     setIsAddModalOpen(false);
   };
 
@@ -252,17 +317,17 @@ export default function Contactos() {
           <div className="flex items-center gap-2">
             <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full border border-emerald-500/30 flex items-center gap-1">
               <Sparkles className="w-3 h-3" />
-              Directorio de Proveedores
+              Directorio y Redes
             </span>
             <span className="text-xs text-slate-300 font-medium">
-              ({allContacts.length} contactos)
+              ({allContacts.length} proveedores verificados)
             </span>
           </div>
           <h1 className="text-xl md:text-2xl font-black tracking-tight text-white">
             Contactos y Proveedores
           </h1>
           <p className="text-xs md:text-sm text-slate-300 max-w-xl leading-relaxed">
-            Comunicate al instante vía WhatsApp o llamada con las ferreterías, proveedores y vendedores oficiales de la empresa.
+            Comunicate al instante vía WhatsApp, consultá sus catálogos web, redes sociales oficiales (Instagram / Facebook) o accedé a su ubicación.
           </p>
         </div>
 
@@ -284,7 +349,7 @@ export default function Contactos() {
           <Input
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Buscar por nombre, teléfono o rubro..."
+            placeholder="Buscar por nombre, teléfono, web o red social..."
             className="pl-10 pr-4 py-2 text-xs rounded-xl border-slate-200 focus-visible:ring-[#031530] font-medium bg-slate-50/50"
           />
           {searchTerm && (
@@ -336,9 +401,17 @@ export default function Contactos() {
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4.5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredContacts.map((contact) => {
             const isCopied = copiedId === contact.id;
+            const hasSocials = contact.socials && (
+              contact.socials.website || 
+              contact.socials.instagram || 
+              contact.socials.facebook || 
+              contact.socials.maps ||
+              contact.address
+            );
+
             return (
               <Card 
                 key={contact.id} 
@@ -382,6 +455,14 @@ export default function Contactos() {
                       )}
                     </div>
 
+                    {/* Dirección / Ubicación */}
+                    {contact.address && (
+                      <div className="flex items-center gap-1.5 text-[11px] text-slate-600 bg-slate-50/80 px-2.5 py-1.5 rounded-xl border border-slate-100">
+                        <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                        <span className="truncate">{contact.address}</span>
+                      </div>
+                    )}
+
                     {/* Caja de Teléfono */}
                     <div className="flex items-center justify-between bg-slate-50 border border-slate-200/80 rounded-2xl px-3.5 py-2.5">
                       <div className="flex items-center gap-2">
@@ -408,8 +489,8 @@ export default function Contactos() {
                     </div>
                   </div>
 
-                  {/* Botones de Acción */}
-                  <div className="pt-2 border-t border-slate-100 flex flex-col gap-2">
+                  {/* Redes Sociales y Sitio Web (Debajo del WhatsApp/Teléfono) */}
+                  <div className="pt-2 border-t border-slate-100 flex flex-col gap-2.5">
                     {/* Botón Principal: WhatsApp con plantilla "Hola, ¿Como estas?" */}
                     <Button
                       onClick={() => handleSendWhatsApp(contact, DEFAULT_MESSAGE_TEMPLATE)}
@@ -421,7 +502,7 @@ export default function Contactos() {
                       <span>Enviar WhatsApp</span>
                     </Button>
 
-                    {/* Botones secundarios: Llamar y Personalizar Mensaje */}
+                    {/* Botones secundarios: Llamar y Editar texto */}
                     <div className="grid grid-cols-2 gap-2">
                       <a
                         href={`tel:${contact.phone}`}
@@ -440,6 +521,75 @@ export default function Contactos() {
                         <span>Editar texto</span>
                       </button>
                     </div>
+
+                    {/* 🌐 Canales Digitales y Redes Sociales */}
+                    {hasSocials && (
+                      <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-1.5">
+                        {/* Sitio Web Oficial */}
+                        {contact.socials?.website && (
+                          <a
+                            href={contact.socials.website}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-50 text-sky-800 hover:bg-sky-100 border border-sky-200 text-[11px] font-bold transition-all"
+                            title="Visitar sitio web oficial"
+                          >
+                            <Globe className="w-3.5 h-3.5 text-sky-600" />
+                            <span>Web</span>
+                            <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+                          </a>
+                        )}
+
+                        {/* Instagram */}
+                        {contact.socials?.instagram && (
+                          <a
+                            href={contact.socials.instagram}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-pink-50 text-pink-800 hover:bg-pink-100 border border-pink-200 text-[11px] font-bold transition-all"
+                            title="Ver perfil de Instagram"
+                          >
+                            <svg className="w-3.5 h-3.5 fill-pink-600" viewBox="0 0 24 24">
+                              <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                            </svg>
+                            <span>Instagram</span>
+                            <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+                          </a>
+                        )}
+
+                        {/* Facebook */}
+                        {contact.socials?.facebook && (
+                          <a
+                            href={contact.socials.facebook}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200 text-[11px] font-bold transition-all"
+                            title="Ver página de Facebook"
+                          >
+                            <svg className="w-3.5 h-3.5 fill-blue-600" viewBox="0 0 24 24">
+                              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                            </svg>
+                            <span>Facebook</span>
+                            <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+                          </a>
+                        )}
+
+                        {/* Google Maps / Ubicación */}
+                        {contact.socials?.maps && (
+                          <a
+                            href={contact.socials.maps}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 text-[11px] font-bold transition-all"
+                            title="Abrir ubicación en Google Maps"
+                          >
+                            <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Maps</span>
+                            <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+                          </a>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -450,14 +600,14 @@ export default function Contactos() {
 
       {/* Modal para Agregar Nuevo Proveedor */}
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-        <DialogContent className="sm:max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+        <DialogContent className="sm:max-w-lg rounded-3xl bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-lg font-black text-slate-900 flex items-center gap-2">
               <Store className="w-5 h-5 text-emerald-600" />
               <span>Nuevo Proveedor o Contacto</span>
             </DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
-              Registrá un nuevo contacto de proveedor para tenerlo disponible y enviarle mensajes rápidamente.
+              Registrá un nuevo contacto de proveedor con sus teléfonos, redes sociales y sitio web.
             </DialogDescription>
           </DialogHeader>
 
@@ -474,32 +624,44 @@ export default function Contactos() {
               />
             </div>
 
-            <div className="space-y-1">
-              <Label htmlFor="prov-phone" className="text-xs font-bold text-slate-700">Teléfono / WhatsApp *</Label>
-              <Input
-                id="prov-phone"
-                value={newPhone}
-                onChange={(e) => setNewPhone(e.target.value)}
-                placeholder="Ej: +54 9 381 400-0000"
-                className="rounded-xl border-slate-200 text-xs font-medium"
-                required
-              />
-              <p className="text-[10px] text-slate-400">Incluí el código de área (+54 9 381...).</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="prov-phone" className="text-xs font-bold text-slate-700">Teléfono / WhatsApp *</Label>
+                <Input
+                  id="prov-phone"
+                  value={newPhone}
+                  onChange={(e) => setNewPhone(e.target.value)}
+                  placeholder="Ej: +54 9 381 400-0000"
+                  className="rounded-xl border-slate-200 text-xs font-medium"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="prov-category" className="text-xs font-bold text-slate-700">Rubro / Categoría</Label>
+                <select
+                  id="prov-category"
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value as any)}
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-medium bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#031530]"
+                >
+                  <option value="ferreteria">Ferretería e Insumos</option>
+                  <option value="comercial">Comercial y Materiales</option>
+                  <option value="vendedor">Vendedor / Distribuidor</option>
+                  <option value="otro">Otro Proveedor</option>
+                </select>
+              </div>
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="prov-category" className="text-xs font-bold text-slate-700">Rubro / Categoría</Label>
-              <select
-                id="prov-category"
-                value={newCategory}
-                onChange={(e) => setNewCategory(e.target.value as any)}
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-medium bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#031530]"
-              >
-                <option value="ferreteria">Ferretería e Insumos</option>
-                <option value="comercial">Comercial y Materiales</option>
-                <option value="vendedor">Vendedor / Distribuidor</option>
-                <option value="otro">Otro Proveedor</option>
-              </select>
+              <Label htmlFor="prov-address" className="text-xs font-bold text-slate-700">Dirección / Localidad (Opcional)</Label>
+              <Input
+                id="prov-address"
+                value={newAddress}
+                onChange={(e) => setNewAddress(e.target.value)}
+                placeholder="Ej: Av. Belgrano 1500, Tucumán"
+                className="rounded-xl border-slate-200 text-xs font-medium"
+              />
             </div>
 
             <div className="space-y-1">
@@ -508,9 +670,54 @@ export default function Contactos() {
                 id="prov-desc"
                 value={newDescription}
                 onChange={(e) => setNewDescription(e.target.value)}
-                placeholder="Ej: Entrega en obra los días martes y jueves"
+                placeholder="Ej: Especialistas en iluminación LED y cables"
                 className="rounded-xl border-slate-200 text-xs font-medium"
               />
+            </div>
+
+            {/* Sección Redes Sociales y Web */}
+            <div className="pt-2 border-t border-slate-100 space-y-3">
+              <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">
+                🌐 Canales Digitales y Redes Sociales
+              </p>
+
+              <div className="space-y-1">
+                <Label htmlFor="prov-web" className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                  <Globe className="w-3.5 h-3.5 text-sky-600" />
+                  <span>Sitio Web Oficial</span>
+                </Label>
+                <Input
+                  id="prov-web"
+                  value={newWebsite}
+                  onChange={(e) => setNewWebsite(e.target.value)}
+                  placeholder="Ej: www.proveedor.com.ar"
+                  className="rounded-xl border-slate-200 text-xs font-medium"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="prov-ig" className="text-xs font-bold text-slate-700">Instagram</Label>
+                  <Input
+                    id="prov-ig"
+                    value={newInstagram}
+                    onChange={(e) => setNewInstagram(e.target.value)}
+                    placeholder="Ej: @proveedortucuman"
+                    className="rounded-xl border-slate-200 text-xs font-medium"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="prov-fb" className="text-xs font-bold text-slate-700">Facebook</Label>
+                  <Input
+                    id="prov-fb"
+                    value={newFacebook}
+                    onChange={(e) => setNewFacebook(e.target.value)}
+                    placeholder="Ej: Proveedor SRL Tucumán"
+                    className="rounded-xl border-slate-200 text-xs font-medium"
+                  />
+                </div>
+              </div>
             </div>
 
             <DialogFooter className="pt-3 gap-2 sm:gap-0">
