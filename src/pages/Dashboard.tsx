@@ -28,7 +28,9 @@ import {
   AlertTriangle,
   ShoppingBag,
   Clock,
-  PhoneCall
+  PhoneCall,
+  Send,
+  Award
 } from 'lucide-react';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -664,6 +666,54 @@ export default function Dashboard() {
                       <span className="bg-teal-100 text-teal-900 text-[8px] font-black px-1.5 py-0.2 rounded uppercase">WhatsApp</span>
                     </div>
                     <p className="text-[10px] text-slate-500 font-medium">Directorio de proveedores y ferreterías con envío directo de WhatsApp.</p>
+                  </div>
+                </div>
+                <ChevronRight size={16} className="text-slate-400 shrink-0" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ⏱️ SECCIÓN: REGISTRO DE HORAS Y FORMULARIOS */}
+        {(isAdmin || isLogistica || isCoordinador) && (
+          <div className="space-y-2 pt-1">
+            <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 px-1">
+              ⏱️ Registro de Horas y Bonos
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div 
+                onClick={() => navigate('/formularios')}
+                className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-sm hover:shadow-md flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-cyan-50 text-cyan-700 flex items-center justify-center shrink-0 border border-cyan-200/60">
+                    <Send size={20} className="stroke-[2]" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">Enviar Formularios</h3>
+                      <span className="bg-cyan-100 text-cyan-900 text-[8px] font-black px-1.5 py-0.2 rounded uppercase">WhatsApp</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 font-medium">Enlace de carga semanal a electricistas.</p>
+                  </div>
+                </div>
+                <ChevronRight size={16} className="text-slate-400 shrink-0" />
+              </div>
+
+              <div 
+                onClick={() => navigate('/trabajadores')}
+                className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-sm hover:shadow-md flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0 border border-amber-200/60">
+                    <Award size={20} className="stroke-[2]" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">Panel Trabajadores</h3>
+                      <span className="bg-amber-100 text-amber-900 text-[8px] font-black px-1.5 py-0.2 rounded uppercase">Horas y Bonos</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 font-medium">Cómputo de horas, bonos y alertas de salud.</p>
                   </div>
                 </div>
                 <ChevronRight size={16} className="text-slate-400 shrink-0" />

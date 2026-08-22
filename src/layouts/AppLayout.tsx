@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Navigate, Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { supabase } from '../lib/supabase';
-import { Home, Wrench, FileText, Truck, Users, Building, LogOut, ShoppingCart, Sparkles, HardHat, ClipboardList, BarChart3, MoreHorizontal, Bell, Key, Eye, EyeOff, DollarSign, Calendar, PhoneCall } from 'lucide-react';
+import { Home, Wrench, FileText, Truck, Users, Building, LogOut, ShoppingCart, Sparkles, HardHat, ClipboardList, BarChart3, MoreHorizontal, Bell, Key, Eye, EyeOff, DollarSign, Calendar, PhoneCall, Send, Award } from 'lucide-react';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -194,8 +194,8 @@ export default function AppLayout() {
     { name: 'Reportes', path: '/reportes', icon: BarChart3, show: isLogistica || isAdmin },
     { name: 'Movimiento de Herramientas', path: '/pedidos-herramientas', icon: FileText, show: true },
     { name: 'Movimiento de Personal', path: '/pedidos-personal', icon: HardHat, show: true },
-
-
+    { name: 'Formularios', path: '/formularios', icon: Send, show: true },
+    { name: 'Trabajadores', path: '/trabajadores', icon: Award, show: true },
     { name: 'Herramientas', path: '/herramientas', icon: Wrench, show: true },
     { name: 'Mis Obras', path: '/mis-obras', icon: Building, show: true },
     { name: 'Personal', path: '/personal', icon: HardHat, show: true },
@@ -520,6 +520,24 @@ export default function AppLayout() {
               >
                 <PhoneCall size={24} className="text-teal-400" />
                 <span className="text-[11px] font-black uppercase tracking-tight">Contactos / Prov.</span>
+              </Link>
+
+              <Link 
+                to="/formularios" 
+                onClick={() => setShowMas(false)}
+                className="flex flex-col items-center justify-center p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:bg-slate-900 transition-all text-center gap-2"
+              >
+                <Send size={24} className="text-cyan-400" />
+                <span className="text-[11px] font-black uppercase tracking-tight">Formularios</span>
+              </Link>
+
+              <Link 
+                to="/trabajadores" 
+                onClick={() => setShowMas(false)}
+                className="flex flex-col items-center justify-center p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:bg-slate-900 transition-all text-center gap-2"
+              >
+                <Award size={24} className="text-amber-400" />
+                <span className="text-[11px] font-black uppercase tracking-tight">Trabajadores</span>
               </Link>
 
               {isAdmin && (

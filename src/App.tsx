@@ -35,6 +35,9 @@ import NuevoPersonalAsistido from './pages/NuevoPersonalAsistido';
 import Notificaciones from './pages/Notificaciones';
 import SeguimientoTraslado from './pages/SeguimientoTraslado';
 import Contactos from './pages/Contactos';
+import Formularios from './pages/Formularios';
+import Trabajadores from './pages/Trabajadores';
+import CargarHorasPublico from './pages/CargarHorasPublico';
 
 
 
@@ -57,6 +60,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/cargar-horas" element={<CargarHorasPublico />} />
         
         <Route element={<AppLayout />}>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -77,7 +81,8 @@ export default function App() {
           <Route path="/solicitudes/:id/seguimiento" element={<SeguimientoTraslado />} />
           <Route path="/notificaciones" element={<Notificaciones />} />
 
-
+          <Route path="/formularios" element={<Formularios />} />
+          <Route path="/trabajadores" element={<Trabajadores />} />
           
           <Route path="/compras" element={<Compras />} />
           <Route path="/compras/:id" element={<CompraDetail />} />
