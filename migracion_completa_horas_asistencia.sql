@@ -1,5 +1,5 @@
 -- =========================================================================
--- PEIE TOOLS: MIGRACIÓN COMPLETA DE HORAS, NOVEDADES Y ASISTENCIA
+-- PEIE TOOLS: MIGRACIÓN COMPLETA Y SEGURA (CON ADD COLUMN IF NOT EXISTS)
 -- =========================================================================
 
 -- 1. TABLA: REGISTRO DE HORAS SEMANALES
@@ -59,14 +59,17 @@ CREATE TABLE IF NOT EXISTS public.reglas_horas_trabajadores (
     horas_objetivo_semanal NUMERIC NOT NULL DEFAULT 44,
     porcentaje_bono NUMERIC NOT NULL DEFAULT 10,
     alerta_salud_activa BOOLEAN DEFAULT true,
-    hora_inicio_permitida TEXT DEFAULT '06:30',
-    hora_fin_permitida TEXT DEFAULT '19:30',
-    hora_limite_puntualidad TEXT DEFAULT '08:15',
-    horas_objetivo_quincena NUMERIC DEFAULT 88,
-    porcentaje_premio_asistencia NUMERIC DEFAULT 10,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- Asegurar que existan todas las columnas si la tabla ya había sido creada antes
+ALTER TABLE public.reglas_horas_trabajadores 
+ADD COLUMN IF NOT EXISTS hora_inicio_permitida TEXT DEFAULT '06:30',
+ADD COLUMN IF NOT EXISTS hora_fin_permitida TEXT DEFAULT '19:30',
+ADD COLUMN IF NOT EXISTS hora_limite_puntualidad TEXT DEFAULT '08:15',
+ADD COLUMN IF NOT EXISTS horas_objetivo_quincena NUMERIC DEFAULT 88,
+ADD COLUMN IF NOT EXISTS porcentaje_premio_asistencia NUMERIC DEFAULT 10;
 
 -- Insertar regla inicial si no existe
 INSERT INTO public.reglas_horas_trabajadores (
