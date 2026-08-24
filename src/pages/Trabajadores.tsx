@@ -506,36 +506,161 @@ export default function Trabajadores() {
     });
   }, [novedades, searchTerm, mesFiltro, quincenaFiltro]);
 
-  // Exportar a Excel
+  // Exportar a Excel con el formato idéntico original (3 Hojas)
   const handleExportNovedades = () => {
-    if (filteredNovedades.length === 0) {
-      toast({ title: 'Sin datos', description: 'No hay novedades para exportar.' });
+    if (novedades.length === 0) {
+      toast({ title: 'Sin datos', description: 'No hay novedades cargadas para exportar.' });
       return;
     }
 
-    const dataToExport = filteredNovedades.map(n => ({
-      'Mes': n.mes,
-      'Quincena': n.quincena,
-      'Fecha': n.fecha,
-      'Apellido y Nombre': n.empleado_nombre,
-      'Estado': n.estado,
-      'Tipo de Licencia': n.tipo_licencia,
-      'Certificado Médico': n.certificado_medico ? 'SÍ' : 'NO',
-      'Hora Inicio': n.hora_ingreso || '08:00',
-      'Hora Egreso': n.hora_egreso || '18:00',
-      'Almuerzo': n.almuerzo ? 'SÍ (-1h)' : 'NO',
-      'Horas Trabajadas': n.horas_trabajadas,
-      'Obra': n.obra_nombre || '',
-      'Observaciones': n.observaciones || '',
-      'Fuente': n.fuente || 'APP_WEB'
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Novedades_PEIE');
-    XLSX.writeFile(wb, `Novedades_PEIE_${mesFiltro}_${quincenaFiltro}.xlsx`);
 
-    toast({ title: 'Excel Exportado', description: 'Reporte de novedades descargado.' });
+    // 1. HOJA 1: NOVEDADES DIARIAS GENERALES
+    const sheet1Data: any[][] = [
+      ["NOVEDADES DIARIAS - PEIE", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+      ["", "MES", "QUINCENA", "FECHA", "APELLIDO Y NOMBRE", "ESTADO", "TIPO DE LICENCIA", "SE JUSTIFICA", "CERTIFICADO\nMEDICO", "DESDE", "HASTA", "MONTO", "ENFERMEDAD TRABAJADOR", "FAMILIAR ENFERMO", "FALLECIMIENTO", "OBSERVACIONES"]
+    ];
+
+    novedades.forEach((n, idx) => {
+      const isSick = n.tipo_licencia === 'Enfermedad Trabajador';
+      const isFam = n.tipo_licencia === 'Familiar Enfermo';
+      const isDuelo = n.tipo_licencia === 'Fallecimiento';
+
+      sheet1Data.push([
+        idx + 1,
+        n.mes || 'AGOSTO',
+        n.quincena || '2Q',
+        n.fecha,
+        n.empleado_nombre,
+        n.estado,
+        n.tipo_licencia || '',
+        '',
+        n.certificado_medico ? 'Si' : 'No',
+        n.desde || '',
+        n.hasta || '',
+        '',
+        isSick ? 1 : '',
+        isFam ? 1 : '',
+        isDuelo ? 1 : '',
+        n.observaciones || ''
+      ]);
+    });
+
+    const ws1 = XLSX.utils.aoa_to_sheet(sheet1Data);
+    XLSX.utils.book_append_sheet(wb, ws1, 'NOVEDADES DIARIAS GENERALES ');
+
+    // 2. HOJA 2: RECUENTO DE LICENCIAS
+    const totalEnf = novedades.filter(n => n.tipo_licencia === 'Enfermedad Trabajador').length;
+    const totalNoJust = novedades.filter(n => n.tipo_licencia === 'No justificado' || (n.estado === 'AUSENTE' && n.tipo_licencia === 'Ninguno')).length;
+    const totalTardes = novedades.filter(n => n.estado === 'LLEGADA TARDE' || n.tipo_licencia === 'Llegada tarde').length;
+    const totalFam = novedades.filter(n => n.tipo_licencia === 'Familiar Enfermo').length;
+    const totalDuelo = novedades.filter(n => n.tipo_licencia === 'Fallecimiento').length;
+
+    const sheet2Data: any[][] = [
+      ["", "", "", "", "", "", "Sin Cargas de Familia", "Con Cargas de Familia", "", "", "", "", "", ""],
+      ["", "Total Nómina Evaluada", empleados.length, "", "", "< 5 años de antigüedad", "3 meses pagos", "6 meses pagos", "", "", "", "", "", ""],
+      ["", "Días por Enfermedad del trabajador", totalEnf, "", "", "> 5 años de antigüedad", "6 meses pagos", "12 meses pagos", "", "", "", "", "", ""],
+      ["", "Días de ausencia: No justificados", totalNoJust, "", "", "* Vencido el plazo de pago, corre 1 año de conservación del puesto", "", "", "", "", "", "", "", ""],
+      ["", "Llegadas tardes", totalTardes, "", "", "", "", "", "", "", "", "", "", ""],
+      ["", "Días por Familiar enfermo", totalFam, "", "", "", "", "", "", "", "", "", "", ""],
+      ["", "Días por Duelo", totalDuelo, "", "", "", "", "", "", "", "", "", "", ""]
+    ];
+
+    const ws2 = XLSX.utils.aoa_to_sheet(sheet2Data);
+    XLSX.utils.book_append_sheet(wb, ws2, 'RECUENTO DE LICENCIAS');
+
+    // 3. HOJA 3: FICHA PERSONAL (del empleado seleccionado o primero)
+    const empNombre = selectedEmpleado?.full_name || 'Personal General';
+    const sheet3Data: any[][] = [
+      ["", "", "", "", "", ""],
+      ["FICHA DEL TRABAJADOR - 2026", "", "", "", "", ""],
+      ["APELLIDO Y NOMBRE ", empNombre, "", "Inasistencias acumuladas", "", "Presentismo Real \n(a la fecha)"],
+      ["Fecha de ingreso", selectedEmpleado?.created_at ? selectedEmpleado.created_at.split('T')[0] : '2024-12-11', "", scorecardMetrics.totalInasistencias, "", scorecardMetrics.presentismoReal / 100],
+      ["Antigüedad", 1, "", "Llegadas tardes", "", ""],
+      ["", "", "", scorecardMetrics.llegadasTarde, "", "Tasa de cumplimiento\nideal (a la fecha)"],
+      ["Días acumulados por enfermedad del trabajador", scorecardMetrics.enfermedad, "", "", "", scorecardMetrics.cumplimientoIdeal / 100],
+      ["Faltas no justificadas", scorecardMetrics.noJustificadas, "", "Asistencia perfecta", "", ""],
+      ["Llegadas tardes", scorecardMetrics.llegadasTarde, "", scorecardMetrics.premioGanado ? "PREMIO GANADO" : "PREMIO PERDIDO", "", ""],
+      ["Días por familiar enfermo", scorecardMetrics.familiarEnfermo, "", "*Sin faltas y sin llegadas tardes", "", ""],
+      ["Días por duelo", scorecardMetrics.duelo, "", "", "", ""]
+    ];
+
+    const ws3 = XLSX.utils.aoa_to_sheet(sheet3Data);
+    XLSX.utils.book_append_sheet(wb, ws3, 'FICHA PERSONAL');
+
+    // Descargar archivo Excel idéntico
+    XLSX.writeFile(wb, `NOVEDADES DIARIAS - PEIE (Exportado ${new Date().toLocaleDateString('es-AR').replace(/\//g, '-')}).xlsx`);
+
+    toast({
+      title: 'Excel Generado en Formato Idéntico',
+      description: 'Se descargó el libro con las 3 hojas originales (Novedades, Recuento y Ficha).'
+    });
+  };
+
+  // Importar archivo Excel desde la UI
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const data = await file.arrayBuffer();
+      const wb = XLSX.read(data);
+      const ws = wb.Sheets['NOVEDADES DIARIAS GENERALES '] || wb.Sheets[wb.SheetNames[0]];
+      const rawRows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+      const recordsToInsert: any[] = [];
+
+      for (let i = 2; i < rawRows.length; i++) {
+        const row = rawRows[i];
+        const mes = (row[1] || '').toString().trim();
+        const quincena = (row[2] || '').toString().trim() || '2Q';
+        const fechaRaw = row[3];
+        const nombre = (row[4] || '').toString().trim();
+        const estadoRaw = (row[5] || '').toString().trim();
+        const tipoLicenciaRaw = (row[6] || '').toString().trim();
+        const seJustifica = (row[7] || '').toString().trim();
+        const certMedicoRaw = (row[8] || '').toString().trim();
+        const desdeRaw = row[9];
+        const hastaRaw = row[10];
+        const obs = (row[15] || '').toString().trim();
+
+        if (!nombre && !fechaRaw && !mes) continue;
+        if (!nombre) continue;
+
+        let estado = 'PRESENTE';
+        const estUpper = estadoRaw.toUpperCase();
+        if (estUpper.includes('AUSENTE')) estado = 'AUSENTE';
+        else if (estUpper.includes('TARDE')) estado = 'LLEGADA TARDE';
+        else if (estUpper.includes('RETIRO') || estUpper.includes('RETIRA')) estado = 'SE RETIRO';
+        else if (estUpper.includes('ART')) estado = 'AUSENTE';
+        else if (tipoLicenciaRaw.toLowerCase().includes('enfermedad')) estado = 'AUSENTE';
+
+        recordsToInsert.push({
+          empleado_nombre: nombre,
+          fecha: typeof fechaRaw === 'string' ? fechaRaw : new Date().toISOString().split('T')[0],
+          mes: mes || 'AGOSTO',
+          quincena: quincena || '2Q',
+          estado: estado,
+          tipo_licencia: tipoLicenciaRaw || 'Ninguno',
+          certificado_medico: certMedicoRaw.toLowerCase().includes('si'),
+          horas_trabajadas: estado === 'PRESENTE' ? 10 : (estado === 'LLEGADA TARDE' ? 8 : 0),
+          horas_ausente: estado === 'AUSENTE' ? 8 : 0,
+          observaciones: obs || (seJustifica ? `Justificación: ${seJustifica}` : null),
+          fuente: 'MANUAL_COORDINADOR'
+        });
+      }
+
+      if (recordsToInsert.length > 0) {
+        await supabase.from('novedades_diarias').insert(recordsToInsert);
+        toast({
+          title: 'Importación Exitosa',
+          description: `Se importaron ${recordsToInsert.length} registros desde el Excel.`
+        });
+        fetchData();
+      }
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Error al importar', description: err.message });
+    }
   };
 
   const handleContactWorker = (phone?: string, name?: string) => {
@@ -836,13 +961,25 @@ export default function Trabajadores() {
                 <span>Nueva Novedad</span>
               </Button>
 
+              <label className="cursor-pointer bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-bold text-xs rounded-xl px-3 py-2 flex items-center gap-1.5 transition-colors shadow-xs">
+                <FileSpreadsheet className="w-3.5 h-3.5 text-blue-600" />
+                <span>Importar Excel</span>
+                <input
+                  type="file"
+                  accept=".xlsx, .xls"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+              </label>
+
               <Button
                 onClick={handleExportNovedades}
                 variant="outline"
                 className="border-slate-300 text-slate-700 font-bold text-xs rounded-xl px-3 py-2 flex items-center gap-1.5"
+                title="Exportar en formato idéntico (3 Hojas: Novedades, Recuento y Ficha)"
               >
                 <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Excel</span>
+                <span>Exportar Excel (3 Hojas)</span>
               </Button>
             </div>
           </div>
