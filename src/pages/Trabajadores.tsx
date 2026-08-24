@@ -23,7 +23,15 @@ import {
   ShieldAlert,
   HelpCircle,
   FileText,
-  User
+  User,
+  Plus,
+  Edit,
+  Trash2,
+  Save,
+  Check,
+  X,
+  ShieldCheck,
+  Utensils
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -59,19 +67,31 @@ export interface EmpleadoScorecard {
   role: string;
   specialty?: string;
   whatsapp?: string;
+  obra_id?: string;
   created_at?: string;
   fecha_ingreso?: string;
-  antiguedad_anios?: number;
+}
+
+// Helper para calcular Quincena y Mes
+function getQuincenaFromDate(dateStr: string): { quincena: string; mes: string } {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const d = new Date(year, month - 1, day);
+  const meses = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+  return {
+    quincena: day <= 15 ? '1Q' : '2Q',
+    mes: meses[d.getMonth()]
+  };
 }
 
 export default function Trabajadores() {
   const { toast } = useToast();
   
   // Pestaña activa
-  const [activeTab, setActiveTab] = useState<'ficha' | 'novedades' | 'computo' | 'reglas'>('ficha');
+  const [activeTab, setActiveTab] = useState<'ficha' | 'novedades' | 'computo'>('ficha');
   
   const [novedades, setNovedades] = useState<NovedadDiaria[]>([]);
   const [empleados, setEmpleados] = useState<EmpleadoScorecard[]>([]);
+  const [obrasList, setObrasList] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Filtros
@@ -88,6 +108,39 @@ export default function Trabajadores() {
   const [horaLimitePuntualidad, setHoraLimitePuntualidad] = useState('08:15');
   const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
   const [savingRules, setSavingRules] = useState(false);
+
+  // Modal: Carga Manual RRHH
+  const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+  const [submittingManual, setSubmittingManual] = useState(false);
+  const [manualForm, setManualForm] = useState({
+    empleado_id: '',
+    fecha: new Date().toISOString().split('T')[0],
+    obra_id: '',
+    estado: 'PRESENTE' as 'PRESENTE' | 'AUSENTE' | 'LLEGADA TARDE' | 'SE RETIRO',
+    hora_ingreso: '08:00',
+    hora_egreso: '18:00',
+    almuerzo: false,
+    horas_trabajadas: 10,
+    tipo_licencia: 'Ninguno',
+    certificado_medico: false,
+    observaciones: ''
+  });
+
+  // Modal: Editar Novedad Existente
+  const [editingNovedad, setEditingNovedad] = useState<NovedadDiaria | null>(null);
+  const [savingEditNovedad, setSavingEditNovedad] = useState(false);
+
+  // Modal: Editar Datos del Empleado
+  const [isEditWorkerModalOpen, setIsEditWorkerModalOpen] = useState(false);
+  const [savingWorker, setSavingWorker] = useState(false);
+  const [workerForm, setWorkerForm] = useState({
+    id: '',
+    full_name: '',
+    specialty: '',
+    whatsapp: '',
+    obra_id: '',
+    fecha_ingreso: ''
+  });
 
   const fetchData = async () => {
     setLoading(true);
@@ -110,7 +163,7 @@ export default function Trabajadores() {
       // 2. Cargar empleados
       const { data: empData } = await supabase
         .from('empleados')
-        .select('id, full_name, role, specialty, whatsapp, created_at')
+        .select('id, full_name, role, specialty, whatsapp, obra_id, created_at')
         .eq('active', true)
         .order('full_name');
 
@@ -121,7 +174,16 @@ export default function Trabajadores() {
         }
       }
 
-      // 3. Cargar novedades de Supabase
+      // 3. Cargar obras
+      const { data: obrasData } = await supabase
+        .from('obras')
+        .select('id, name')
+        .eq('active', true)
+        .order('name');
+
+      if (obrasData) setObrasList(obrasData);
+
+      // 4. Cargar novedades de Supabase
       const { data: novData } = await supabase
         .from('novedades_diarias')
         .select('*')
@@ -129,7 +191,7 @@ export default function Trabajadores() {
 
       setNovedades(novData || []);
     } catch (err: any) {
-      console.error('Error cargando datos de trabajadores:', err);
+      console.error('Error cargando datos:', err);
       toast({
         variant: 'destructive',
         title: 'Error de carga',
@@ -144,7 +206,18 @@ export default function Trabajadores() {
     fetchData();
   }, []);
 
-  // Guardar reglas
+  // Calcular horas netas en formulario manual
+  const calcularHorasNetas = (inicio: string, egreso: string, conAlmuerzo: boolean) => {
+    const [h1, m1] = inicio.split(':').map(Number);
+    const [h2, m2] = egreso.split(':').map(Number);
+    let diff = (h2 * 60 + m2) - (h1 * 60 + m1);
+    if (diff < 0) diff += 24 * 60;
+    let netHours = diff / 60;
+    if (conAlmuerzo && netHours > 4) netHours = Math.max(0, netHours - 1);
+    return Math.round(netHours * 10) / 10;
+  };
+
+  // Guardar Reglas
   const handleSaveRules = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingRules(true);
@@ -158,28 +231,205 @@ export default function Trabajadores() {
         updated_at: new Date().toISOString()
       };
 
-      const { error } = await supabase
-        .from('reglas_horas_trabajadores')
-        .upsert([payload]);
-
-      if (error) console.warn(error);
+      await supabase.from('reglas_horas_trabajadores').upsert([payload]);
 
       toast({
-        title: 'Reglas y Horarios Actualizados',
-        description: `Ventana de obra: ${horaInicioPermitida} a ${horaFinPermitida} hs. Bono: +${porcentajeBono}%.`
+        title: 'Reglas y Horarios Guardados',
+        description: `Ventana: ${horaInicioPermitida} a ${horaFinPermitida} hs. Bono: +${porcentajeBono}%.`
       });
       setIsRulesModalOpen(false);
     } catch (err: any) {
-      toast({ variant: 'destructive', title: 'Error al guardar', description: err.message });
+      toast({ variant: 'destructive', title: 'Error al guardar reglas', description: err.message });
     } finally {
       setSavingRules(false);
     }
   };
 
-  // Empleado seleccionado para la Ficha Individual
+  // Empleado seleccionado para la Ficha
   const selectedEmpleado = useMemo(() => {
     return empleados.find(e => e.id === selectedEmpleadoId) || empleados[0];
   }, [empleados, selectedEmpleadoId]);
+
+  // Abrir modal de edición de datos de empleado
+  const handleOpenEditWorker = () => {
+    if (!selectedEmpleado) return;
+    setWorkerForm({
+      id: selectedEmpleado.id,
+      full_name: selectedEmpleado.full_name,
+      specialty: selectedEmpleado.specialty || selectedEmpleado.role || '',
+      whatsapp: selectedEmpleado.whatsapp || '',
+      obra_id: selectedEmpleado.obra_id || '',
+      fecha_ingreso: selectedEmpleado.created_at ? selectedEmpleado.created_at.split('T')[0] : '2024-12-11'
+    });
+    setIsEditWorkerModalOpen(true);
+  };
+
+  // Guardar edición de datos de empleado
+  const handleSaveWorkerProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingWorker(true);
+    try {
+      const { error } = await supabase
+        .from('empleados')
+        .update({
+          full_name: workerForm.full_name.trim(),
+          specialty: workerForm.specialty.trim(),
+          whatsapp: workerForm.whatsapp.trim() || null,
+          obra_id: workerForm.obra_id || null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', workerForm.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Perfil de Trabajador Actualizado',
+        description: `Los datos de ${workerForm.full_name} se guardaron con éxito.`
+      });
+
+      setIsEditWorkerModalOpen(false);
+      fetchData();
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Error al actualizar', description: err.message });
+    } finally {
+      setSavingWorker(false);
+    }
+  };
+
+  // Abrir modal de carga manual RRHH
+  const handleOpenManualModal = () => {
+    setManualForm({
+      empleado_id: selectedEmpleadoId || (empleados[0]?.id || ''),
+      fecha: new Date().toISOString().split('T')[0],
+      obra_id: selectedEmpleado?.obra_id || '',
+      estado: 'PRESENTE',
+      hora_ingreso: '08:00',
+      hora_egreso: '18:00',
+      almuerzo: false,
+      horas_trabajadas: 10,
+      tipo_licencia: 'Ninguno',
+      certificado_medico: false,
+      observaciones: 'Cargado manualmente por RRHH'
+    });
+    setIsManualModalOpen(true);
+  };
+
+  // Guardar Carga Manual RRHH
+  const handleSaveManualEntry = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualForm.empleado_id) {
+      toast({ variant: 'destructive', title: 'Seleccioná un trabajador' });
+      return;
+    }
+
+    setSubmittingManual(true);
+    try {
+      const emp = empleados.find(e => e.id === manualForm.empleado_id);
+      const obra = obrasList.find(o => o.id === manualForm.obra_id);
+      const { quincena, mes } = getQuincenaFromDate(manualForm.fecha);
+      
+      const netHours = manualForm.estado === 'AUSENTE'
+        ? 0
+        : calcularHorasNetas(manualForm.hora_ingreso, manualForm.hora_egreso, manualForm.almuerzo);
+
+      const payload = {
+        empleado_id: manualForm.empleado_id,
+        empleado_nombre: emp?.full_name || 'Trabajador',
+        fecha: manualForm.fecha,
+        mes: mes,
+        quincena: quincena,
+        obra_id: manualForm.obra_id || null,
+        obra_nombre: obra?.name || 'Obra Asignada',
+        hora_ingreso: manualForm.hora_ingreso,
+        hora_egreso: manualForm.hora_egreso,
+        almuerzo: manualForm.almuerzo,
+        horas_ausente: manualForm.estado === 'AUSENTE' ? 8 : 0,
+        horas_trabajadas: netHours,
+        estado: manualForm.estado,
+        tipo_licencia: manualForm.tipo_licencia,
+        certificado_medico: manualForm.certificado_medico,
+        observaciones: manualForm.observaciones.trim() || 'Ajuste manual de RRHH',
+        fuente: 'MANUAL_COORDINADOR'
+      };
+
+      const { error } = await supabase.from('novedades_diarias').insert([payload]);
+      if (error) throw error;
+
+      toast({
+        title: 'Asistencia Registrada por RRHH',
+        description: `Se registró la jornada de ${emp?.full_name} (${netHours} hs).`
+      });
+
+      setIsManualModalOpen(false);
+      fetchData();
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Error al registrar', description: err.message });
+    } finally {
+      setSubmittingManual(false);
+    }
+  };
+
+  // Abrir modal de edición de novedad
+  const handleOpenEditNovedad = (nov: NovedadDiaria) => {
+    setEditingNovedad({ ...nov });
+  };
+
+  // Guardar edición de novedad existente
+  const handleSaveEditNovedad = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingNovedad) return;
+
+    setSavingEditNovedad(true);
+    try {
+      const netHours = editingNovedad.estado === 'AUSENTE'
+        ? 0
+        : calcularHorasNetas(editingNovedad.hora_ingreso || '08:00', editingNovedad.hora_egreso || '18:00', !!editingNovedad.almuerzo);
+
+      const { error } = await supabase
+        .from('novedades_diarias')
+        .update({
+          estado: editingNovedad.estado,
+          tipo_licencia: editingNovedad.tipo_licencia,
+          certificado_medico: editingNovedad.certificado_medico,
+          hora_ingreso: editingNovedad.hora_ingreso,
+          hora_egreso: editingNovedad.hora_egreso,
+          almuerzo: editingNovedad.almuerzo,
+          horas_trabajadas: netHours,
+          observaciones: editingNovedad.observaciones,
+          fuente: 'MANUAL_COORDINADOR',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', editingNovedad.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Novedad Actualizada',
+        description: 'La incidencia ha sido modificada correctamente.'
+      });
+
+      setEditingNovedad(null);
+      fetchData();
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Error al modificar', description: err.message });
+    } finally {
+      setSavingEditNovedad(false);
+    }
+  };
+
+  // Eliminar novedad
+  const handleDeleteNovedad = async (id: string) => {
+    if (!window.confirm('¿Estás seguro de eliminar este registro de asistencia?')) return;
+    try {
+      const { error } = await supabase.from('novedades_diarias').delete().eq('id', id);
+      if (error) throw error;
+
+      toast({ title: 'Registro eliminado', description: 'La novedad fue eliminada.' });
+      fetchData();
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Error al eliminar', description: err.message });
+    }
+  };
 
   // Métricas calculadas para la Ficha del Trabajador
   const scorecardMetrics = useMemo(() => {
@@ -221,7 +471,7 @@ export default function Trabajadores() {
 
     const cumplimientoIdeal = Math.max(0, Math.min(100, Math.round(((totalJornadas - noJustificadas) / totalJornadas) * 10000) / 100));
     
-    // Premio por Asistencia Perfecta: Se pierde si hay faltas o llegadas tardes
+    // Premio por Asistencia Perfecta
     const premioGanado = noJustificadas === 0 && llegadasTarde === 0 && totalInasistencias <= 1;
 
     return {
@@ -239,7 +489,7 @@ export default function Trabajadores() {
     };
   }, [selectedEmpleado, novedades]);
 
-  // Novedades filtradas para la tabla de Novedades Diarias
+  // Novedades filtradas para la tabla
   const filteredNovedades = useMemo(() => {
     return novedades.filter(n => {
       const s = searchTerm.toLowerCase();
@@ -256,7 +506,7 @@ export default function Trabajadores() {
     });
   }, [novedades, searchTerm, mesFiltro, quincenaFiltro]);
 
-  // Exportar Novedades a Excel
+  // Exportar a Excel
   const handleExportNovedades = () => {
     if (filteredNovedades.length === 0) {
       toast({ title: 'Sin datos', description: 'No hay novedades para exportar.' });
@@ -288,7 +538,6 @@ export default function Trabajadores() {
     toast({ title: 'Excel Exportado', description: 'Reporte de novedades descargado.' });
   };
 
-  // WhatsApp directo para consultar salud
   const handleContactWorker = (phone?: string, name?: string) => {
     const p = phone || selectedEmpleado?.whatsapp;
     const n = (name || selectedEmpleado?.full_name || 'compañero').split(' ')[0];
@@ -314,27 +563,36 @@ export default function Trabajadores() {
           <div className="flex items-center gap-2">
             <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full border border-emerald-500/30 flex items-center gap-1">
               <Award className="w-3 h-3" />
-              Gestión Integral de Personal
+              Gestión & Auditoría RRHH
             </span>
             <span className="text-xs text-slate-300 font-medium">
               (Ventana: {horaInicioPermitida} a {horaFinPermitida} hs • Puntualidad: {horaLimitePuntualidad} hs)
             </span>
           </div>
           <h1 className="text-xl md:text-2xl font-black tracking-tight text-white">
-            Panel de Trabajadores, Asistencia & Novedades
+            Panel de Trabajadores, Asistencia & RRHH
           </h1>
           <p className="text-xs md:text-sm text-slate-300 max-w-2xl leading-relaxed">
-            Ficha individual de presentismo, control de novedades por quincena, seguimiento de salud y reglas anti-fraude para el bot de WhatsApp.
+            Ficha de presentismo, carga y justificación manual por RRHH, libro de novedades por quincena y reglas anti-fraude.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 relative z-10">
+        <div className="flex flex-wrap items-center gap-2 relative z-10">
+          {/* Botón Carga Manual RRHH */}
+          <Button
+            onClick={handleOpenManualModal}
+            className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-2xl px-4 py-2.5 shadow-md transition-all flex items-center gap-1.5 active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ Cargar Asistencia (RRHH)</span>
+          </Button>
+
           <Button
             onClick={() => setIsRulesModalOpen(true)}
-            className="bg-white/10 hover:bg-white/20 text-white border border-white/20 font-bold text-xs rounded-2xl px-4 py-2.5 shadow-sm transition-all flex items-center gap-2"
+            className="bg-white/10 hover:bg-white/20 text-white border border-white/20 font-bold text-xs rounded-2xl px-3.5 py-2.5 shadow-sm transition-all flex items-center gap-1.5"
           >
             <Settings className="w-4 h-4" />
-            <span>Reglas & Horarios</span>
+            <span>Reglas</span>
           </Button>
 
           <Button
@@ -375,7 +633,7 @@ export default function Trabajadores() {
       {activeTab === 'ficha' && (
         <div className="space-y-6 animate-fadeIn">
           
-          {/* Selector de Empleado */}
+          {/* Selector de Empleado y Botón de Edición de Perfil */}
           <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3 w-full sm:w-auto">
               <div className="w-11 h-11 bg-blue-50 text-blue-700 rounded-2xl flex items-center justify-center font-black text-sm shrink-0">
@@ -395,22 +653,33 @@ export default function Trabajadores() {
               </div>
             </div>
 
-            {selectedEmpleado?.whatsapp && (
+            <div className="flex items-center gap-2 w-full sm:w-auto">
               <Button
-                onClick={() => handleContactWorker()}
-                className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 shadow-sm"
+                onClick={handleOpenEditWorker}
+                variant="outline"
+                className="rounded-xl border-slate-300 text-xs font-bold flex items-center gap-1.5 text-slate-700"
               >
-                <Phone className="w-3.5 h-3.5" />
-                <span>Contactar por WhatsApp</span>
+                <Edit className="w-3.5 h-3.5 text-blue-600" />
+                <span>Editar Datos Operario</span>
               </Button>
-            )}
+
+              {selectedEmpleado?.whatsapp && (
+                <Button
+                  onClick={() => handleContactWorker()}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 shadow-sm"
+                >
+                  <Phone className="w-3.5 h-3.5" />
+                  <span>WhatsApp</span>
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Ficha Principal */}
           {selectedEmpleado ? (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               
-              {/* Columna Izquierda: Métricas en Tabla (Estilo Planilla 3) */}
+              {/* Columna Izquierda: Métricas en Tabla */}
               <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden">
                 <div className="bg-[#031530] text-white p-4 font-black text-sm uppercase tracking-wide flex items-center justify-between">
                   <span>FICHA DEL TRABAJADOR - {new Date().getFullYear()}</span>
@@ -521,12 +790,12 @@ export default function Trabajadores() {
       )}
 
       {/* =================================================================== */}
-      {/* PESTAÑA 2: LIBRO DE NOVEDADES DIARIAS (PLANILLA 2)                  */}
+      {/* PESTAÑA 2: LIBRO DE NOVEDADES DIARIAS (CON EDICIÓN Y AUDITORÍA)    */}
       {/* =================================================================== */}
       {activeTab === 'novedades' && (
         <div className="space-y-4 animate-fadeIn">
           
-          {/* Barra de Filtros por Mes, Quincena y Búsqueda */}
+          {/* Barra de Filtros y Acciones */}
           <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
             <div className="relative w-full md:max-w-xs">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -538,7 +807,7 @@ export default function Trabajadores() {
               />
             </div>
 
-            <div className="flex items-center gap-2 w-full md:w-auto">
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
               <select
                 value={mesFiltro}
                 onChange={(e) => setMesFiltro(e.target.value)}
@@ -560,21 +829,33 @@ export default function Trabajadores() {
               </select>
 
               <Button
-                onClick={handleExportNovedades}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl px-3.5 py-2 flex items-center gap-1.5 shadow-sm"
+                onClick={handleOpenManualModal}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl px-3 py-2 flex items-center gap-1.5 shadow-sm"
               >
-                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <Plus className="w-3.5 h-3.5" />
+                <span>Nueva Novedad</span>
+              </Button>
+
+              <Button
+                onClick={handleExportNovedades}
+                variant="outline"
+                className="border-slate-300 text-slate-700 font-bold text-xs rounded-xl px-3 py-2 flex items-center gap-1.5"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
                 <span>Excel</span>
               </Button>
             </div>
           </div>
 
-          {/* Tabla de Novedades Diarias */}
+          {/* Tabla de Novedades Diarias con Acciones */}
           {filteredNovedades.length === 0 ? (
-            <div className="bg-white rounded-3xl p-12 text-center border border-slate-200/80 shadow-xs space-y-2">
+            <div className="bg-white rounded-3xl p-12 text-center border border-slate-200/80 shadow-xs space-y-3">
               <FileText className="w-10 h-10 text-slate-300 mx-auto" />
               <h3 className="text-sm font-bold text-slate-700">Sin novedades registradas</h3>
               <p className="text-xs text-slate-400">No hay incidencias para el mes y quincena seleccionados.</p>
+              <Button onClick={handleOpenManualModal} className="bg-blue-600 text-white text-xs rounded-xl">
+                + Cargar Asistencia Manual por RRHH
+              </Button>
             </div>
           ) : (
             <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden">
@@ -589,14 +870,16 @@ export default function Trabajadores() {
                       <th className="py-3 px-4">Tipo de Licencia</th>
                       <th className="py-3 px-4 text-center">Cert. Médico</th>
                       <th className="py-3 px-4">Horas</th>
+                      <th className="py-3 px-4">Fuente</th>
                       <th className="py-3 px-4">Observaciones</th>
-                      <th className="py-3 px-4 text-center">Acción</th>
+                      <th className="py-3 px-4 text-center">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {filteredNovedades.map((nov) => {
                       const isSick = nov.tipo_licencia?.toLowerCase().includes('enfermedad');
-                      const isLate = nov.estado === 'LLEGADA TARDE';
+                      const isManual = nov.fuente === 'MANUAL_COORDINADOR';
+                      const isWpp = nov.fuente === 'WHATSAPP_N8N';
 
                       return (
                         <tr key={nov.id} className="hover:bg-slate-50 transition-colors">
@@ -637,19 +920,48 @@ export default function Trabajadores() {
                           <td className="py-3 px-4 font-black text-slate-900">
                             {nov.horas_trabajadas} hs
                           </td>
+                          <td className="py-3 px-4">
+                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md border ${
+                              isManual 
+                                ? 'bg-purple-50 text-purple-800 border-purple-200' 
+                                : isWpp 
+                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                                  : 'bg-blue-50 text-blue-800 border-blue-200'
+                            }`}>
+                              {isManual ? '👔 RRHH' : isWpp ? '🤖 WhatsApp' : '📱 Web'}
+                            </span>
+                          </td>
                           <td className="py-3 px-4 text-slate-600 max-w-xs truncate text-[11px]">
                             {nov.observaciones || '-'}
                           </td>
                           <td className="py-3 px-4 text-center">
-                            {isSick && (
+                            <div className="flex items-center justify-center gap-1">
                               <button
-                                onClick={() => handleContactWorker(undefined, nov.empleado_nombre)}
-                                className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                                title="Enviar mensaje de salud por WhatsApp"
+                                onClick={() => handleOpenEditNovedad(nov)}
+                                className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                title="Editar jornada / justificación"
                               >
-                                <HeartHandshake className="w-4 h-4" />
+                                <Edit className="w-3.5 h-3.5" />
                               </button>
-                            )}
+
+                              <button
+                                onClick={() => handleDeleteNovedad(nov.id)}
+                                className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                title="Eliminar registro"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+
+                              {isSick && (
+                                <button
+                                  onClick={() => handleContactWorker(undefined, nov.empleado_nombre)}
+                                  className="p-1 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                                  title="Enviar mensaje de salud por WhatsApp"
+                                >
+                                  <HeartHandshake className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -719,7 +1031,371 @@ export default function Trabajadores() {
         </div>
       )}
 
-      {/* Modal: Reglas, Horarios y Anti-Fraude */}
+      {/* =================================================================== */}
+      {/* MODAL 1: CARGA MANUAL O JUSTIFICACIÓN POR RRHH                       */}
+      {/* =================================================================== */}
+      <Dialog open={isManualModalOpen} onOpenChange={setIsManualModalOpen}>
+        <DialogContent className="sm:max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-black text-slate-900 flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-emerald-600" />
+              <span>Cargar / Justificar Asistencia (RRHH)</span>
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Registrá la jornada o licencia médica en nombre del trabajador.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSaveManualEntry} className="space-y-4 pt-2">
+            
+            {/* Selección de Trabajador */}
+            <div className="space-y-1">
+              <Label className="text-xs font-bold text-slate-700">Trabajador *</Label>
+              <select
+                value={manualForm.empleado_id}
+                onChange={(e) => setManualForm({ ...manualForm, empleado_id: e.target.value })}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-white"
+                required
+              >
+                <option value="">Seleccionar empleado...</option>
+                {empleados.map(emp => (
+                  <option key={emp.id} value={emp.id}>{emp.full_name} ({emp.specialty || emp.role})</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Fecha y Obra */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs font-bold text-slate-700">Fecha *</Label>
+                <Input
+                  type="date"
+                  value={manualForm.fecha}
+                  onChange={(e) => setManualForm({ ...manualForm, fecha: e.target.value })}
+                  className="rounded-xl text-xs font-bold"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-bold text-slate-700">Obra</Label>
+                <select
+                  value={manualForm.obra_id}
+                  onChange={(e) => setManualForm({ ...manualForm, obra_id: e.target.value })}
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-white"
+                >
+                  <option value="">Seleccionar obra...</option>
+                  {obrasList.map(o => (
+                    <option key={o.id} value={o.id}>{o.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Estado */}
+            <div className="space-y-1">
+              <Label className="text-xs font-bold text-slate-700">Estado de Asistencia *</Label>
+              <div className="grid grid-cols-4 gap-1.5">
+                {[
+                  { id: 'PRESENTE', label: 'Presente' },
+                  { id: 'LLEGADA TARDE', label: 'Tarde' },
+                  { id: 'SE RETIRO', label: 'Se Retiró' },
+                  { id: 'AUSENTE', label: 'Ausente' }
+                ].map(est => (
+                  <button
+                    key={est.id}
+                    type="button"
+                    onClick={() => setManualForm({ ...manualForm, estado: est.id as any })}
+                    className={`py-2 rounded-xl text-xs font-black transition-all border ${
+                      manualForm.estado === est.id
+                        ? 'bg-[#031530] text-white border-[#031530]'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    {est.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Horarios (si presente) o Licencia (si ausente) */}
+            {manualForm.estado !== 'AUSENTE' ? (
+              <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-bold text-slate-700">Hora Inicio</Label>
+                    <Input
+                      type="time"
+                      value={manualForm.hora_ingreso}
+                      onChange={(e) => setManualForm({ ...manualForm, hora_ingreso: e.target.value })}
+                      className="bg-white rounded-xl text-xs font-black text-center"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-bold text-slate-700">Hora Egreso</Label>
+                    <Input
+                      type="time"
+                      value={manualForm.hora_egreso}
+                      onChange={(e) => setManualForm({ ...manualForm, hora_egreso: e.target.value })}
+                      className="bg-white rounded-xl text-xs font-black text-center"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-xs font-bold text-slate-700">¿Descontar 1h de almuerzo?</span>
+                  <button
+                    type="button"
+                    onClick={() => setManualForm({ ...manualForm, almuerzo: !manualForm.almuerzo })}
+                    className={`px-3 py-1 rounded-lg text-xs font-black ${
+                      manualForm.almuerzo ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'
+                    }`}
+                  >
+                    {manualForm.almuerzo ? 'SÍ (-1h)' : 'NO'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-rose-50/60 p-3.5 rounded-2xl border border-rose-200 space-y-3">
+                <div className="space-y-1">
+                  <Label className="text-xs font-bold text-rose-900">Tipo de Licencia</Label>
+                  <select
+                    value={manualForm.tipo_licencia}
+                    onChange={(e) => setManualForm({ ...manualForm, tipo_licencia: e.target.value })}
+                    className="w-full h-10 px-3 rounded-xl border border-rose-200 text-xs font-bold text-slate-800 bg-white"
+                  >
+                    <option value="Enfermedad Trabajador">Enfermedad del Trabajador</option>
+                    <option value="Familiar Enfermo">Familiar Enfermo a cargo</option>
+                    <option value="Fallecimiento">Fallecimiento / Duelo</option>
+                    <option value="No justificado">Falta No Justificada</option>
+                    <option value="Llegada tarde">Llegada tarde</option>
+                    <option value="Otro">Otro motivo</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-rose-900">¿Tiene Certificado Médico?</span>
+                  <button
+                    type="button"
+                    onClick={() => setManualForm({ ...manualForm, certificado_medico: !manualForm.certificado_medico })}
+                    className={`px-3 py-1 rounded-lg text-xs font-black ${
+                      manualForm.certificado_medico ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'
+                    }`}
+                  >
+                    {manualForm.certificado_medico ? 'SÍ (Válido)' : 'NO'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Observaciones */}
+            <div className="space-y-1">
+              <Label className="text-xs font-bold text-slate-700">Observaciones / Motivo de RRHH</Label>
+              <Input
+                value={manualForm.observaciones}
+                onChange={(e) => setManualForm({ ...manualForm, observaciones: e.target.value })}
+                placeholder="Ej: Presentó certificado médico por WhatsApp / Se le rompió la moto"
+                className="rounded-xl text-xs"
+              />
+            </div>
+
+            <DialogFooter className="pt-2 gap-2 sm:gap-0">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsManualModalOpen(false)}
+                className="rounded-xl text-xs font-bold"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={submittingManual}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold px-5"
+              >
+                {submittingManual ? 'Guardando...' : 'Registrar Jornada'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* =================================================================== */}
+      {/* MODAL 2: EDITAR NOVEDAD EXISTENTE                                   */}
+      {/* =================================================================== */}
+      <Dialog open={!!editingNovedad} onOpenChange={(open) => !open && setEditingNovedad(null)}>
+        <DialogContent className="sm:max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-black text-slate-900 flex items-center gap-2">
+              <Edit className="w-5 h-5 text-blue-600" />
+              <span>Editar Novedad • {editingNovedad?.empleado_nombre}</span>
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Fecha: {editingNovedad?.fecha} ({editingNovedad?.quincena} {editingNovedad?.mes})
+            </DialogDescription>
+          </DialogHeader>
+
+          {editingNovedad && (
+            <form onSubmit={handleSaveEditNovedad} className="space-y-4 pt-2">
+              
+              <div className="space-y-1">
+                <Label className="text-xs font-bold text-slate-700">Estado</Label>
+                <select
+                  value={editingNovedad.estado}
+                  onChange={(e) => setEditingNovedad({ ...editingNovedad, estado: e.target.value as any })}
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-white"
+                >
+                  <option value="PRESENTE">PRESENTE</option>
+                  <option value="LLEGADA TARDE">LLEGADA TARDE</option>
+                  <option value="SE RETIRO">SE RETIRÓ</option>
+                  <option value="AUSENTE">AUSENTE</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-bold text-slate-700">Tipo de Licencia</Label>
+                <select
+                  value={editingNovedad.tipo_licencia}
+                  onChange={(e) => setEditingNovedad({ ...editingNovedad, tipo_licencia: e.target.value })}
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-white"
+                >
+                  <option value="Ninguno">Ninguno</option>
+                  <option value="Enfermedad Trabajador">Enfermedad del Trabajador</option>
+                  <option value="Familiar Enfermo">Familiar Enfermo</option>
+                  <option value="Fallecimiento">Fallecimiento / Duelo</option>
+                  <option value="No justificado">No justificado</option>
+                  <option value="Llegada tarde">Llegada tarde</option>
+                  <option value="Otro">Otro</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200">
+                <span className="text-xs font-bold text-slate-700">Certificado Médico Presentado</span>
+                <input
+                  type="checkbox"
+                  checked={editingNovedad.certificado_medico}
+                  onChange={(e) => setEditingNovedad({ ...editingNovedad, certificado_medico: e.target.checked })}
+                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-bold text-slate-700">Observaciones</Label>
+                <Input
+                  value={editingNovedad.observaciones || ''}
+                  onChange={(e) => setEditingNovedad({ ...editingNovedad, observaciones: e.target.value })}
+                  className="rounded-xl text-xs font-medium"
+                />
+              </div>
+
+              <DialogFooter className="pt-2 gap-2 sm:gap-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditingNovedad(null)}
+                  className="rounded-xl text-xs font-bold"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={savingEditNovedad}
+                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold px-5"
+                >
+                  {savingEditNovedad ? 'Guardando...' : 'Guardar Cambios'}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* =================================================================== */}
+      {/* MODAL 3: EDITAR PERFIL DE OPERARIO                                   */}
+      {/* =================================================================== */}
+      <Dialog open={isEditWorkerModalOpen} onOpenChange={setIsEditWorkerModalOpen}>
+        <DialogContent className="sm:max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-black text-slate-900 flex items-center gap-2">
+              <User className="w-5 h-5 text-blue-600" />
+              <span>Editar Datos de Trabajador</span>
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Modificá el nombre, rol, WhatsApp u obra habitual del operario.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSaveWorkerProfile} className="space-y-4 pt-2">
+            
+            <div className="space-y-1">
+              <Label className="text-xs font-bold text-slate-700">Nombre Completo *</Label>
+              <Input
+                value={workerForm.full_name}
+                onChange={(e) => setWorkerForm({ ...workerForm, full_name: e.target.value })}
+                className="rounded-xl text-xs font-bold"
+                required
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs font-bold text-slate-700">Especialidad / Rol</Label>
+              <Input
+                value={workerForm.specialty}
+                onChange={(e) => setWorkerForm({ ...workerForm, specialty: e.target.value })}
+                placeholder="Ej: Electricista Oficial / Ayudante"
+                className="rounded-xl text-xs font-bold"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs font-bold text-slate-700">Teléfono / WhatsApp</Label>
+              <Input
+                value={workerForm.whatsapp}
+                onChange={(e) => setWorkerForm({ ...workerForm, whatsapp: e.target.value })}
+                placeholder="Ej: +54 9 381 123-4567"
+                className="rounded-xl text-xs font-mono font-bold"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs font-bold text-slate-700">Obra Habitual Asignada</Label>
+              <select
+                value={workerForm.obra_id}
+                onChange={(e) => setWorkerForm({ ...workerForm, obra_id: e.target.value })}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-white"
+              >
+                <option value="">Sin obra fija</option>
+                {obrasList.map(o => (
+                  <option key={o.id} value={o.id}>{o.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <DialogFooter className="pt-2 gap-2 sm:gap-0">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsEditWorkerModalOpen(false)}
+                className="rounded-xl text-xs font-bold"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={savingWorker}
+                className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold px-5"
+              >
+                {savingWorker ? 'Guardando...' : 'Guardar Perfil'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* =================================================================== */}
+      {/* MODAL 4: REGLAS, HORARIOS Y ANTI-FRAUDE                              */}
+      {/* =================================================================== */}
       <Dialog open={isRulesModalOpen} onOpenChange={setIsRulesModalOpen}>
         <DialogContent className="sm:max-w-md rounded-3xl bg-white p-6 shadow-2xl">
           <DialogHeader>
@@ -734,7 +1410,6 @@ export default function Trabajadores() {
 
           <form onSubmit={handleSaveRules} className="space-y-4 pt-2">
             
-            {/* Ventana Horaria */}
             <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-3">
               <span className="text-xs font-black text-slate-900 block flex items-center gap-1.5">
                 <ShieldAlert className="w-4 h-4 text-amber-600" />
@@ -780,7 +1455,6 @@ export default function Trabajadores() {
               </div>
             </div>
 
-            {/* Bonos */}
             <div className="space-y-3">
               <div className="space-y-1">
                 <Label className="text-xs font-bold text-slate-700">Horas Objetivo Semanales (para Bono)</Label>
