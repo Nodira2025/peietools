@@ -16,14 +16,26 @@ import {
   ArrowRight, 
   ArrowLeft, 
   Check, 
-  HelpCircle,
-  AlertCircle,
+  Building2,
+  AlertTriangle,
   Send,
-  Edit3
+  Edit3,
+  ShieldAlert,
+  Utensils
 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 
-// Helper para obtener el lunes de la semana actual en formato YYYY-MM-DD
+// Helper para quincena y semana
+function getQuincenaInfo(date = new Date()): { quincena: string; mes: string; diaMes: number } {
+  const dia = date.getDate();
+  const meses = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+  return {
+    quincena: dia <= 15 ? '1Q' : '2Q',
+    mes: meses[date.getMonth()],
+    diaMes: dia
+  };
+}
+
 function getMondayOfCurrentWeek(): string {
   const d = new Date();
   const day = d.getDay();
@@ -32,7 +44,6 @@ function getMondayOfCurrentWeek(): string {
   return monday.toISOString().split('T')[0];
 }
 
-// Helper para obtener el nombre del día de hoy en español
 const DIAS_MAP: { [key: number]: { key: string; label: string } } = {
   0: { key: 'domingo', label: 'Domingo' },
   1: { key: 'lunes', label: 'Lunes' },
@@ -46,7 +57,7 @@ const DIAS_MAP: { [key: number]: { key: string; label: string } } = {
 type Step = 
   | 'DNI'                     // Paso 1: Ingreso de DNI
   | 'VALIDAR_IDENTIDAD'       // Paso 2: ¿Sos [Nombre]?
-  | 'HORAS_HOY'               // Paso 3: Horas de hoy + ¿Completó los otros días?
+  | 'HORAS_HOY'               // Paso 3: Horas de hoy + Obra + ¿Completó los otros días?
   | 'ASISTENTE_SEMANAL'       // Paso 4: Carga guiada día por día
   | 'RESUMEN_FINAL'           // Paso 5: Resumen y cálculo total
   | 'EXITO';                  // Paso 6: Confirmación
@@ -61,57 +72,100 @@ export default function CargarHorasPublico() {
   const [nombre, setNombre] = useState(searchParams.get('nombre') || '');
   const [semanaInicio, setSemanaInicio] = useState<string>(getMondayOfCurrentWeek());
   
+  // Obra seleccionada
+  const [obraId, setObraId] = useState<string>('');
+  const [obraNombre, setObraNombre] = useState<string>('');
+  const [obrasList, setObrasList] = useState<{ id: string; name: string }[]>([]);
+
   // Días y horas de la semana
   const [horas, setHoras] = useState<{ [key: string]: number }>({
-    lunes: 8,
-    martes: 8,
-    miercoles: 8,
-    jueves: 8,
+    lunes: 10,
+    martes: 10,
+    miercoles: 10,
+    jueves: 9.5,
     viernes: 8,
-    sabado: 4,
+    sabado: 6.5,
     domingo: 0
   });
 
   // Horas del día de hoy
   const todayIndex = new Date().getDay();
   const todayInfo = DIAS_MAP[todayIndex] || { key: 'lunes', label: 'Lunes' };
-  const [horasHoy, setHorasHoy] = useState<number>(todayIndex === 6 ? 4 : todayIndex === 0 ? 0 : 8);
-  const [cargoDiasAnteriores, setCargoDiasAnteriores] = useState<boolean | null>(null);
+  const [horasHoy, setHorasHoy] = useState<number>(todayIndex === 6 ? 6.5 : todayIndex === 0 ? 0 : 10);
+  const [horaInicio, setHoraInicio] = useState('08:00');
+  const [horaEgreso, setHoraEgreso] = useState('18:00');
+  const [almuerzo, setAlmuerzo] = useState(false);
+  const [estadoHoy, setEstadoHoy] = useState<'PRESENTE' | 'AUSENTE' | 'LLEGADA TARDE' | 'SE RETIRO'>('PRESENTE');
 
-  // Motivos de ausencia
-  const [motivoAusencia, setMotivoAusencia] = useState<string>('Ninguno');
+  // Motivos de ausencia / novedades
+  const [tipoLicencia, setTipoLicencia] = useState<string>('Ninguno');
+  const [certificadoMedico, setCertificadoMedico] = useState(false);
   const [detallesAusencia, setDetallesAusencia] = useState('');
   
-  // Reglas de bonos
+  // Reglas de bonos y anti-fraude horario
   const [horasObjetivo, setHorasObjetivo] = useState(44);
   const [porcentajeBono, setPorcentajeBono] = useState(10);
+  const [horaInicioPermitida, setHoraInicioPermitida] = useState('06:30');
+  const [horaFinPermitida, setHoraFinPermitida] = useState('19:30');
   
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [empleadosList, setEmpleadosList] = useState<{ id: string; full_name: string; whatsapp?: string }[]>([]);
+  const [empleadosList, setEmpleadosList] = useState<{ id: string; full_name: string; whatsapp?: string; obra_id?: string }[]>([]);
+
+  // Verificación Anti-Fraude Horario
+  const timeValidation = useMemo(() => {
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    
+    const [hMin, mMin] = horaInicioPermitida.split(':').map(Number);
+    const [hMax, mMax] = horaFinPermitida.split(':').map(Number);
+    
+    const minLimit = hMin * 60 + mMin;
+    const maxLimit = hMax * 60 + mMax;
+    
+    const isAllowed = currentMinutes >= minLimit && currentMinutes <= maxLimit;
+    const isLate = currentMinutes > (8 * 60 + 15); // Después de las 08:15 hs
+
+    return {
+      isAllowed,
+      isLate,
+      currentHourFormatted: now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+    };
+  }, [horaInicioPermitida, horaFinPermitida]);
 
   useEffect(() => {
     async function loadConfig() {
       try {
-        // Cargar reglas de bonos
+        // 1. Cargar reglas
         const { data: reglasData } = await supabase
           .from('reglas_horas_trabajadores')
-          .select('horas_objetivo_semanal, porcentaje_bono')
+          .select('*')
           .limit(1)
           .maybeSingle();
 
         if (reglasData) {
           if (reglasData.horas_objetivo_semanal) setHorasObjetivo(Number(reglasData.horas_objetivo_semanal));
           if (reglasData.porcentaje_bono) setPorcentajeBono(Number(reglasData.porcentaje_bono));
+          if (reglasData.hora_inicio_permitida) setHoraInicioPermitida(reglasData.hora_inicio_permitida);
+          if (reglasData.hora_fin_permitida) setHoraFinPermitida(reglasData.hora_fin_permitida);
         }
 
-        // Cargar lista de empleados de Supabase
+        // 2. Cargar empleados
         const { data: empData } = await supabase
           .from('empleados')
-          .select('id, full_name, whatsapp')
+          .select('id, full_name, whatsapp, obra_id')
           .eq('active', true)
           .order('full_name');
 
         if (empData) setEmpleadosList(empData);
+
+        // 3. Cargar obras activas
+        const { data: obrasData } = await supabase
+          .from('obras')
+          .select('id, name')
+          .eq('active', true)
+          .order('name');
+
+        if (obrasData) setObrasList(obrasData);
       } catch (err) {
         console.error('Error loading config:', err);
       }
@@ -120,76 +174,57 @@ export default function CargarHorasPublico() {
     loadConfig();
   }, []);
 
-  // Si vino con DNI y Nombre por URL, sugerir avanzar
-  useEffect(() => {
-    if (searchParams.get('nombre')) {
-      setNombre(searchParams.get('nombre') || '');
-    }
-  }, [searchParams]);
-
-  // Cargar registro existente si el usuario ya tenía horas guardadas esta semana
-  const buscarRegistroPrevio = async (dniSearch: string) => {
-    try {
-      const { data } = await supabase
-        .from('registro_horas_semanales')
-        .select('*')
-        .eq('empleado_dni', dniSearch.trim())
-        .eq('semana_inicio', semanaInicio)
-        .maybeSingle();
-
-      if (data) {
-        setHoras({
-          lunes: Number(data.lunes) || 0,
-          martes: Number(data.martes) || 0,
-          miercoles: Number(data.miercoles) || 0,
-          jueves: Number(data.jueves) || 0,
-          viernes: Number(data.viernes) || 0,
-          sabado: Number(data.sabado) || 0,
-          domingo: Number(data.domingo) || 0
-        });
-        if (data.motivo_ausencia) setMotivoAusencia(data.motivo_ausencia);
-        if (data.detalles_ausencia) setDetallesAusencia(data.detalles_ausencia);
-      }
-    } catch (err) {
-      console.warn(err);
-    }
+  // Calcular horas netas a partir de entrada/salida
+  const calcularHorasNetas = (inicio: string, egreso: string, conAlmuerzo: boolean) => {
+    const [h1, m1] = inicio.split(':').map(Number);
+    const [h2, m2] = egreso.split(':').map(Number);
+    let diff = (h2 * 60 + m2) - (h1 * 60 + m1);
+    if (diff < 0) diff += 24 * 60;
+    let netHours = diff / 60;
+    if (conAlmuerzo && netHours > 4) netHours = Math.max(0, netHours - 1);
+    return Math.round(netHours * 10) / 10;
   };
 
-  // PASO 1 -> PASO 2: Buscar nombre por DNI y validar
+  // PASO 1 -> PASO 2: Buscar nombre por DNI
   const handleDniSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!dni.trim() || dni.trim().length < 6) {
       toast({
         variant: 'destructive',
-        title: 'DNI inválido',
-        description: 'Por favor ingresá un número de documento válido.'
+        title: 'DNI requerido',
+        description: 'Ingresá un número de documento válido.'
       });
       return;
     }
 
-    // Buscar si tenemos el nombre registrado
     let detectedName = nombre;
-    if (!detectedName && empleadosList.length > 0) {
+    let detectedObraId = obraId;
+
+    if (empleadosList.length > 0) {
       const match = empleadosList.find(e => 
         (e.whatsapp && e.whatsapp.includes(dni.trim())) ||
         e.id === dni.trim()
       );
-      if (match) detectedName = match.full_name;
+      if (match) {
+        detectedName = match.full_name;
+        if (match.obra_id) detectedObraId = match.obra_id;
+      }
     }
 
-    if (!detectedName) {
-      // Si no tenemos el nombre aún, pedimos que lo confirme o ingrese
-      detectedName = 'Trabajador de PEIE';
-    }
-
+    if (!detectedName) detectedName = 'Trabajador de PEIE';
+    
     setNombre(detectedName);
-    buscarRegistroPrevio(dni.trim());
+    if (detectedObraId) {
+      setObraId(detectedObraId);
+      const obraMatch = obrasList.find(o => o.id === detectedObraId);
+      if (obraMatch) setObraNombre(obraMatch.name);
+    }
+
     setCurrentStep('VALIDAR_IDENTIDAD');
   };
 
   // PASO 2 -> PASO 3: Validación de identidad
   const handleConfirmIdentity = () => {
-    // Actualizar horas de hoy con el valor actual
     setHoras(prev => ({
       ...prev,
       [todayInfo.key]: horasHoy
@@ -199,25 +234,22 @@ export default function CargarHorasPublico() {
 
   // PASO 3 -> PASO 4 o PASO 5: Horas de hoy y decisión sobre días anteriores
   const handleTodaySubmit = (completadoAnteriores: boolean) => {
-    setCargoDiasAnteriores(completadoAnteriores);
-    
-    // Actualizar el día de hoy en el objeto de horas
-    const updatedHoras = {
-      ...horas,
-      [todayInfo.key]: horasHoy
-    };
-    setHoras(updatedHoras);
+    const netas = calcularHorasNetas(horaInicio, horaEgreso, almuerzo);
+    const updatedVal = estadoHoy === 'AUSENTE' ? 0 : netas;
+    setHorasHoy(updatedVal);
+
+    setHoras(prev => ({
+      ...prev,
+      [todayInfo.key]: updatedVal
+    }));
 
     if (completadoAnteriores) {
-      // Ya cargó los días anteriores, va directo al resumen
       setCurrentStep('RESUMEN_FINAL');
     } else {
-      // Le faltó cargar los otros días, va al asistente semanal guiado
       setCurrentStep('ASISTENTE_SEMANAL');
     }
   };
 
-  // Cambiar horas de un día específico
   const handleHourChange = (diaKey: string, val: number) => {
     setHoras(prev => ({
       ...prev,
@@ -225,18 +257,46 @@ export default function CargarHorasPublico() {
     }));
   };
 
-  // Total de horas calculado en tiempo real
   const totalHoras = useMemo(() => {
     return Object.values(horas).reduce((acc, h) => acc + (Number(h) || 0), 0);
   }, [horas]);
 
   const calificaBono = totalHoras >= horasObjetivo;
+  const quincenaInfo = getQuincenaInfo();
 
-  // Confirmar y Guardar
+  // Guardar y Finalizar
   const handleFinalSubmit = async () => {
     setIsSubmitting(true);
     try {
-      const payload = {
+      const nowIso = new Date().toISOString();
+      const fechaHoy = nowIso.split('T')[0];
+
+      // 1. Guardar Novedad Diaria de Hoy
+      const novedadPayload = {
+        empleado_dni: dni.trim(),
+        empleado_nombre: nombre.trim(),
+        fecha: fechaHoy,
+        mes: quincenaInfo.mes,
+        quincena: quincenaInfo.quincena,
+        obra_id: obraId || null,
+        obra_nombre: obraNombre || 'Obra Asignada',
+        hora_ingreso: horaInicio,
+        hora_egreso: horaEgreso,
+        almuerzo: almuerzo,
+        horas_ausente: estadoHoy === 'AUSENTE' ? 8 : 0,
+        horas_trabajadas: horasHoy,
+        estado: estadoHoy,
+        tipo_licencia: tipoLicencia,
+        certificado_medico: certificadoMedico,
+        observaciones: detallesAusencia.trim() || null,
+        fuente: 'APP_WEB',
+        updated_at: nowIso
+      };
+
+      await supabase.from('novedades_diarias').insert([novedadPayload]);
+
+      // 2. Guardar Cómputo Semanal
+      const horasPayload = {
         empleado_dni: dni.trim(),
         empleado_nombre: nombre.trim(),
         semana_inicio: semanaInicio,
@@ -248,43 +308,36 @@ export default function CargarHorasPublico() {
         sabado: horas.sabado,
         domingo: horas.domingo,
         total_horas: totalHoras,
-        motivo_ausencia: motivoAusencia,
+        motivo_ausencia: tipoLicencia,
         detalles_ausencia: detallesAusencia.trim() || null,
         bono_alcanzado: calificaBono,
         porcentaje_bono: calificaBono ? porcentajeBono : 0,
-        updated_at: new Date().toISOString()
+        updated_at: nowIso
       };
 
-      // Guardar en Supabase
-      const { error } = await supabase
-        .from('registro_horas_semanales')
-        .upsert([payload]);
+      await supabase.from('registro_horas_semanales').upsert([horasPayload]);
 
-      if (error) {
-        console.warn('Fallback a guardado local:', error.message);
-      }
-
-      // Guardado local
+      // Respaldo en localStorage
       try {
         const localKey = `peie_horas_${semanaInicio}`;
         const currentSaved = JSON.parse(localStorage.getItem(localKey) || '[]');
         const filtered = currentSaved.filter((item: any) => item.empleado_dni !== dni.trim());
-        filtered.push({ ...payload, id: `local-${Date.now()}` });
+        filtered.push({ ...horasPayload, id: `local-${Date.now()}` });
         localStorage.setItem(localKey, JSON.stringify(filtered));
-      } catch (storageErr) {
-        console.error(storageErr);
+      } catch (e) {
+        console.error(e);
       }
 
       setCurrentStep('EXITO');
       toast({
-        title: '¡Horas registradas con éxito!',
-        description: `Se computaron ${totalHoras} horas en total.`
+        title: '¡Horas registradas correctamente!',
+        description: `Se computaron ${totalHoras} hs para la ${quincenaInfo.quincena} de ${quincenaInfo.mes}.`
       });
     } catch (err: any) {
       toast({
         variant: 'destructive',
         title: 'Error al enviar',
-        description: err.message || 'No se pudo guardar la información. Probá de nuevo.'
+        description: err.message || 'No se pudo guardar la información.'
       });
     } finally {
       setIsSubmitting(false);
@@ -306,16 +359,29 @@ export default function CargarHorasPublico() {
       
       <div className="max-w-lg w-full mx-auto space-y-4">
         
-        {/* Encabezado */}
+        {/* Encabezado con Quincena */}
         <div className="text-center space-y-1 text-white pt-2">
           <div className="inline-flex items-center gap-1.5 bg-white/10 px-3 py-1 rounded-full text-xs font-bold text-peie-light border border-white/10 backdrop-blur-md">
-            <HeartHandshake className="w-3.5 h-3.5" />
-            <span>Asistente de Cómputo de Horas</span>
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Carga de Horas • {quincenaInfo.quincena} {quincenaInfo.mes}</span>
           </div>
           <h1 className="text-xl sm:text-2xl font-black tracking-tight">
-            Registro de Trabajo • PEIE
+            Control de Asistencia y Jornada
           </h1>
         </div>
+
+        {/* Banner Anti-Fraude Horario */}
+        {!timeValidation.isAllowed && (
+          <div className="bg-amber-500/20 border border-amber-400/40 text-amber-200 p-3.5 rounded-2xl flex items-start gap-3 backdrop-blur-md text-xs">
+            <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-black text-white">Atención: Fuera de Horario Laboral de Obra</p>
+              <p className="text-[11px] text-amber-200/90 leading-tight mt-0.5">
+                Hora actual: <strong>{timeValidation.currentHourFormatted} hs</strong>. La ventana oficial es de <strong>{horaInicioPermitida} hs a {horaFinPermitida} hs</strong>.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Tarjeta Principal del Asistente */}
         <Card className="bg-white rounded-[28px] border-0 shadow-2xl overflow-hidden">
@@ -331,16 +397,16 @@ export default function CargarHorasPublico() {
                     <User className="w-6 h-6 stroke-[2.5]" />
                   </div>
                   <h2 className="text-lg font-black text-slate-900">
-                    Ingresá tu DNI para comenzar
+                    Ingresá tu DNI para identificarte
                   </h2>
                   <p className="text-xs text-slate-500">
-                    Vamos a identificar tu legajo para computar tus horas de esta semana.
+                    Buscamos tu legajo para registrar tu asistencia en la obra asignada.
                   </p>
                 </div>
 
                 <div className="space-y-1.5">
                   <Label htmlFor="input-dni" className="text-xs font-bold text-slate-700">
-                    Número de Documento (DNI)
+                    Número de DNI (sin puntos)
                   </Label>
                   <Input
                     id="input-dni"
@@ -353,13 +419,6 @@ export default function CargarHorasPublico() {
                     required
                   />
                 </div>
-
-                {/* Si no tiene DNI en el sistema, puede elegir su nombre */}
-                {nombre && nombre !== 'Trabajador de PEIE' && (
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-600 text-center">
-                    Nombre detectado: <strong className="text-slate-900">{nombre}</strong>
-                  </div>
-                )}
 
                 <Button
                   type="submit"
@@ -389,24 +448,33 @@ export default function CargarHorasPublico() {
                     ¿Sos {nombre}?
                   </h2>
                   <p className="text-xs text-slate-500">
-                    DNI ingresado: <strong className="font-mono">{dni}</strong>
+                    DNI registrado: <strong className="font-mono">{dni}</strong>
                   </p>
                 </div>
 
-                {/* Si el nombre era genérico o quiere editarlo */}
-                {nombre === 'Trabajador de PEIE' && (
-                  <div className="space-y-1 text-left bg-slate-50 p-3 rounded-2xl border border-slate-200">
-                    <Label className="text-[11px] font-bold text-slate-700">Completá tu nombre y apellido:</Label>
-                    <Input
-                      value={nombre === 'Trabajador de PEIE' ? '' : nombre}
-                      onChange={(e) => setNombre(e.target.value)}
-                      placeholder="Ej: Juan Gómez"
-                      className="bg-white text-xs font-bold rounded-xl"
-                    />
-                  </div>
-                )}
+                {/* Selección de Obra */}
+                <div className="text-left space-y-1.5 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+                  <Label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Obra en la que estás trabajando hoy:</span>
+                  </Label>
+                  <select
+                    value={obraId}
+                    onChange={(e) => {
+                      setObraId(e.target.value);
+                      const m = obrasList.find(o => o.id === e.target.value);
+                      if (m) setObraNombre(m.name);
+                    }}
+                    className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-white"
+                  >
+                    <option value="">Seleccionar Obra...</option>
+                    {obrasList.map(o => (
+                      <option key={o.id} value={o.id}>{o.name}</option>
+                    ))}
+                  </select>
+                </div>
 
-                <div className="space-y-2.5 pt-2">
+                <div className="space-y-2.5 pt-1">
                   <Button
                     onClick={handleConfirmIdentity}
                     className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm py-4 rounded-2xl shadow-lg shadow-emerald-600/20 active:scale-98 transition-all flex items-center justify-center gap-2"
@@ -427,50 +495,125 @@ export default function CargarHorasPublico() {
             )}
 
             {/* =================================================================== */}
-            {/* PASO 3: HORAS DEL DÍA DE HOY + ¿COMPLETÓ LOS OTROS DÍAS?            */}
+            {/* PASO 3: HORAS DEL DÍA DE HOY + ENTRADA/SALIDA/ALMUERZO              */}
             {/* =================================================================== */}
             {currentStep === 'HORAS_HOY' && (
-              <div className="space-y-6 animate-fadeIn">
+              <div className="space-y-5 animate-fadeIn">
                 <div className="space-y-1 text-center">
                   <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
                     <Clock className="w-6 h-6 stroke-[2.5]" />
                   </div>
                   <h2 className="text-lg font-black text-slate-900">
-                    Horas de hoy ({todayInfo.label})
+                    Jornada de Hoy ({todayInfo.label})
                   </h2>
                   <p className="text-xs text-slate-500">
-                    ¿Cuántas horas trabajaste en la jornada de hoy?
+                    Registrá tus horarios y estado de asistencia:
                   </p>
                 </div>
 
-                {/* Selector rápido de horas de hoy */}
-                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-slate-800">
-                      Horas hoy ({todayInfo.label}):
-                    </span>
-                    <span className="text-sm font-black text-blue-700 bg-blue-50 px-3 py-1 rounded-xl border border-blue-200">
-                      {horasHoy} hs
-                    </span>
-                  </div>
+                {/* Estado: Presente / Llegada tarde / Ausente */}
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: 'PRESENTE', label: '🟢 Presente' },
+                    { id: 'LLEGADA TARDE', label: '🟡 Tarde' },
+                    { id: 'AUSENTE', label: '🔴 Ausente' }
+                  ].map(est => (
+                    <button
+                      key={est.id}
+                      type="button"
+                      onClick={() => setEstadoHoy(est.id as any)}
+                      className={`py-2 px-1 rounded-xl text-xs font-black transition-all border ${
+                        estadoHoy === est.id
+                          ? 'bg-[#031530] text-white border-[#031530] shadow-sm'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      {est.label}
+                    </button>
+                  ))}
+                </div>
 
-                  <div className="flex items-center justify-between gap-1.5">
-                    {[0, 4, 8, 9, 10].map((preset) => (
+                {/* Si está presente o tarde: Horarios de entrada y egreso */}
+                {estadoHoy !== 'AUSENTE' ? (
+                  <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3.5">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-bold text-slate-700">Hora de Inicio</Label>
+                        <Input
+                          type="time"
+                          value={horaInicio}
+                          onChange={(e) => setHoraInicio(e.target.value)}
+                          className="bg-white rounded-xl text-xs font-black text-center"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-bold text-slate-700">Hora de Egreso</Label>
+                        <Input
+                          type="time"
+                          value={horaEgreso}
+                          onChange={(e) => setHoraEgreso(e.target.value)}
+                          className="bg-white rounded-xl text-xs font-black text-center"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
+                      <div className="flex items-center gap-2">
+                        <Utensils className="w-3.5 h-3.5 text-slate-500" />
+                        <span className="text-xs font-bold text-slate-700">¿Tuviste 1h de almuerzo?</span>
+                      </div>
                       <button
-                        key={preset}
                         type="button"
-                        onClick={() => setHorasHoy(preset)}
-                        className={`flex-1 py-2 rounded-xl text-xs font-extrabold transition-all ${
-                          horasHoy === preset
-                            ? 'bg-[#031530] text-white shadow-sm scale-105'
-                            : 'bg-white text-slate-700 hover:bg-slate-200 border border-slate-200'
+                        onClick={() => setAlmuerzo(!almuerzo)}
+                        className={`px-3 py-1 rounded-lg text-xs font-black transition-colors ${
+                          almuerzo ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'
                         }`}
                       >
-                        {preset}h
+                        {almuerzo ? 'SÍ (-1h)' : 'NO'}
                       </button>
-                    ))}
+                    </div>
+
+                    <div className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-slate-200 text-xs">
+                      <span className="font-bold text-slate-500">Horas netas computadas hoy:</span>
+                      <span className="font-black text-sm text-emerald-700">
+                        {calcularHorasNetas(horaInicio, horaEgreso, almuerzo)} hs
+                      </span>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  /* Si está ausente: Tipificación de Licencia */
+                  <div className="space-y-3 bg-rose-50/50 p-4 rounded-2xl border border-rose-200">
+                    <div className="space-y-1">
+                      <Label className="text-xs font-bold text-rose-900">Motivo / Tipo de Licencia:</Label>
+                      <select
+                        value={tipoLicencia}
+                        onChange={(e) => setTipoLicencia(e.target.value)}
+                        className="w-full h-10 px-3 rounded-xl border border-rose-200 text-xs font-bold text-slate-800 bg-white"
+                      >
+                        <option value="Enfermedad Trabajador">Enfermedad del Trabajador (Reposo)</option>
+                        <option value="Familiar Enfermo">Familiar Enfermo a cargo</option>
+                        <option value="Fallecimiento">Fallecimiento / Duelo</option>
+                        <option value="Llegada tarde">Llegada tarde justificada</option>
+                        <option value="No justificado">Falta no justificada</option>
+                        <option value="Otro">Otro motivo</option>
+                      </select>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-xs font-bold text-rose-900">¿Presentás certificado médico?</span>
+                      <button
+                        type="button"
+                        onClick={() => setCertificadoMedico(!certificadoMedico)}
+                        className={`px-3 py-1 rounded-lg text-xs font-black transition-colors ${
+                          certificadoMedico ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'
+                        }`}
+                      >
+                        {certificadoMedico ? 'SÍ' : 'NO'}
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Pregunta sobre los días anteriores */}
                 <div className="space-y-3 pt-2 border-t border-slate-100">
@@ -478,18 +621,15 @@ export default function CargarHorasPublico() {
                     <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">
                       ¿Ya habías registrado los días anteriores de esta semana?
                     </h3>
-                    <p className="text-[11px] text-slate-500">
-                      Seleccioná una opción para continuar:
-                    </p>
                   </div>
 
                   <div className="grid grid-cols-1 gap-2.5">
                     <Button
                       type="button"
                       onClick={() => handleTodaySubmit(true)}
-                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-3.5 rounded-2xl shadow-sm flex items-center justify-between px-4 text-left"
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-3.5 rounded-2xl shadow-sm flex items-center justify-between px-4"
                     >
-                      <div className="flex items-center gap-2.5">
+                      <div className="flex items-center gap-2">
                         <CheckCircle2 className="w-4 h-4 shrink-0" />
                         <span>Sí, ya cargué mis días anteriores</span>
                       </div>
@@ -500,18 +640,18 @@ export default function CargarHorasPublico() {
                       type="button"
                       onClick={() => handleTodaySubmit(false)}
                       variant="outline"
-                      className="w-full border-slate-300 hover:bg-slate-100 text-slate-800 font-bold text-xs py-3.5 rounded-2xl flex items-center justify-between px-4 text-left"
+                      className="w-full border-slate-300 hover:bg-slate-100 text-slate-800 font-bold text-xs py-3.5 rounded-2xl flex items-center justify-between px-4"
                     >
-                      <div className="flex items-center gap-2.5">
+                      <div className="flex items-center gap-2">
                         <Edit3 className="w-4 h-4 text-blue-600 shrink-0" />
-                        <span>No, me faltó cargar los otros días (Completar semana)</span>
+                        <span>No, me faltó cargar los otros días (Completar)</span>
                       </div>
                       <ArrowRight className="w-4 h-4 shrink-0" />
                     </Button>
                   </div>
                 </div>
 
-                <div className="flex justify-center pt-2">
+                <div className="flex justify-center pt-1">
                   <button
                     type="button"
                     onClick={() => setCurrentStep('VALIDAR_IDENTIDAD')}
@@ -537,18 +677,18 @@ export default function CargarHorasPublico() {
                     Asistente Semanal de Horas
                   </h2>
                   <p className="text-xs text-slate-500">
-                    Ingresá las horas que trabajaste cada día de esta semana:
+                    Completá las horas trabajadas en cada jornada:
                   </p>
                 </div>
 
-                {/* Resumen flotante de total */}
+                {/* Resumen flotante */}
                 <div className="bg-[#031530] text-white p-3 rounded-2xl flex items-center justify-between text-xs font-black shadow-md">
                   <span>Total Acumulado:</span>
                   <span className="text-emerald-400 text-base">{totalHoras} hs</span>
                 </div>
 
                 {/* Lista interactiva de días */}
-                <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+                <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
                   {diasSemana.map((dia) => {
                     const currentVal = horas[dia.key] || 0;
                     return (
@@ -557,17 +697,14 @@ export default function CargarHorasPublico() {
                         className="bg-slate-50 border border-slate-200 rounded-2xl p-3 flex flex-col gap-2"
                       >
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-black text-slate-800">
-                            {dia.label}
-                          </span>
+                          <span className="text-xs font-black text-slate-800">{dia.label}</span>
                           <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100">
                             {currentVal} hs
                           </span>
                         </div>
 
-                        {/* Presets de horas */}
                         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-                          {[0, 4, 8, 9, 10].map((preset) => (
+                          {[0, 6.5, 8, 9.5, 10].map((preset) => (
                             <button
                               key={preset}
                               type="button"
@@ -585,24 +722,6 @@ export default function CargarHorasPublico() {
                       </div>
                     );
                   })}
-                </div>
-
-                {/* Motivos de ausencia si algún día fue 0 */}
-                <div className="space-y-2 pt-2 border-t border-slate-100">
-                  <Label className="text-[11px] font-bold text-slate-700">
-                    ¿Tuviste algún día de inasistencia por enfermedad u otro motivo?
-                  </Label>
-                  <select
-                    value={motivoAusencia}
-                    onChange={(e) => setMotivoAusencia(e.target.value)}
-                    className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-white"
-                  >
-                    <option value="Ninguno">No tuve ausencias / Cumplí mis jornadas normales</option>
-                    <option value="Enfermedad / Salud">Estuve enfermo o en reposo médico</option>
-                    <option value="Falta Justificada / Trámite">Trámite personal / Asuntos familiares</option>
-                    <option value="Lluvia / Clima">Lluvia o cuestiones climáticas en obra</option>
-                    <option value="Otro">Otro motivo</option>
-                  </select>
                 </div>
 
                 <div className="flex items-center gap-2 pt-2">
@@ -628,7 +747,7 @@ export default function CargarHorasPublico() {
             )}
 
             {/* =================================================================== */}
-            {/* PASO 5: RESUMEN FINAL Y CÁLCULO DE BONO                              */}
+            {/* PASO 5: RESUMEN FINAL Y CONFIRMACIÓN                                */}
             {/* =================================================================== */}
             {currentStep === 'RESUMEN_FINAL' && (
               <div className="space-y-5 animate-fadeIn">
@@ -637,10 +756,10 @@ export default function CargarHorasPublico() {
                     <Award className="w-6 h-6 stroke-[2.5]" />
                   </div>
                   <h2 className="text-lg font-black text-slate-900">
-                    Cómputo Total de la Semana
+                    Cómputo Total • {quincenaInfo.quincena} {quincenaInfo.mes}
                   </h2>
                   <p className="text-xs text-slate-500">
-                    {nombre} • DNI {dni}
+                    {nombre} • DNI {dni} • {obraNombre || 'Obra Asignada'}
                   </p>
                 </div>
 
@@ -656,7 +775,7 @@ export default function CargarHorasPublico() {
                   </div>
 
                   <div className="flex justify-between items-center pt-1 text-xs">
-                    <span className="font-bold text-slate-600">Total computado:</span>
+                    <span className="font-bold text-slate-600">Total semanal computado:</span>
                     <span className="text-lg font-black text-slate-900">{totalHoras} hs</span>
                   </div>
 
@@ -664,9 +783,9 @@ export default function CargarHorasPublico() {
                     <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white p-3.5 rounded-xl flex items-center gap-3">
                       <Award className="w-7 h-7 shrink-0" />
                       <div>
-                        <p className="text-xs font-black uppercase">¡Alcanzaste el Bono Semanal!</p>
+                        <p className="text-xs font-black uppercase">¡Bono Semanal Alcanzado!</p>
                         <p className="text-[10px] text-emerald-100 font-medium">
-                          Superaste la meta de {horasObjetivo} hs semanales (+{porcentajeBono}% de premio).
+                          Meta de {horasObjetivo} hs cumplida (+{porcentajeBono}% premio).
                         </p>
                       </div>
                     </div>
@@ -676,9 +795,9 @@ export default function CargarHorasPublico() {
                     </div>
                   )}
 
-                  {motivoAusencia !== 'Ninguno' && (
+                  {tipoLicencia !== 'Ninguno' && (
                     <div className="text-[11px] text-rose-700 bg-rose-50 p-2.5 rounded-xl border border-rose-200">
-                      <strong>Motivo de ausencia declarado:</strong> {motivoAusencia}
+                      <strong>Novedad registrada:</strong> {tipoLicencia} {certificadoMedico ? '(Con Certificado Médico)' : ''}
                     </div>
                   )}
                 </div>
@@ -728,7 +847,7 @@ export default function CargarHorasPublico() {
                     ¡Listo, {nombre.split(' ')[0]}!
                   </h2>
                   <p className="text-xs text-slate-600 leading-relaxed max-w-xs mx-auto">
-                    Tus <strong>{totalHoras} horas</strong> quedaron ingresadas en el sistema de PEIE Tools.
+                    Tus <strong>{totalHoras} horas</strong> de la {quincenaInfo.quincena} de {quincenaInfo.mes} quedaron ingresadas en PEIE Tools.
                   </p>
                 </div>
 
@@ -751,7 +870,7 @@ export default function CargarHorasPublico() {
 
         {/* Pie */}
         <div className="text-center text-xs text-slate-400 pb-2">
-          <p>© PEIE Tools • Creado para reconocer y cuidar a cada trabajador.</p>
+          <p>© PEIE Tools • Control de Asistencia y Reconocimiento Laboral.</p>
         </div>
 
       </div>

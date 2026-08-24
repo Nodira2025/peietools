@@ -1,0 +1,174 @@
+{
+  "name": "PEIE Tools - Bot WhatsApp Control Asistencia Anti-Fraude",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-asistencia",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook WhatsApp",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "id": "node-webhook-1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extraer datos del mensaje entrante de WhatsApp\nconst body = $input.item.json.body || {};\nconst messageText = (body.message || body.text || body.body || '').trim();\nconst fromPhone = (body.from || body.phone || body.sender || '').replace(/[^0-9]/g, '');\nconst pushName = body.pushName || body.senderName || 'Trabajador';\n\n// Validar Horario en Zona Horaria de Argentina (GMT-3)\nconst now = new Date();\nconst arTimeStr = now.toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour12: false });\nconst [hh, mm] = arTimeStr.split(':').map(Number);\nconst currentMinutes = hh * 60 + mm;\n\n// Rango permitido: 06:30 (390 min) hasta 19:30 (1170 min)\nconst minAllowed = 6 * 60 + 30;\nconst maxAllowed = 19 * 60 + 30;\nconst isWithinAllowedTime = currentMinutes >= minAllowed && currentMinutes <= maxAllowed;\n\n// Determinar si es llegada tarde (> 08:15)\nconst isLate = currentMinutes > (8 * 60 + 15);\n\n// Determinar Quincena actual\nconst dayOfMonth = now.getDate();\nconst quincena = dayOfMonth <= 15 ? '1Q' : '2Q';\nconst meses = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];\nconst mesNombre = meses[now.getMonth()];\nconst fechaISO = now.toISOString().split('T')[0];\n\nreturn {\n  fromPhone,\n  pushName,\n  messageText,\n  timeFormatted: `${hh.toString().padStart(2, '0')}:${mm.toString().padStart(2, '0')}`,\n  isWithinAllowedTime,\n  isLate,\n  fechaISO,\n  mesNombre,\n  quincena\n};"
+      },
+      "name": "Validador Anti-Fraude Horario",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ],
+      "id": "node-time-validator"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.isWithinAllowedTime }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "¿Dentro de Horario Permitido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        680,
+        300
+      ],
+      "id": "node-if-time"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"rejected_out_of_hours\",\n  \"replyMessage\": \"⚠️ *REGISTRO RECHAZADO POR HORARIO* ⚠️\\n\\nHola {{ $json.pushName }}, el registro de asistencia de obra en PEIE está habilitado únicamente entre las *06:30 hs* y las *19:30 hs*.\\n\\nHora actual registrada: *{{ $json.timeFormatted }} hs*.\\n\\nTu intento ha quedado registrado en el log de auditoría pero *no computa como presente a deshora*.\"\n}"
+      },
+      "name": "Respuesta: Bloqueo Fuera de Horario",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        920,
+        460
+      ],
+      "id": "node-resp-rejected"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT id, full_name, role, specialty, obra_id FROM public.empleados WHERE whatsapp LIKE '%{{ $json.fromPhone.slice(-8) }}%' AND active = true LIMIT 1;"
+      },
+      "name": "Buscar Empleado en Supabase",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        920,
+        220
+      ],
+      "id": "node-db-find-emp"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO public.novedades_diarias (\n  empleado_id, empleado_nombre, fecha, mes, quincena,\n  hora_ingreso, estado, tipo_licencia, observaciones, fuente\n) VALUES (\n  '{{ $node[\"Buscar Empleado en Supabase\"].json[\"id\"] }}',\n  '{{ $node[\"Buscar Empleado en Supabase\"].json[\"full_name\"] }}',\n  '{{ $node[\"Validador Anti-Fraude Horario\"].json[\"fechaISO\"] }}',\n  '{{ $node[\"Validador Anti-Fraude Horario\"].json[\"mesNombre\"] }}',\n  '{{ $node[\"Validador Anti-Fraude Horario\"].json[\"quincena\"] }}',\n  '{{ $node[\"Validador Anti-Fraude Horario\"].json[\"timeFormatted\"] }}',\n  CASE WHEN {{ $node[\"Validador Anti-Fraude Horario\"].json[\"isLate\"] }} THEN 'LLEGADA TARDE' ELSE 'PRESENTE' END,\n  CASE WHEN {{ $node[\"Validador Anti-Fraude Horario\"].json[\"isLate\"] }} THEN 'Llegada tarde' ELSE 'Ninguno' END,\n  'Asistencia confirmada vía Bot WhatsApp n8n a las {{ $node[\"Validador Anti-Fraude Horario\"].json[\"timeFormatted\"] }} hs',\n  'WHATSAPP_N8N'\n)\nON CONFLICT DO NOTHING;"
+      },
+      "name": "Guardar Asistencia en Supabase",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        1160,
+        220
+      ],
+      "id": "node-db-insert"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"success\",\n  \"replyMessage\": \"✅ *ASISTENCIA REGISTRADA EXITOSAMENTE*\\n\\n👤 *Trabajador:* {{ $node[\"Buscar Empleado en Supabase\"].json[\"full_name\"] }}\\n📅 *Fecha:* {{ $node[\"Validador Anti-Fraude Horario\"].json[\"fechaISO\"] }}\\n⏰ *Hora de Ingreso:* {{ $node[\"Validador Anti-Fraude Horario\"].json[\"timeFormatted\"] }} hs\\n📊 *Estado:* \" + ($node[\"Validador Anti-Fraude Horario\"].json[\"isLate\"] ? \"⚠️ LLEGADA TARDE (después de las 08:15 hs)\" : \"🟢 PRESENTE A TIEMPO\") + \"\\n📌 *Quincena:* {{ $node[\"Validador Anti-Fraude Horario\"].json[\"quincena\"] }} - {{ $node[\"Validador Anti-Fraude Horario\"].json[\"mesNombre\"] }}\\n\\n¡Que tengas una excelente jornada laboral en PEIE!\"\n}"
+      },
+      "name": "Respuesta: Asistencia Confirmada",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1380,
+        220
+      ],
+      "id": "node-resp-success"
+    }
+  ],
+  "connections": {
+    "Webhook WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Validador Anti-Fraude Horario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validador Anti-Fraude Horario": {
+      "main": [
+        [
+          {
+            "node": "¿Dentro de Horario Permitido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Dentro de Horario Permitido?": {
+      "main": [
+        [
+          {
+            "node": "Buscar Empleado en Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respuesta: Bloqueo Fuera de Horario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Empleado en Supabase": {
+      "main": [
+        [
+          {
+            "node": "Guardar Asistencia en Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar Asistencia en Supabase": {
+      "main": [
+        [
+          {
+            "node": "Respuesta: Asistencia Confirmada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
