@@ -31,11 +31,13 @@ import {
   Check,
   X,
   ShieldCheck,
-  Utensils
+  Utensils,
+  BarChart3
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { buildWhatsAppLink } from '../lib/whatsapp';
+import { TrabajadoresReportesTab } from '../components/TrabajadoresReportesTab';
 import * as XLSX from 'xlsx';
 
 export interface NovedadDiaria {
@@ -87,7 +89,7 @@ export default function Trabajadores() {
   const { toast } = useToast();
   
   // Pestaña activa
-  const [activeTab, setActiveTab] = useState<'ficha' | 'novedades' | 'computo'>('ficha');
+  const [activeTab, setActiveTab] = useState<'reportes' | 'ficha' | 'novedades' | 'computo'>('reportes');
   
   const [novedades, setNovedades] = useState<NovedadDiaria[]>([]);
   const [empleados, setEmpleados] = useState<EmpleadoScorecard[]>([]);
@@ -734,6 +736,7 @@ export default function Trabajadores() {
       {/* Selector de Pestañas */}
       <div className="flex items-center gap-2 border-b border-slate-200/80 pb-2 overflow-x-auto no-scrollbar">
         {[
+          { id: 'reportes', label: '📊 Dashboard & Reportes KPI', icon: BarChart3 },
           { id: 'ficha', label: '📇 Ficha del Trabajador (Scorecard)', icon: UserCheck },
           { id: 'novedades', label: '📋 Libro de Novedades Diarias', icon: FileText },
           { id: 'computo', label: '⏱️ Cómputo de Horas & Quincena', icon: Clock }
@@ -751,6 +754,19 @@ export default function Trabajadores() {
           </button>
         ))}
       </div>
+
+      {/* =================================================================== */}
+      {/* PESTAÑA: DASHBOARD Y REPORTES KPI (NUEVO)                           */}
+      {/* =================================================================== */}
+      {activeTab === 'reportes' && (
+        <TrabajadoresReportesTab
+          novedades={novedades}
+          empleados={empleados}
+          obrasList={obrasList}
+          horasObjetivo={horasObjetivo}
+          porcentajeBono={porcentajeBono}
+        />
+      )}
 
       {/* =================================================================== */}
       {/* PESTAÑA 1: FICHA DEL TRABAJADOR (SCORECARD INDIVIDUAL)              */}
