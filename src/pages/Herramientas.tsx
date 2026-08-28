@@ -70,6 +70,7 @@ export default function Herramientas() {
   const { toast } = useToast();
   const { profile } = useAuthStore();
   const isAdmin = profile?.role === 'admin' || profile?.role === 'logistica';
+  const canManageTools = profile?.role === 'admin' || profile?.role === 'logistica' || profile?.role === 'encargado' || profile?.role === 'solicitante' || profile?.role === 'coordinador';
 
   const fetchHerramientas = async () => {
     try {
@@ -467,10 +468,12 @@ export default function Herramientas() {
                 <Layers className="mr-2 h-4 w-4 text-blue-600" />
                 Gestionar Categorías
               </Button>
-              <Button className="bg-peie-blue hover:bg-peie-blue/90 flex-1 sm:flex-none h-11 rounded-xl font-bold" onClick={() => navigate('/herramientas/nueva')}>
-                <Plus className="mr-2 h-4 w-4" /> Nueva Herramienta
-              </Button>
             </>
+          )}
+          {canManageTools && (
+            <Button className="bg-peie-blue hover:bg-peie-blue/90 flex-1 sm:flex-none h-11 rounded-xl font-bold" onClick={() => navigate('/herramientas/nueva')}>
+              <Plus className="mr-2 h-4 w-4" /> Nueva Herramienta
+            </Button>
           )}
         </div>
       </div>

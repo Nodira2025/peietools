@@ -93,8 +93,8 @@ export default function NuevaHerramienta() {
     },
   });
 
-  // Admin, Logística y Encargados pueden crear herramientas
-  const isAuthorized = profile?.role === 'admin' || profile?.role === 'logistica' || profile?.role === 'encargado' || profile?.role === 'solicitante';
+  // Admin, Logística, Encargados y Coordinadores pueden crear herramientas
+  const isAuthorized = profile?.role === 'admin' || profile?.role === 'logistica' || profile?.role === 'encargado' || profile?.role === 'solicitante' || profile?.role === 'coordinador';
 
 
   useEffect(() => {

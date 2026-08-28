@@ -69,7 +69,7 @@ export default function HerramientaDetail() {
   const [obras, setObras] = useState<any[]>([]);
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'logistica' || profile?.role === 'compras';
-  const canEdit = isAdmin || profile?.role === 'solicitante' || profile?.role === 'encargado';
+  const canEdit = isAdmin || profile?.role === 'solicitante' || profile?.role === 'encargado' || profile?.role === 'coordinador';
 
   const [movimientosList, setMovimientosList] = useState<any[]>([]);
   const [loadingMovimientos, setLoadingMovimientos] = useState(false);
