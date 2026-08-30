@@ -197,7 +197,9 @@ export default function AppLayout() {
     { name: 'Movimiento de Personal', path: '/pedidos-personal', icon: FileText },
     { name: 'Formularios', path: '/formularios', icon: Send },
     { name: 'Trabajadores', path: '/trabajadores', icon: Award },
+    { name: 'Liquidación de Sueldos', path: '/liquidacion-sueldos', icon: DollarSign },
   ];
+
 
   const isRrhhActive = rrhhItems.some(item => location.pathname.startsWith(item.path));
 
@@ -622,6 +624,16 @@ export default function AppLayout() {
                 <Award size={24} className="text-amber-400" />
                 <span className="text-[11px] font-black uppercase tracking-tight">Trabajadores</span>
               </Link>
+
+              <Link 
+                to="/liquidacion-sueldos" 
+                onClick={() => setShowMas(false)}
+                className="flex flex-col items-center justify-center p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:bg-slate-900 transition-all text-center gap-2"
+              >
+                <DollarSign size={24} className="text-emerald-400" />
+                <span className="text-[11px] font-black uppercase tracking-tight">Liquidación Sueldos</span>
+              </Link>
+
 
               {isAdmin && (
                 <Link 

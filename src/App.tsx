@@ -38,6 +38,8 @@ import Contactos from './pages/Contactos';
 import Formularios from './pages/Formularios';
 import Trabajadores from './pages/Trabajadores';
 import CargarHorasPublico from './pages/CargarHorasPublico';
+import LiquidacionSueldos from './pages/LiquidacionSueldos';
+
 
 
 
@@ -83,6 +85,8 @@ export default function App() {
 
           <Route path="/formularios" element={<Formularios />} />
           <Route path="/trabajadores" element={<Trabajadores />} />
+          <Route path="/liquidacion-sueldos" element={<LiquidacionSueldos />} />
+
           
           <Route path="/compras" element={<Compras />} />
           <Route path="/compras/:id" element={<CompraDetail />} />
