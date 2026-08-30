@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { Navigate, Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { supabase } from '../lib/supabase';
-import { Home, Wrench, FileText, Truck, Users, Building, LogOut, ShoppingCart, Sparkles, HardHat, ClipboardList, BarChart3, MoreHorizontal, Bell, Key, Eye, EyeOff, DollarSign, Calendar, PhoneCall, Send, Award } from 'lucide-react';
+import { Home, Wrench, FileText, Truck, Users, Building, LogOut, ShoppingCart, Sparkles, HardHat, ClipboardList, BarChart3, MoreHorizontal, Bell, Key, Eye, EyeOff, DollarSign, Calendar, PhoneCall, Send, Award, ChevronDown } from 'lucide-react';
+
+
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -188,24 +190,31 @@ export default function AppLayout() {
   const isAdmin = profile.role === 'admin';
   const isLogistica = profile.role === 'logistica';
 
-  const navItems = [
+  const [isRrhhOpen, setIsRrhhOpen] = useState(true);
+
+  const rrhhItems = [
+    { name: 'Personal', path: '/personal', icon: HardHat },
+    { name: 'Movimiento de Personal', path: '/pedidos-personal', icon: FileText },
+    { name: 'Formularios', path: '/formularios', icon: Send },
+    { name: 'Trabajadores', path: '/trabajadores', icon: Award },
+  ];
+
+  const isRrhhActive = rrhhItems.some(item => location.pathname.startsWith(item.path));
+
+  const mainNavTop = [
     { name: 'Inicio', path: '/dashboard', icon: Sparkles, show: true },
     { name: 'Notificaciones', path: '/notificaciones', icon: Bell, show: true, badge: pendingCount },
     { name: 'Reportes', path: '/reportes', icon: BarChart3, show: isLogistica || isAdmin },
-    { name: 'Movimiento de Herramientas', path: '/pedidos-herramientas', icon: FileText, show: true },
-    { name: 'Movimiento de Personal', path: '/pedidos-personal', icon: HardHat, show: true },
-    { name: 'Formularios', path: '/formularios', icon: Send, show: true },
-    { name: 'Trabajadores', path: '/trabajadores', icon: Award, show: true },
     { name: 'Herramientas', path: '/herramientas', icon: Wrench, show: true },
+    { name: 'Movimiento de Herramientas', path: '/pedidos-herramientas', icon: FileText, show: true },
     { name: 'Mis Obras', path: '/mis-obras', icon: Building, show: true },
-    { name: 'Personal', path: '/personal', icon: HardHat, show: true },
+  ].filter(item => item.show);
+
+  const mainNavBottom = [
     { name: 'Contactos', path: '/contactos', icon: PhoneCall, show: true },
-    { name: 'Órdenes', path: '/ordenes', icon: ClipboardList, show: false },
     { name: 'Logística', path: '/logistica', icon: Truck, show: isLogistica || isAdmin },
     { name: 'Registro de Compras', path: '/compras', icon: ShoppingCart, show: isLogistica || isAdmin || deviceMode !== 'mobile' },
     { name: 'Obras (Admin)', path: '/obras', icon: Building, show: isAdmin },
-
-
     { name: 'Usuarios', path: '/usuarios', icon: Users, show: isAdmin },
   ].filter(item => item.show);
 
@@ -269,7 +278,80 @@ export default function AppLayout() {
 
         {/* Links Sidebar */}
         <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-          {navItems.map((item) => {
+          {mainNavTop.map((item) => {
+            const Icon = item.icon;
+            const isActive = location.pathname === item.path || (item.path !== '/dashboard' && location.pathname.startsWith(item.path));
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+                  isActive 
+                    ? 'bg-peie-blue text-white font-medium shadow-md shadow-peie-blue/10' 
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-peie-blue'
+                }`}
+              >
+                <Icon size={20} className={isActive ? 'text-peie-light' : 'text-slate-400'} />
+                <span className="text-sm">{item.name}</span>
+                {item.badge && item.badge > 0 ? (
+                  <span className="ml-auto bg-rose-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    {item.badge}
+                  </span>
+                ) : isActive ? (
+                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-peie-light animate-pulse" />
+                ) : null}
+              </Link>
+            );
+          })}
+
+          {/* Sección Unificada: Recursos Humanos */}
+          <div className="pt-2 pb-1">
+            <button
+              type="button"
+              onClick={() => setIsRrhhOpen(prev => !prev)}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-left transition-all duration-200 ${
+                isRrhhActive
+                  ? 'bg-peie-blue/10 text-peie-blue font-bold border border-peie-blue/20'
+                  : 'text-slate-700 hover:bg-slate-50 hover:text-peie-blue font-medium'
+              }`}
+            >
+              <div className="flex items-center space-x-3">
+                <Users size={20} className={isRrhhActive ? 'text-peie-blue' : 'text-slate-400'} />
+                <span className="text-sm font-bold">Recursos Humanos</span>
+              </div>
+              <ChevronDown
+                size={16}
+                className={`transition-transform duration-200 ${
+                  isRrhhActive ? 'text-peie-blue' : 'text-slate-400'
+                } ${isRrhhOpen ? 'rotate-0' : '-rotate-90'}`}
+              />
+            </button>
+
+            {isRrhhOpen && (
+              <div className="mt-1 ml-3 pl-3 border-l-2 border-slate-200/80 space-y-1 py-1">
+                {rrhhItems.map((sub) => {
+                  const SubIcon = sub.icon;
+                  const isSubActive = location.pathname === sub.path || location.pathname.startsWith(sub.path);
+                  return (
+                    <Link
+                      key={sub.path}
+                      to={sub.path}
+                      className={`flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs transition-all duration-150 ${
+                        isSubActive
+                          ? 'bg-peie-blue text-white font-bold shadow-sm'
+                          : 'text-slate-600 hover:text-peie-blue hover:bg-slate-50 font-medium'
+                      }`}
+                    >
+                      <SubIcon size={16} className={isSubActive ? 'text-peie-light' : 'text-slate-400'} />
+                      <span>{sub.name}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {mainNavBottom.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname.startsWith(item.path);
             return (
@@ -295,6 +377,7 @@ export default function AppLayout() {
             );
           })}
         </nav>
+
 
         {/* Pie Sidebar: Perfil de Usuario */}
         <div className="p-4 border-t border-slate-100 bg-slate-50/50">
