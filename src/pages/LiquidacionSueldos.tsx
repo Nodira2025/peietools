@@ -20,7 +20,10 @@ import {
   Sliders, 
   Check, 
   TrendingUp,
-  X
+  AlertCircle,
+  HelpCircle,
+  Sparkles,
+  Award
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { buildWhatsAppLink } from '../lib/whatsapp';
@@ -43,8 +46,8 @@ interface NovedadRegistro {
   empleado_id?: string;
   empleado_nombre: string;
   fecha: string;
-  mes: string;
-  quincena: string;
+  mes?: string;
+  quincena?: string;
   obra_id?: string;
   obra_nombre?: string;
   horas_trabajadas: number;
@@ -52,10 +55,42 @@ interface NovedadRegistro {
   estado: string;
 }
 
+interface SemanalRegistro {
+  id: string;
+  empleado_id?: string;
+  empleado_nombre: string;
+  semana_inicio: string;
+  total_horas: number;
+}
+
 const MESES = [
   'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
   'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'
 ];
+
+// Función para normalizar texto (remover acentos y espacios extra)
+function normalizeText(text: string | null | undefined): string {
+  if (!text) return '';
+  return text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+// Obtener mes y quincena a partir de una fecha YYYY-MM-DD
+function getPeriodoFromDate(dateStr: string | null | undefined) {
+  if (!dateStr) return { mes: 'AGOSTO', quincena: '2Q', year: 2026 };
+  const parts = dateStr.split('-');
+  const y = Number(parts[0]) || 2026;
+  const m = Number(parts[1]) || 8;
+  const d = Number(parts[2]) || 1;
+  return {
+    mes: MESES[m - 1] || 'AGOSTO',
+    quincena: d <= 15 ? '1Q' : '2Q',
+    year: y
+  };
+}
 
 export default function LiquidacionSueldos() {
   const { toast } = useToast();
@@ -63,19 +98,28 @@ export default function LiquidacionSueldos() {
   // Estados principales
   const [empleados, setEmpleados] = useState<EmpleadoSueldo[]>([]);
   const [novedades, setNovedades] = useState<NovedadRegistro[]>([]);
+  const [semanales, setSemanales] = useState<SemanalRegistro[]>([]);
   const [obrasList, setObrasList] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Filtros de Período
   const currentMonthIdx = new Date().getMonth();
-  const currentDay = new Date().getDate();
+  const [selectedPeriodoModo, setSelectedPeriodoModo] = useState<'MES' | '1Q' | '2Q' | 'HISTORICO'>('HISTORICO');
   const [selectedMes, setSelectedMes] = useState<string>(MESES[currentMonthIdx] || 'AGOSTO');
-  const [selectedQuincena, setSelectedQuincena] = useState<'1Q' | '2Q' | 'TODO_EL_MES'>(currentDay <= 15 ? '1Q' : '2Q');
   const [selectedObraId, setSelectedObraId] = useState<string>('TODAS');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   // Tarifas en memoria / edición
   const [tarifasEditadas, setTarifasEditadas] = useState<Record<string, number>>({});
+  const [horasManualesMap, setHorasManualesMap] = useState<Record<string, number>>(() => {
+    try {
+      const saved = localStorage.getItem('peie_horas_manuales_liquidacion');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
   const [savingTarifas, setSavingTarifas] = useState(false);
   const [valorHoraDefecto, setValorHoraDefecto] = useState<number>(4500);
   const [porcentajeBonoPresentismo, setPorcentajeBonoPresentismo] = useState<number>(10);
@@ -110,7 +154,7 @@ export default function LiquidacionSueldos() {
   // Modal: Desglose Diario de Asistencia
   const [selectedEmpleadoNovedades, setSelectedEmpleadoNovedades] = useState<{ emp: EmpleadoSueldo; items: NovedadRegistro[] } | null>(null);
 
-  // 1. Cargar Datos
+  // 1. Cargar Datos desde Supabase
   const loadData = async () => {
     setLoading(true);
     try {
@@ -133,7 +177,7 @@ export default function LiquidacionSueldos() {
 
       const formattedEmps: EmpleadoSueldo[] = (empData || []).map((e: any) => {
         const obraObj = Array.isArray(e.obras) ? e.obras[0] : e.obras;
-        const vHora = Number(e.valor_hora) || localTarifasSaved[e.id] || 0;
+        const vHora = Number(e.valor_hora) || localTarifasSaved[e.id] || 4500;
         return {
           ...e,
           obras: obraObj,
@@ -143,44 +187,32 @@ export default function LiquidacionSueldos() {
 
       setEmpleados(formattedEmps);
 
-      // Poblar el mapa de edición
+      // Poblar mapa de tarifas inicial
       const mapInicial: Record<string, number> = {};
       formattedEmps.forEach(emp => {
-        mapInicial[emp.id] = emp.valor_hora || 0;
+        mapInicial[emp.id] = emp.valor_hora || 4500;
       });
       setTarifasEditadas(mapInicial);
 
-      // 2. Cargar Novedades Diarias
-      const { data: novData } = await supabase
-        .from('novedades_diarias')
-        .select('*')
-        .order('fecha', { ascending: true });
+      // 2. Cargar Novedades Diarias y Semanales
+      const [novRes, semRes, oRes, regRes] = await Promise.all([
+        supabase.from('novedades_diarias').select('*').order('fecha', { ascending: false }),
+        supabase.from('registro_horas_semanales').select('*').order('semana_inicio', { ascending: false }),
+        supabase.from('obras').select('id, name').eq('active', true).order('name'),
+        supabase.from('reglas_horas_trabajadores').select('*').limit(1).maybeSingle()
+      ]);
 
-      setNovedades((novData as NovedadRegistro[]) || []);
+      if (novRes.data) setNovedades(novRes.data as NovedadRegistro[]);
+      if (semRes.data) setSemanales(semRes.data as SemanalRegistro[]);
+      if (oRes.data) setObrasList(oRes.data);
 
-      // 3. Cargar Obras
-      const { data: oData } = await supabase
-        .from('obras')
-        .select('id, name')
-        .eq('active', true)
-        .order('name');
-
-      setObrasList(oData || []);
-
-      // 4. Cargar Reglas de Sueldos
-      const { data: regData } = await supabase
-        .from('reglas_horas_trabajadores')
-        .select('*')
-        .limit(1)
-        .maybeSingle();
-
-      if (regData) {
-        if (regData.valor_hora_defecto) setValorHoraDefecto(Number(regData.valor_hora_defecto));
-        if (regData.porcentaje_bono) setPorcentajeBonoPresentismo(Number(regData.porcentaje_bono));
-        if (regData.horas_objetivo_quincena) setHorasObjetivoQuincena(Number(regData.horas_objetivo_quincena));
+      if (regRes.data) {
+        if (regRes.data.valor_hora_defecto) setValorHoraDefecto(Number(regRes.data.valor_hora_defecto));
+        if (regRes.data.porcentaje_bono) setPorcentajeBonoPresentismo(Number(regRes.data.porcentaje_bono));
+        if (regRes.data.horas_objetivo_quincena) setHorasObjetivoQuincena(Number(regRes.data.horas_objetivo_quincena));
       }
     } catch (err: any) {
-      console.error(err);
+      console.error('Error al sincronizar datos de sueldos:', err);
       toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar los datos de liquidación.' });
     } finally {
       setLoading(false);
@@ -191,6 +223,13 @@ export default function LiquidacionSueldos() {
     loadData();
   }, []);
 
+  // Guardar cambio de horas manual
+  const handleHorasManualChange = (empId: string, horas: number) => {
+    const next = { ...horasManualesMap, [empId]: horas };
+    setHorasManualesMap(next);
+    localStorage.setItem('peie_horas_manuales_liquidacion', JSON.stringify(next));
+  };
+
   // Guardar mapa de adelantos en localStorage
   const handleAdelantoChange = (empId: string, valor: number) => {
     const next = { ...adelantosMap, [empId]: valor };
@@ -200,9 +239,8 @@ export default function LiquidacionSueldos() {
 
   // Guardar Tarifa de un empleado individual
   const handleSaveTarifaIndividual = async (empId: string) => {
-    const valor = Number(tarifasEditadas[empId]) || 0;
+    const valor = Number(tarifasEditadas[empId]) || valorHoraDefecto;
     try {
-      // Guardar local
       const localTarifas: Record<string, number> = {};
       try {
         const raw = localStorage.getItem('peie_tarifas_horas');
@@ -211,14 +249,13 @@ export default function LiquidacionSueldos() {
       localTarifas[empId] = valor;
       localStorage.setItem('peie_tarifas_horas', JSON.stringify(localTarifas));
 
-      // Guardar en Supabase (con fallback seguro si la columna no existe aún)
       const { error } = await supabase
         .from('empleados')
         .update({ valor_hora: valor })
         .eq('id', empId);
 
       if (error) {
-        console.warn('Columna valor_hora no disponible en base aún. Guardado en caché local.', error.message);
+        console.warn('Columna valor_hora no disponible en BD aún. Guardado en memoria local.', error.message);
       }
 
       setEmpleados(prev => prev.map(e => e.id === empId ? { ...e, valor_hora: valor } : e));
@@ -244,7 +281,6 @@ export default function LiquidacionSueldos() {
       setTarifasEditadas(nextMap);
       localStorage.setItem('peie_tarifas_horas', JSON.stringify(nextMap));
 
-      // Guardar en Supabase
       await supabase
         .from('empleados')
         .update({ valor_hora: tarifaMasivaGlobal })
@@ -295,22 +331,30 @@ export default function LiquidacionSueldos() {
     }
   };
 
-  // 2. Filtro de Novedades del Período
+  // 2. Filtro de Novedades y Horas con Normalización
   const filteredNovedades = useMemo(() => {
     return novedades.filter(nov => {
-      // Filtro de mes
-      if (nov.mes?.toUpperCase() !== selectedMes.toUpperCase()) return false;
+      if (selectedPeriodoModo === 'HISTORICO') return true;
 
-      // Filtro de quincena
-      if (selectedQuincena !== 'TODO_EL_MES') {
-        const day = Number(nov.fecha?.split('-')[2]) || 0;
-        if (selectedQuincena === '1Q' && day > 15) return false;
-        if (selectedQuincena === '2Q' && day <= 15) return false;
+      const periodo = getPeriodoFromDate(nov.fecha);
+      const mesNov = (nov.mes || periodo.mes).toUpperCase().trim();
+      const quincenaNov = (nov.quincena || periodo.quincena).toUpperCase().trim();
+
+      if (selectedPeriodoModo === 'MES') {
+        return mesNov === selectedMes.toUpperCase().trim();
+      }
+
+      if (selectedPeriodoModo === '1Q') {
+        return mesNov === selectedMes.toUpperCase().trim() && quincenaNov === '1Q';
+      }
+
+      if (selectedPeriodoModo === '2Q') {
+        return mesNov === selectedMes.toUpperCase().trim() && quincenaNov === '2Q';
       }
 
       return true;
     });
-  }, [novedades, selectedMes, selectedQuincena]);
+  }, [novedades, selectedPeriodoModo, selectedMes]);
 
   // 3. Cómputo y Liquidación para cada empleado
   const liquidaciones = useMemo(() => {
@@ -318,49 +362,66 @@ export default function LiquidacionSueldos() {
       .filter(emp => {
         if (selectedObraId !== 'TODAS' && emp.obra_id !== selectedObraId) return false;
         if (searchTerm) {
-          const term = searchTerm.toLowerCase().trim();
-          const matchName = emp.full_name.toLowerCase().includes(term);
-          const matchSpec = (emp.specialty || '').toLowerCase().includes(term);
-          const matchObra = (emp.obras?.name || '').toLowerCase().includes(term);
+          const term = normalizeText(searchTerm);
+          const matchName = normalizeText(emp.full_name).includes(term);
+          const matchSpec = normalizeText(emp.specialty).includes(term);
+          const matchObra = normalizeText(emp.obras?.name).includes(term);
           if (!matchName && !matchSpec && !matchObra) return false;
         }
         return true;
       })
       .map(emp => {
-        // Novedades de este empleado en el período
-        const empNovs = filteredNovedades.filter(n => 
-          (n.empleado_id && n.empleado_id === emp.id) || 
-          (n.empleado_nombre && n.empleado_nombre.trim().toLowerCase() === emp.full_name.trim().toLowerCase())
-        );
+        const empNormName = normalizeText(emp.full_name);
 
-        // Sumatorias de horas
-        const horasTrabajadas = empNovs.reduce((acc, curr) => acc + (Number(curr.horas_trabajadas) || 0), 0);
+        // Novedades diarias que pertenecen a este empleado
+        const empNovs = filteredNovedades.filter(n => {
+          if (n.empleado_id && n.empleado_id === emp.id) return true;
+          if (n.empleado_nombre && normalizeText(n.empleado_nombre) === empNormName) return true;
+          return false;
+        });
+
+        // Sumatorias de horas automáticas de asistencia diaria
+        const horasAsistencia = empNovs.reduce((acc, curr) => acc + (Number(curr.horas_trabajadas) || 0), 0);
         const horasAusente = empNovs.reduce((acc, curr) => acc + (Number(curr.horas_ausente) || 0), 0);
-        const diasPresente = empNovs.filter(n => n.estado === 'PRESENTE' || n.horas_trabajadas > 0).length;
+        const diasPresente = empNovs.filter(n => n.estado === 'PRESENTE' || Number(n.horas_trabajadas) > 0).length;
         const diasAusente = empNovs.filter(n => n.estado === 'AUSENTE').length;
-        const diasTardanza = empNovs.filter(n => n.estado === 'LLEGADA TARDE').length;
 
-        // Valor Hora (de la grilla de edición o fallback)
+        // Horas Semanales (respaldo si novedades diarias es 0)
+        let horasSemanalesTotal = 0;
+        if (horasAsistencia === 0) {
+          const empSems = semanales.filter(s => {
+            if (s.empleado_id && s.empleado_id === emp.id) return true;
+            if (s.empleado_nombre && normalizeText(s.empleado_nombre) === empNormName) return true;
+            return false;
+          });
+          horasSemanalesTotal = empSems.reduce((acc, curr) => acc + (Number(curr.total_horas) || 0), 0);
+        }
+
+        // Horas Computadas (Asistencia > Semanales > Manual)
+        const horasCalculadasBase = horasAsistencia > 0 ? horasAsistencia : horasSemanalesTotal;
+        const horasFinales = horasManualesMap[emp.id] !== undefined ? horasManualesMap[emp.id] : horasCalculadasBase;
+
+        // Tarifa / Valor Hora
         const valorHora = Number(tarifasEditadas[emp.id]) || Number(emp.valor_hora) || valorHoraDefecto;
-        const sueldoBruto = horasTrabajadas * valorHora;
+        const sueldoBruto = Math.round(horasFinales * valorHora);
 
-        // Bono Presentismo (si no tuvo ausencias injustificadas y cumplió las horas quincenales)
-        const cumplePresentismo = diasAusente === 0 && (horasTrabajadas >= horasObjetivoQuincena || diasPresente >= 10);
+        // Bono Presentismo
+        const cumplePresentismo = diasAusente === 0 && (horasFinales >= horasObjetivoQuincena || diasPresente >= 10);
         const bonoPresentismo = cumplePresentismo ? Math.round((sueldoBruto * porcentajeBonoPresentismo) / 100) : 0;
 
         // Adelantos / deducciones
         const adelanto = Number(adelantosMap[emp.id]) || 0;
 
-        // Total Neto
+        // Total Neto a Cobrar
         const totalNeto = Math.max(0, sueldoBruto + bonoPresentismo - adelanto);
 
         return {
           empleado: emp,
-          horasTrabajadas,
+          horasCalculadasBase,
+          horasFinales,
           horasAusente,
           diasPresente,
           diasAusente,
-          diasTardanza,
           valorHora,
           sueldoBruto,
           bonoPresentismo,
@@ -373,9 +434,11 @@ export default function LiquidacionSueldos() {
   }, [
     empleados, 
     filteredNovedades, 
+    semanales,
     selectedObraId, 
     searchTerm, 
     tarifasEditadas, 
+    horasManualesMap,
     valorHoraDefecto, 
     porcentajeBonoPresentismo, 
     horasObjetivoQuincena,
@@ -384,7 +447,7 @@ export default function LiquidacionSueldos() {
 
   // Métricas Consolidadas
   const totalMontoPagar = useMemo(() => liquidaciones.reduce((acc, curr) => acc + curr.totalNeto, 0), [liquidaciones]);
-  const totalHorasLiquidadas = useMemo(() => liquidaciones.reduce((acc, curr) => acc + curr.horasTrabajadas, 0), [liquidaciones]);
+  const totalHorasLiquidadas = useMemo(() => liquidaciones.reduce((acc, curr) => acc + curr.horasFinales, 0), [liquidaciones]);
   const promedioValorHora = useMemo(() => {
     if (liquidaciones.length === 0) return 0;
     const sum = liquidaciones.reduce((acc, curr) => acc + curr.valorHora, 0);
@@ -403,15 +466,15 @@ export default function LiquidacionSueldos() {
       'Trabajador': liq.empleado.full_name,
       'Especialidad': liq.empleado.specialty || 'General',
       'Obra Asignada': liq.empleado.obras?.name || 'Base / Sin Asignar',
-      'Días Trabajados': liq.diasPresente,
+      'Días Asistidos': liq.diasPresente,
       'Días Ausente': liq.diasAusente,
-      'Horas Totales': liq.horasTrabajadas,
+      'Horas Computadas': liq.horasFinales,
       'Valor Hora ($)': liq.valorHora,
-      'Sueldo Bruto ($)': liq.sueldoBruto,
+      'Subtotal Bruto ($)': liq.sueldoBruto,
       'Bono Presentismo ($)': liq.bonoPresentismo,
       'Adelantos / Descuentos ($)': liq.adelanto,
-      'TOTAL NETO A PAGAR ($)': liq.totalNeto,
-      'Período': `${selectedQuincena === 'TODO_EL_MES' ? 'Mes Completo' : selectedQuincena} - ${selectedMes}`
+      'TOTAL NETO FACTURADO / A PAGAR ($)': liq.totalNeto,
+      'Período': selectedPeriodoModo === 'HISTORICO' ? 'Histórico Completo' : `${selectedPeriodoModo} - ${selectedMes}`
     }));
 
     // Fila de Totales
@@ -420,14 +483,14 @@ export default function LiquidacionSueldos() {
       'Trabajador': 'TOTALES CONSOLIDADOS',
       'Especialidad': '',
       'Obra Asignada': '',
-      'Días Trabajados': '',
+      'Días Asistidos': '',
       'Días Ausente': '',
-      'Horas Totales': totalHorasLiquidadas,
+      'Horas Computadas': totalHorasLiquidadas,
       'Valor Hora ($)': promedioValorHora,
-      'Sueldo Bruto ($)': liquidaciones.reduce((a, b) => a + b.sueldoBruto, 0),
+      'Subtotal Bruto ($)': liquidaciones.reduce((a, b) => a + b.sueldoBruto, 0),
       'Bono Presentismo ($)': liquidaciones.reduce((a, b) => a + b.bonoPresentismo, 0),
       'Adelantos / Descuentos ($)': liquidaciones.reduce((a, b) => a + b.adelanto, 0),
-      'TOTAL NETO A PAGAR ($)': totalMontoPagar,
+      'TOTAL NETO FACTURADO / A PAGAR ($)': totalMontoPagar,
       'Período': ''
     });
 
@@ -435,7 +498,7 @@ export default function LiquidacionSueldos() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Liquidacion_Sueldos');
 
-    const fileName = `PEIE_Liquidacion_Sueldos_${selectedMes}_${selectedQuincena}.xlsx`;
+    const fileName = `PEIE_Liquidacion_Sueldos_${selectedMes}_${selectedPeriodoModo}.xlsx`;
     XLSX.writeFile(workbook, fileName);
 
     toast({ title: 'Planilla Descargada', description: `Se exportó ${fileName} con éxito.` });
@@ -448,22 +511,24 @@ export default function LiquidacionSueldos() {
       return;
     }
 
-    const periodoText = selectedQuincena === 'TODO_EL_MES' 
-      ? `Mes de ${selectedMes}` 
-      : `${selectedQuincena} (${selectedQuincena === '1Q' ? '1 al 15' : '16 al fin de mes'}) de ${selectedMes}`;
+    const periodoText = selectedPeriodoModo === 'HISTORICO' 
+      ? 'Liquidación Histórica Acumulada' 
+      : selectedPeriodoModo === 'MES' 
+        ? `Mes de ${selectedMes}` 
+        : `${selectedPeriodoModo} (${selectedPeriodoModo === '1Q' ? '1 al 15' : '16 al fin de mes'}) de ${selectedMes}`;
 
     const text = `*PEIE TOOLS - RESUMEN DE LIQUIDACIÓN DE SUELDO*\n\n` +
       `👤 *Trabajador:* ${liq.empleado.full_name}\n` +
       `📅 *Período:* ${periodoText}\n` +
       `🏗️ *Obra:* ${liq.empleado.obras?.name || 'Base Central'}\n` +
       `---------------------------------------\n` +
-      `⏱️ *Horas Trabajadas:* ${liq.horasTrabajadas} hs\n` +
+      `⏱️ *Horas Trabajadas:* ${liq.horasFinales} hs\n` +
       `💵 *Valor Hora:* $${liq.valorHora.toLocaleString('es-AR')}\n` +
-      `💰 *Subtotal Bruto:* $${liq.sueldoBruto.toLocaleString('es-AR')}\n` +
+      `💰 *Subtotal Facturado:* $${liq.sueldoBruto.toLocaleString('es-AR')}\n` +
       (liq.bonoPresentismo > 0 ? `🎁 *Bono Presentismo (+):* $${liq.bonoPresentismo.toLocaleString('es-AR')}\n` : '') +
       (liq.adelanto > 0 ? `🔻 *Adelantos/Descuentos (-):* $${liq.adelanto.toLocaleString('es-AR')}\n` : '') +
       `---------------------------------------\n` +
-      `💲 *TOTAL NETO A COBRAR: $${liq.totalNeto.toLocaleString('es-AR')}*\n\n` +
+      `💲 *TOTAL NETO FACTURADO: $${liq.totalNeto.toLocaleString('es-AR')}*\n\n` +
       `_Por cualquier duda sobre el cómputo de horas, comunicate con el área de Recursos Humanos de PEIE._`;
 
     const url = buildWhatsAppLink(liq.empleado.whatsapp, text);
@@ -481,8 +546,10 @@ export default function LiquidacionSueldos() {
               <DollarSign className="h-6 w-6 text-blue-400" />
             </div>
             <div>
-              <h1 className="text-2xl font-black tracking-tight">Liquidación de Sueldos</h1>
-              <p className="text-xs text-blue-200 font-semibold">Cómputo automático de horas, asignación de tarifas y liquidación quincenal</p>
+              <h1 className="text-2xl font-black tracking-tight">Liquidación de Sueldos y Tarifas</h1>
+              <p className="text-xs text-blue-200 font-semibold">
+                Cómputo de horas trabajadas, asignación de tarifa por hora y monto facturado por operario
+              </p>
             </div>
           </div>
         </div>
@@ -494,7 +561,7 @@ export default function LiquidacionSueldos() {
             className="border-blue-400/40 bg-blue-900/30 hover:bg-blue-800/50 text-white text-xs font-bold rounded-xl gap-2 h-10 shadow-sm"
           >
             <Sliders className="h-4 w-4 text-blue-300" />
-            Configurar Tarifas Masivas
+            Tarifas Masivas ($/h)
           </Button>
 
           <Button
@@ -523,7 +590,7 @@ export default function LiquidacionSueldos() {
         <Card className="rounded-2xl border-slate-200 shadow-sm bg-gradient-to-br from-emerald-50 to-white overflow-hidden border-l-4 border-l-emerald-500">
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Liquidado</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Facturado</p>
               <div className="p-2 bg-emerald-100 rounded-xl text-emerald-600">
                 <DollarSign className="h-5 w-5" />
               </div>
@@ -541,7 +608,7 @@ export default function LiquidacionSueldos() {
         <Card className="rounded-2xl border-slate-200 shadow-sm bg-gradient-to-br from-blue-50 to-white overflow-hidden border-l-4 border-l-blue-500">
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Horas Trabajadas</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Horas Totales</p>
               <div className="p-2 bg-blue-100 rounded-xl text-blue-600">
                 <Clock className="h-5 w-5" />
               </div>
@@ -550,7 +617,7 @@ export default function LiquidacionSueldos() {
               {totalHorasLiquidadas.toLocaleString('es-AR')} hs
             </p>
             <p className="text-[11px] font-semibold text-blue-700 mt-1">
-              Registradas en {selectedMes} ({selectedQuincena})
+              {selectedPeriodoModo === 'HISTORICO' ? 'Histórico acumulado' : `${selectedPeriodoModo} - ${selectedMes}`}
             </p>
           </CardContent>
         </Card>
@@ -577,7 +644,7 @@ export default function LiquidacionSueldos() {
         <Card className="rounded-2xl border-slate-200 shadow-sm bg-gradient-to-br from-purple-50 to-white overflow-hidden border-l-4 border-l-purple-500">
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Nómina Activa</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Nómina Total</p>
               <div className="p-2 bg-purple-100 rounded-xl text-purple-600">
                 <Users className="h-5 w-5" />
               </div>
@@ -586,7 +653,7 @@ export default function LiquidacionSueldos() {
               {liquidaciones.length} Operarios
             </p>
             <p className="text-[11px] font-semibold text-purple-700 mt-1">
-              {liquidaciones.filter(l => l.horasTrabajadas > 0).length} con horas en este período
+              {liquidaciones.filter(l => l.horasFinales > 0).length} con horas computadas
             </p>
           </CardContent>
         </Card>
@@ -595,40 +662,86 @@ export default function LiquidacionSueldos() {
 
       {/* Barra de Filtros de Período y Búsqueda */}
       <Card className="rounded-2xl border-slate-200 shadow-sm bg-white">
-        <CardContent className="p-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            
-            {/* Mes */}
-            <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-                <Calendar className="h-3.5 w-3.5 text-peie-blue" /> Mes
-              </Label>
-              <select
-                value={selectedMes}
-                onChange={(e) => setSelectedMes(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-bold bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-peie-blue text-slate-800"
-              >
-                {MESES.map(m => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-            </div>
+        <CardContent className="p-5 space-y-4">
+          
+          {/* Selector de Modo de Período */}
+          <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 pb-3">
+            <span className="text-xs font-bold text-slate-500 mr-2 flex items-center gap-1.5">
+              <Calendar className="h-4 w-4 text-peie-blue" /> Tramo Temporal:
+            </span>
 
-            {/* Quincena */}
-            <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-                <Clock className="h-3.5 w-3.5 text-peie-blue" /> Quincena / Tramo
-              </Label>
-              <select
-                value={selectedQuincena}
-                onChange={(e) => setSelectedQuincena(e.target.value as any)}
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-bold bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-peie-blue text-slate-800"
-              >
-                <option value="1Q">1ª Quincena (Días 1 al 15)</option>
-                <option value="2Q">2ª Quincena (Días 16 al fin de mes)</option>
-                <option value="TODO_EL_MES">Mes Completo (1 al 31)</option>
-              </select>
-            </div>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => setSelectedPeriodoModo('HISTORICO')}
+              className={`rounded-xl text-xs font-bold h-8 px-3 transition-all ${
+                selectedPeriodoModo === 'HISTORICO'
+                  ? 'bg-peie-blue text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              Histórico / Todos los Registros
+            </Button>
+
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => setSelectedPeriodoModo('MES')}
+              className={`rounded-xl text-xs font-bold h-8 px-3 transition-all ${
+                selectedPeriodoModo === 'MES'
+                  ? 'bg-peie-blue text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              Mes Completo
+            </Button>
+
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => setSelectedPeriodoModo('1Q')}
+              className={`rounded-xl text-xs font-bold h-8 px-3 transition-all ${
+                selectedPeriodoModo === '1Q'
+                  ? 'bg-peie-blue text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              1ª Quincena (1 al 15)
+            </Button>
+
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => setSelectedPeriodoModo('2Q')}
+              className={`rounded-xl text-xs font-bold h-8 px-3 transition-all ${
+                selectedPeriodoModo === '2Q'
+                  ? 'bg-peie-blue text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              2ª Quincena (16 al 31)
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            
+            {/* Mes (si no es histórico) */}
+            {selectedPeriodoModo !== 'HISTORICO' && (
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5 text-peie-blue" /> Mes
+                </Label>
+                <select
+                  value={selectedMes}
+                  onChange={(e) => setSelectedMes(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-bold bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-peie-blue text-slate-800"
+                >
+                  {MESES.map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Obra */}
             <div className="space-y-1.5">
@@ -668,19 +781,30 @@ export default function LiquidacionSueldos() {
         </CardContent>
       </Card>
 
+      {/* Banner Informativo sobre edición en vivo */}
+      <div className="bg-blue-50/80 border border-blue-200/80 p-4 rounded-2xl flex items-start gap-3 text-xs text-blue-900">
+        <Sparkles className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
+        <div className="space-y-0.5">
+          <p className="font-bold">Cálculo en tiempo real y edición directa</p>
+          <p className="text-blue-800 font-medium">
+            Las horas se leen automáticamente de los registros de asistencia. Si un operario no cargó asistencia aún o querés liquidarle horas fijas, <strong>podés tipear directamente las horas o la tarifa en la tabla</strong> y el total se actualizará al instante.
+          </p>
+        </div>
+      </div>
+
       {/* Tabla Principal de Liquidaciones */}
       <Card className="rounded-3xl border-slate-200 shadow-sm bg-white overflow-hidden">
         <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
           <div>
             <h2 className="text-base font-black text-slate-900">
-              Detalle de Liquidación ({selectedQuincena === 'TODO_EL_MES' ? 'Mes Completo' : selectedQuincena} - {selectedMes})
+              Planilla de Liquidación y Sueldos ({selectedPeriodoModo === 'HISTORICO' ? 'Histórico Completo' : `${selectedPeriodoModo} - ${selectedMes}`})
             </h2>
             <p className="text-xs text-slate-500 font-medium">
-              Ingresá el valor hora para cada operario o modificalo en vivo. Las horas se computan de la asistencia.
+              Podés ajustar horas, valor por hora y deducciones por operario.
             </p>
           </div>
           <span className="px-3 py-1 bg-peie-blue/10 text-peie-blue font-black text-xs rounded-full border border-peie-blue/20">
-            {liquidaciones.length} Registros
+            {liquidaciones.length} Trabajadores
           </span>
         </div>
 
@@ -690,13 +814,13 @@ export default function LiquidacionSueldos() {
               <tr className="bg-slate-100 text-slate-700 font-black uppercase text-[10px] tracking-wider border-b border-slate-200">
                 <th className="py-3.5 px-4">Operario</th>
                 <th className="py-3.5 px-3">Obra</th>
-                <th className="py-3.5 px-3 text-center">Horas Reg.</th>
-                <th className="py-3.5 px-3 text-center">Ausencias</th>
+                <th className="py-3.5 px-3 text-center">Horas Trabajadas</th>
+                <th className="py-3.5 px-3 text-center">Asistencias</th>
                 <th className="py-3.5 px-3 text-right">Valor Hora ($)</th>
-                <th className="py-3.5 px-3 text-right">Bruto ($)</th>
+                <th className="py-3.5 px-3 text-right">Subtotal Facturado</th>
                 <th className="py-3.5 px-3 text-right">Presentismo ($)</th>
                 <th className="py-3.5 px-3 text-right">Adelantos ($)</th>
-                <th className="py-3.5 px-4 text-right bg-emerald-50/50 text-emerald-950 font-extrabold">Neto a Cobrar</th>
+                <th className="py-3.5 px-4 text-right bg-emerald-50/60 text-emerald-950 font-extrabold">Total a Cobrar</th>
                 <th className="py-3.5 px-3 text-center">Acciones</th>
               </tr>
             </thead>
@@ -710,14 +834,14 @@ export default function LiquidacionSueldos() {
               ) : (
                 liquidaciones.map((liq) => {
                   const emp = liq.empleado;
-                  const currentValorHora = tarifasEditadas[emp.id] !== undefined ? tarifasEditadas[emp.id] : (emp.valor_hora || 0);
+                  const currentValorHora = tarifasEditadas[emp.id] !== undefined ? tarifasEditadas[emp.id] : (emp.valor_hora || valorHoraDefecto);
 
                   return (
                     <tr key={emp.id} className="hover:bg-blue-50/40 transition-colors">
                       {/* Operario */}
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-black shrink-0 overflow-hidden border border-blue-200">
+                          <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-black shrink-0 overflow-hidden border border-blue-200">
                             {emp.photo_url ? (
                               <img src={emp.photo_url} alt={emp.full_name} className="w-full h-full object-cover" />
                             ) : (
@@ -738,26 +862,36 @@ export default function LiquidacionSueldos() {
                         </span>
                       </td>
 
-                      {/* Horas Trabajadas */}
+                      {/* Input / Botón de Horas Trabajadas */}
                       <td className="py-3 px-3 text-center">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedEmpleadoNovedades({ emp, items: liq.novedadesList })}
-                          className="font-black text-xs px-2 py-1 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors border border-blue-200"
-                          title="Ver desglose diario de horas"
-                        >
-                          {liq.horasTrabajadas} hs
-                        </button>
+                        <div className="flex items-center justify-center gap-1">
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.5"
+                            value={liq.horasFinales || ''}
+                            placeholder="0"
+                            onChange={(e) => handleHorasManualChange(emp.id, Number(e.target.value) || 0)}
+                            className="w-16 h-8 text-center font-black text-xs rounded-lg border-blue-300 bg-blue-50/50 px-1 text-blue-900"
+                            title="Editar horas computadas"
+                          />
+                          <span className="text-[11px] font-bold text-slate-400">hs</span>
+                        </div>
                       </td>
 
-                      {/* Ausencias */}
+                      {/* Asistencias / Ausencias */}
                       <td className="py-3 px-3 text-center">
-                        {liq.diasAusente > 0 ? (
-                          <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 font-bold text-[10px]">
-                            {liq.diasAusente} d ({liq.horasAusente} hs)
-                          </span>
+                        {liq.novedadesList.length > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedEmpleadoNovedades({ emp, items: liq.novedadesList })}
+                            className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 border"
+                            title="Ver registros diarios de asistencia"
+                          >
+                            {liq.diasPresente} pres. / {liq.diasAusente} aus.
+                          </button>
                         ) : (
-                          <span className="text-emerald-600 font-bold text-[11px]">0</span>
+                          <span className="text-slate-400 font-medium text-[10px]">Sin registro</span>
                         )}
                       </td>
 
@@ -787,8 +921,8 @@ export default function LiquidacionSueldos() {
                         </div>
                       </td>
 
-                      {/* Sueldo Bruto */}
-                      <td className="py-3 px-3 text-right font-bold text-slate-800">
+                      {/* Subtotal Facturado / Sueldo Bruto */}
+                      <td className="py-3 px-3 text-right font-bold text-slate-900">
                         ${liq.sueldoBruto.toLocaleString('es-AR')}
                       </td>
 
@@ -820,8 +954,8 @@ export default function LiquidacionSueldos() {
                       </td>
 
                       {/* Total Neto */}
-                      <td className="py-3 px-4 text-right bg-emerald-50/40">
-                        <span className="text-sm font-black text-emerald-800">
+                      <td className="py-3 px-4 text-right bg-emerald-50/50">
+                        <span className="text-sm font-black text-emerald-900">
                           ${liq.totalNeto.toLocaleString('es-AR')}
                         </span>
                       </td>
@@ -837,7 +971,7 @@ export default function LiquidacionSueldos() {
                               setIsReceiptModalOpen(true);
                             }}
                             className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-all"
-                            title="Ver e imprimir recibo"
+                            title="Ver e imprimir recibo de sueldo"
                           >
                             <FileText className="h-4 w-4" />
                           </button>
@@ -901,7 +1035,7 @@ export default function LiquidacionSueldos() {
           <DialogHeader>
             <DialogTitle className="text-xl font-black text-slate-900 flex items-center gap-2">
               <Sliders className="h-5 w-5 text-peie-blue" />
-              Configurar Tarifas Masivas
+              Configurar Tarifas Masivas ($/hora)
             </DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
               Asigná el valor de la hora de forma masiva a toda la nómina o diferenciado por especialidad.
@@ -999,7 +1133,7 @@ export default function LiquidacionSueldos() {
                 </div>
                 <div className="text-right">
                   <span className="px-2.5 py-1 rounded-full bg-blue-100 text-peie-blue font-black text-xs">
-                    {selectedQuincena === 'TODO_EL_MES' ? 'Mes Completo' : selectedQuincena}
+                    {selectedPeriodoModo === 'HISTORICO' ? 'Histórico' : selectedPeriodoModo}
                   </span>
                   <p className="text-[10px] text-slate-400 font-bold mt-0.5">{selectedMes} 2026</p>
                 </div>
@@ -1023,7 +1157,7 @@ export default function LiquidacionSueldos() {
                 <div className="divide-y divide-slate-100 p-4 space-y-2">
                   
                   <div className="flex justify-between items-center text-slate-700">
-                    <span>Horas Trabajadas ({selectedLiquidacionForReceipt.horasTrabajadas} hs x ${selectedLiquidacionForReceipt.valorHora.toLocaleString('es-AR')})</span>
+                    <span>Horas Trabajadas ({selectedLiquidacionForReceipt.horasFinales} hs x ${selectedLiquidacionForReceipt.valorHora.toLocaleString('es-AR')})</span>
                     <span className="font-bold">${selectedLiquidacionForReceipt.sueldoBruto.toLocaleString('es-AR')}</span>
                   </div>
 
@@ -1042,7 +1176,7 @@ export default function LiquidacionSueldos() {
                   )}
 
                   <div className="flex justify-between items-center text-slate-900 pt-3 text-sm font-black border-t border-slate-200">
-                    <span>TOTAL NETO A COBRAR:</span>
+                    <span>TOTAL FACTURADO / A COBRAR:</span>
                     <span className="text-emerald-700 text-base">${selectedLiquidacionForReceipt.totalNeto.toLocaleString('es-AR')}</span>
                   </div>
 
@@ -1083,7 +1217,7 @@ export default function LiquidacionSueldos() {
                   Asistencia Diaria: {selectedEmpleadoNovedades.emp.full_name}
                 </DialogTitle>
                 <DialogDescription className="text-xs text-slate-500">
-                  Registros computados en {selectedMes} ({selectedQuincena})
+                  Registros computados en {selectedMes} ({selectedPeriodoModo})
                 </DialogDescription>
               </DialogHeader>
 
