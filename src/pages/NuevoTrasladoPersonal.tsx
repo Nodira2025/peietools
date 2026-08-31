@@ -206,6 +206,47 @@ export default function NuevoTrasladoPersonal() {
     setSubmitting(true);
 
     try {
+      const isLibre = !empleado.obra_id || empleado.status === 'Libre';
+      const isAdminOrLogistica = profile.role === 'admin' || profile.role === 'logistica';
+      const targetObra = obras.find(o => o.id === targetObraId);
+      const now = new Date().toISOString();
+
+      if (isLibre || isAdminOrLogistica) {
+        // Asignación directa inmediata sin requerir teléfono ni validación externa
+        const { error: empUpdateError } = await supabase
+          .from('empleados')
+          .update({
+            obra_id: targetObraId,
+            status: 'Trabajando',
+            updated_at: now
+          })
+          .eq('id', empleado.id);
+
+        if (empUpdateError) throw empUpdateError;
+
+        // Registrar traslado confirmado en auditoría
+        await supabase
+          .from('traslados_personal')
+          .insert([{
+            empleado_id: empleado.id,
+            source_obra_id: empleado.obra_id || null,
+            target_obra_id: targetObraId,
+            requester_id: profile.id,
+            status: 'Confirmado',
+            confirmed_by: profile.id,
+            confirmed_at: now
+          }]);
+
+        toast({
+          title: 'Operario Asignado',
+          description: `${empleado.full_name} fue asignado a ${targetObra?.name || 'la obra'} con éxito.`,
+          className: 'bg-emerald-50 border-emerald-200'
+        });
+
+        setTimeout(() => navigate('/personal'), 500);
+        return;
+      }
+
       // 1. Crear el registro en traslados_personal
       const { data: trasladoData, error: trasladoError } = await supabase
         .from('traslados_personal')
@@ -229,7 +270,6 @@ export default function NuevoTrasladoPersonal() {
 
       if (empUpdateError) throw empUpdateError;
 
-      const targetObra = obras.find(o => o.id === targetObraId);
       const sourceObraEncargado = empleado.obras?.encargado_name;
       let sourceProfileData = null;
       if (sourceObraEncargado) {
@@ -245,7 +285,7 @@ export default function NuevoTrasladoPersonal() {
 
       toast({ 
         title: 'Traslado Iniciado', 
-        description: 'Se registró el traslado. Abriendo WhatsApp...',
+        description: 'Se registró la solicitud de traslado.',
         className: 'bg-emerald-50 border-emerald-200'
       });
 
@@ -266,12 +306,7 @@ export default function NuevoTrasladoPersonal() {
           navigate('/personal');
         }, 800);
       } else {
-        toast({ 
-          variant: 'default', 
-          title: 'Aviso', 
-          description: 'El encargado no tiene WhatsApp registrado. Aprobación pendiente en el sistema.' 
-        });
-        setTimeout(() => navigate('/personal'), 1500);
+        setTimeout(() => navigate('/personal'), 1200);
       }
 
     } catch (err: any) {
@@ -279,6 +314,7 @@ export default function NuevoTrasladoPersonal() {
       setSubmitting(false);
     }
   };
+
 
   // ─── Filter Logic ────────────────────────────────────────────────────────
 

@@ -117,6 +117,12 @@ export default function Personal() {
   const imageExportRef = useRef<HTMLDivElement>(null);
   const [isExportingImage, setIsExportingImage] = useState(false);
 
+  // Quick Assign Obra Modal state
+  const [empToAssign, setEmpToAssign] = useState<Empleado | null>(null);
+  const [assignTargetObraId, setAssignTargetObraId] = useState<string>('');
+  const [assignSaving, setAssignSaving] = useState(false);
+
+
 
   const handleOpenProfile = (emp: Empleado) => {
     setSelectedEmpForProfile(emp);
@@ -223,6 +229,50 @@ export default function Personal() {
       setAddSaving(false);
     }
   };
+
+  const handleConfirmAssign = async () => {
+    if (!empToAssign || !assignTargetObraId || !profile) return;
+    setAssignSaving(true);
+    try {
+      const targetObra = obrasOpciones.find(o => o.id === assignTargetObraId);
+      const now = new Date().toISOString();
+
+      const { error: empError } = await supabase
+        .from('empleados')
+        .update({
+          obra_id: assignTargetObraId,
+          status: 'Trabajando',
+          updated_at: now
+        })
+        .eq('id', empToAssign.id);
+
+      if (empError) throw empError;
+
+      await supabase.from('traslados_personal').insert([{
+        empleado_id: empToAssign.id,
+        source_obra_id: empToAssign.obra_id || null,
+        target_obra_id: assignTargetObraId,
+        requester_id: profile.id,
+        status: 'Confirmado',
+        confirmed_by: profile.id,
+        confirmed_at: now
+      }]);
+
+      toast({
+        title: 'Operario Asignado',
+        description: `${empToAssign.full_name} fue asignado a ${targetObra?.name || 'la obra'} con éxito.`
+      });
+
+      setEmpToAssign(null);
+      setAssignTargetObraId('');
+      fetchData();
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Error al asignar', description: err.message });
+    } finally {
+      setAssignSaving(false);
+    }
+  };
+
 
   const handleDeleteEmployee = async () => {
     if (!selectedEmpForProfile) return;
@@ -943,7 +993,10 @@ export default function Personal() {
                                   variant="outline" 
                                   size="sm"
                                   className="text-blue-600 border-blue-200 hover:bg-blue-50/50 h-8 px-3 text-[11px] font-black rounded-lg"
-                                  onClick={() => navigate(`/personal/trasladar/${emp.id}`)}
+                                  onClick={() => {
+                                    setEmpToAssign(emp);
+                                    setAssignTargetObraId(obrasOpciones[0]?.id || '');
+                                  }}
                                 >
                                   Asignar
                                 </Button>
@@ -1037,7 +1090,10 @@ export default function Personal() {
                             variant="outline" 
                             size="sm"
                             className="text-blue-600 border-blue-200 hover:bg-blue-50/50 h-8 px-3 text-[11px] font-black rounded-lg"
-                            onClick={() => navigate(`/personal/trasladar/${emp.id}`)}
+                            onClick={() => {
+                              setEmpToAssign(emp);
+                              setAssignTargetObraId(obrasOpciones[0]?.id || '');
+                            }}
                           >
                             Asignar
                           </Button>
@@ -1404,6 +1460,78 @@ export default function Personal() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Modal Rápido para Asignar Operario a Obra */}
+      <Dialog open={Boolean(empToAssign)} onOpenChange={(open) => !open && setEmpToAssign(null)}>
+        <DialogContent className="rounded-3xl w-[95%] max-w-md bg-white border-slate-100 shadow-xl overflow-hidden p-0">
+          <div className="bg-gradient-to-r from-[#031530] to-[#042454] text-white p-5 pb-6">
+            <DialogHeader className="text-left space-y-1">
+              <DialogTitle className="text-xl font-extrabold tracking-tight">Asignar a Obra</DialogTitle>
+              <p className="text-slate-300 text-xs font-semibold">
+                Seleccioná el destino para {empToAssign?.full_name}
+              </p>
+            </DialogHeader>
+          </div>
+
+          <div className="p-6 space-y-4">
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-black shrink-0">
+                {empToAssign?.photo_url ? (
+                  <img src={empToAssign.photo_url} alt={empToAssign.full_name} className="w-full h-full object-cover rounded-full" />
+                ) : (
+                  <HardHat className="h-5 w-5" />
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="font-extrabold text-sm text-slate-900 truncate">{empToAssign?.full_name}</p>
+                <p className="text-xs text-slate-500 font-semibold">{empToAssign?.specialty || 'Electricista'}</p>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Obra de Destino</Label>
+              <Select
+                value={assignTargetObraId}
+                onValueChange={setAssignTargetObraId}
+              >
+                <SelectTrigger className="rounded-xl border-slate-200 focus:ring-blue-600 font-semibold text-slate-800 bg-white h-11">
+                  <SelectValue placeholder="Seleccionar obra..." />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-slate-100 bg-white shadow-md max-h-60">
+                  {obrasOpciones.map(o => (
+                    <SelectItem key={o.id} value={o.id} className="font-semibold text-slate-700">
+                      {o.name} {o.encargado_name ? `(${o.encargado_name})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter className="bg-slate-50 p-4 border-t border-slate-100 gap-2 sm:gap-0 rounded-b-3xl flex flex-row items-center justify-end">
+            <Button 
+              variant="ghost" 
+              onClick={() => setEmpToAssign(null)}
+              className="rounded-xl hover:bg-slate-200 text-slate-600 font-bold text-xs"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmAssign}
+              disabled={assignSaving || !assignTargetObraId}
+              className="bg-blue-600 text-white hover:bg-blue-700 rounded-xl font-extrabold text-xs px-5 shadow-md shadow-blue-600/10 flex items-center gap-1.5"
+            >
+              {assignSaving ? 'Asignando...' : (
+                <>
+                  <Check className="h-3.5 w-3.5" />
+                  Confirmar Asignación
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       {/* Contenedor de captura para Exportar a Imagen - Estilo Matriz Unificado Exacto */}
       <div 
