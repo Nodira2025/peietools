@@ -634,14 +634,25 @@ export default function Personal() {
         scale: 2,
         backgroundColor: '#ffffff',
         useCORS: true,
-        logging: false
+        logging: false,
+        onclone: (clonedDoc) => {
+          const el = clonedDoc.querySelector('[data-export-container="personal-matrix"]');
+          if (el) {
+            (el as HTMLElement).style.position = 'static';
+            (el as HTMLElement).style.top = '0';
+            (el as HTMLElement).style.left = '0';
+            (el as HTMLElement).style.overflow = 'visible';
+            (el as HTMLElement).style.width = 'auto';
+            (el as HTMLElement).style.height = 'auto';
+          }
+        }
       });
       const image = canvas.toDataURL('image/png');
       const link = document.createElement('a');
       link.href = image;
-      link.download = `Matriz_Personal_Imagen_${new Date().toISOString().slice(0, 10)}.png`;
+      link.download = `Distribucion_Personal_Por_Obra_${new Date().toISOString().slice(0, 10)}.png`;
       link.click();
-      toast({ title: '¡Imagen Generada!', description: 'Se descargó la matriz de personal como imagen PNG.' });
+      toast({ title: '¡Imagen Generada!', description: 'Se descargó la distribución de personal con celdas de obra perfectamente unificadas.' });
     } catch (e: any) {
       console.error('Error al exportar imagen:', e);
       toast({ variant: 'destructive', title: 'Error', description: 'No se pudo generar la imagen.' });
@@ -649,6 +660,7 @@ export default function Personal() {
       setIsExportingImage(false);
     }
   };
+
 
 
   return (
@@ -1393,69 +1405,92 @@ export default function Personal() {
         </DialogContent>
       </Dialog>
 
-      {/* Contenedor de captura para Exportar a Imagen - Estilo Matriz Exacto */}
-      <div className="overflow-hidden h-0 w-0 pointer-events-none fixed top-[-9999px] left-[-9999px]">
-        <div ref={imageExportRef} className="p-6 bg-white w-[780px] font-sans text-slate-900 border border-slate-400">
-          <div className="mb-4 text-center border-b border-slate-900 pb-3">
-            <h2 className="text-xl font-black text-slate-900 uppercase tracking-wide">Distribución de Personal por Obra</h2>
-            <p className="text-xs text-slate-600 font-bold mt-1">PEIE Tools • {new Date().toLocaleDateString('es-AR')}</p>
+      {/* Contenedor de captura para Exportar a Imagen - Estilo Matriz Unificado Exacto */}
+      <div 
+        data-export-container="personal-matrix"
+        className="overflow-hidden h-0 w-0 pointer-events-none fixed top-[-9999px] left-[-9999px]"
+      >
+        <div 
+          ref={imageExportRef} 
+          className="p-8 bg-white w-[850px] font-sans text-slate-900 border-2 border-slate-900"
+          style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}
+        >
+          {/* Encabezado */}
+          <div className="mb-5 text-center border-b-2 border-slate-900 pb-3">
+            <h2 className="text-2xl font-black text-slate-900 uppercase tracking-wider">Distribución de Personal por Obra</h2>
+            <p className="text-xs text-slate-700 font-extrabold mt-1">PEIE Tools • {new Date().toLocaleDateString('es-AR')}</p>
           </div>
 
-          <table className="w-full border-collapse border border-slate-900 text-xs">
-            <thead>
-              <tr className="bg-slate-800 text-white font-bold text-center">
-                <th className="border border-slate-900 px-3 py-2 w-12 text-center">#</th>
-                <th className="border border-slate-900 px-3 py-2 text-left">Nombre Completo</th>
-                <th className="border border-slate-900 px-3 py-2 text-center w-56">Obra Asignada</th>
-                <th className="border border-slate-900 px-3 py-2 text-center w-24">Cantidad</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(() => {
-                const groupedMap = new Map<string, Empleado[]>();
-                filteredEmpleados.forEach((emp) => {
-                  const obraName = emp.obras?.name || (emp.status === 'Trabajando' ? 'Obra Sin Nombre' : 'AUSENTES / LIC. MEDICA');
-                  if (!groupedMap.has(obraName)) groupedMap.set(obraName, []);
-                  groupedMap.get(obraName)!.push(emp);
-                });
-                const sortedObraNames = Array.from(groupedMap.keys()).sort((a, b) => a.localeCompare(b));
-                let globalIdx = 1;
+          {/* Matriz con bordes definidos */}
+          <div className="border-2 border-slate-900 text-xs">
+            {/* Header de la Tabla */}
+            <div className="flex bg-[#0f172a] text-white font-black text-center border-b-2 border-slate-900">
+              <div className="w-12 py-2.5 px-2 border-r-2 border-slate-900 text-center font-black">#</div>
+              <div className="flex-1 py-2.5 px-4 border-r-2 border-slate-900 text-left font-black">Nombre Completo</div>
+              <div className="w-64 py-2.5 px-3 border-r-2 border-slate-900 text-center font-black">Obra Asignada</div>
+              <div className="w-24 py-2.5 px-2 text-center font-black">Cantidad</div>
+            </div>
 
-                return sortedObraNames.map((obraName) => {
-                  const empList = groupedMap.get(obraName)!;
-                  empList.sort((a, b) => a.full_name.localeCompare(b.full_name));
+            {/* Listado agrupado por Obra */}
+            {(() => {
+              const groupedMap = new Map<string, Empleado[]>();
+              filteredEmpleados.forEach((emp) => {
+                const obraName = emp.obras?.name || (emp.status === 'Trabajando' ? 'Obra Sin Nombre' : 'AUSENTES / LIC. MEDICA');
+                if (!groupedMap.has(obraName)) groupedMap.set(obraName, []);
+                groupedMap.get(obraName)!.push(emp);
+              });
+              const sortedObraNames = Array.from(groupedMap.keys()).sort((a, b) => a.localeCompare(b));
+              let globalIdx = 1;
 
-                  return empList.map((emp, empIdx) => {
-                    const isFirstInObra = empIdx === 0;
-                    const currentRowIdx = globalIdx++;
+              return sortedObraNames.map((obraName, groupIdx) => {
+                const empList = groupedMap.get(obraName)!;
+                empList.sort((a, b) => a.full_name.localeCompare(b.full_name));
+                const isLastGroup = groupIdx === sortedObraNames.length - 1;
 
-                    return (
-                      <tr key={emp.id} className="border-b border-slate-900 text-slate-900 font-medium">
-                        <td className="border border-slate-900 px-3 py-1.5 text-center font-bold">{currentRowIdx}</td>
-                        <td className="border border-slate-900 px-3 py-1.5 text-left font-bold">{emp.full_name}</td>
-                        {isFirstInObra && (
-                          <td
-                            rowSpan={empList.length}
-                            className="border border-slate-900 px-3 py-1.5 text-center font-black uppercase bg-slate-50 align-middle"
-                          >
-                            {obraName}
-                          </td>
-                        )}
-                        {isFirstInObra && (
-                          <td
-                            rowSpan={empList.length}
-                            className="border border-slate-900 px-3 py-1.5 text-center font-black bg-slate-50 align-middle text-sm"
-                          >
-                            {empList.length}
-                          </td>
-                        )}
-                      </tr>
-                    );
-                  });
-                });
-              })()}
-            </tbody>
-          </table>
+                return (
+                  <div key={obraName} className={`flex ${!isLastGroup ? 'border-b-2 border-slate-900' : ''}`}>
+                    {/* Lista de Empleados (Columnas # y Nombre Completo) */}
+                    <div className="flex-1 flex flex-col border-r-2 border-slate-900">
+                      {empList.map((emp, empIdx) => {
+                        const isLastEmp = empIdx === empList.length - 1;
+                        const rowNumber = globalIdx++;
+                        return (
+                          <div key={emp.id} className={`flex items-center min-h-[34px] ${!isLastEmp ? 'border-b border-slate-900' : ''}`}>
+                            <div className="w-12 py-1.5 px-2 text-center font-bold border-r-2 border-slate-900 text-slate-800 shrink-0">
+                              {rowNumber}
+                            </div>
+                            <div className="flex-1 py-1.5 px-4 text-left font-extrabold text-slate-950">
+                              {emp.full_name}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Columna Obra Asignada: Unificada verticalmente en un solo bloque para toda la obra */}
+                    <div className="w-64 py-2 px-3 text-center font-black uppercase bg-slate-50 text-slate-900 flex items-center justify-center border-r-2 border-slate-900 text-xs tracking-tight">
+                      {obraName}
+                    </div>
+
+                    {/* Columna Cantidad: Unificada verticalmente en un solo bloque */}
+                    <div className="w-24 py-2 px-2 text-center font-black bg-slate-50 text-slate-950 flex items-center justify-center text-sm">
+                      {empList.length}
+                    </div>
+                  </div>
+                );
+              });
+            })()}
+
+            {/* Fila de Totales */}
+            <div className="flex bg-slate-100 border-t-2 border-slate-900 font-black text-xs">
+              <div className="flex-1 py-2.5 px-4 text-right border-r-2 border-slate-900 uppercase tracking-wide text-slate-900">
+                Total Personal en Obras:
+              </div>
+              <div className="w-24 py-2.5 px-2 text-center font-black text-sm text-slate-950 bg-slate-200">
+                {filteredEmpleados.length}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
