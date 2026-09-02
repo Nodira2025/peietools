@@ -86,7 +86,7 @@ export default function NuevoTrasladoPersonal() {
     }
     setEmpleado(empData);
 
-    // Traer lista de obras destino (activas y excluyendo la actual)
+    // Traer lista de obras destino (todas las obras activas, excluyendo la actual del operario)
     const { data: obrasData } = await supabase
       .from('obras')
       .select('id, name, encargado_name, status')
@@ -94,16 +94,7 @@ export default function NuevoTrasladoPersonal() {
       .neq('id', empData.obra_id || '00000000-0000-0000-0000-000000000000')
       .order('name');
     
-    let filteredObrasData = obrasData || [];
-    const isAdminOrLogistica = profile?.role === 'admin' || profile?.role === 'logistica';
-    if (!isAdminOrLogistica && profile) {
-      filteredObrasData = (obrasData || []).filter(o => 
-        (typeof o.encargado_name === 'string' && typeof profile.full_name === 'string' && o.encargado_name.toLowerCase().trim() === profile.full_name.toLowerCase().trim()) ||
-        o.id === profile.obra_id
-      );
-    }
-    
-    setObras(filteredObrasData);
+    setObras(obrasData || []);
     setLoading(false);
   };
 

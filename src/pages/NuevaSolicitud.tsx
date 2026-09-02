@@ -212,35 +212,14 @@ export default function NuevaSolicitud() {
         }
       }
 
-      // 2. Cargar Obras destino
+      // 2. Cargar Obras destino (todas las obras activas disponibles como destino)
       const { data: obrasData } = await supabase
         .from('obras')
         .select('id, name, encargado_name')
         .eq('active', true)
         .order('name');
       if (obrasData) {
-        const canViewAllObras = profile?.role === 'admin' || profile?.role === 'logistica';
-        const userFullName = (profile?.full_name || '').toLowerCase().trim();
-        const userParts = userFullName.split(/\s+/).filter(Boolean);
-
-        const visibleObras = canViewAllObras ? obrasData : obrasData.filter((obra) => {
-          if (!profile) return false;
-          if (profile.obra_id === obra.id) return true;
-
-          const managerName = (obra.encargado_name || '').toLowerCase().trim();
-          if (!userParts.length || !managerName) return false;
-
-          const managerParts = managerName.split(/\s+/).filter(Boolean);
-          const cleanName = (name: string) => name.replace(/h/g, '');
-          const firstNameMatch = userParts[0] === managerParts[0] ||
-            userParts[0].startsWith(managerParts[0]) ||
-            managerParts[0].startsWith(userParts[0]) ||
-            cleanName(userParts[0]) === cleanName(managerParts[0]);
-
-          return firstNameMatch || userFullName.includes(managerName) || managerName.includes(userFullName);
-        });
-
-        setObras(visibleObras);
+        setObras(obrasData);
       }
 
       // 3. Cargar Personal de Logística
