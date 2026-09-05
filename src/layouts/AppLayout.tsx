@@ -33,6 +33,7 @@ export default function AppLayout() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [updatingPassword, setUpdatingPassword] = useState(false);
+  const [isRrhhOpen, setIsRrhhOpen] = useState(true);
   const { toast } = useToast();
 
   const handlePasswordChange = async (e: React.FormEvent) => {
@@ -189,8 +190,6 @@ export default function AppLayout() {
 
   const isAdmin = profile.role === 'admin';
   const isLogistica = profile.role === 'logistica';
-
-  const [isRrhhOpen, setIsRrhhOpen] = useState(true);
 
   const rrhhItems = [
     { name: 'Personal', path: '/personal', icon: HardHat },
