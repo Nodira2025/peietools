@@ -19,41 +19,50 @@ export const TUCUMAN_BOUNDS = {
  */
 export const KNOWN_TUCUMAN_LOCATIONS: Record<string, GeoCoordinates> = {
   // San Miguel de Tucumán Centro / Barrio Norte / Sur
-  'QUALITY BARRIO NORTE': { latitude: -26.8185, longitude: -65.2038 },
-  'ALBERDI 152': { latitude: -26.8360, longitude: -65.2110 },
-  'LA RIOJA 846': { latitude: -26.8395, longitude: -65.2155 },
-  'PIEDRAS 1668': { latitude: -26.8430, longitude: -65.2285 },
-  'PEDRO DE VILLALBA': { latitude: -26.8305, longitude: -65.2340 },
-  'CLINICA MAYO': { latitude: -26.8315, longitude: -65.2085 },
-  'DOMUS': { latitude: -26.8220, longitude: -65.2140 },
-  'TORRE DUO - LINK': { latitude: -26.8190, longitude: -65.2105 },
-  '#300 - LINK': { latitude: -26.8250, longitude: -65.2170 },
-  'ONE BOULEVARD': { latitude: -26.8150, longitude: -65.2060 },
-  'ONE RESIDENCE': { latitude: -26.8165, longitude: -65.2080 },
-  'DEPÓSITO DE LA EMPRESA': { latitude: -26.8350, longitude: -65.2250 },
-  'DEPOSITO PEIE': { latitude: -26.8350, longitude: -65.2250 },
-  'OBRA CENTRAL': { latitude: -26.8270, longitude: -65.2190 },
-  'MANTENIMIENTO': { latitude: -26.8290, longitude: -65.2210 },
-  'CAMIONETA': { latitude: -26.8260, longitude: -65.2200 },
+  'QUALITY BARRIO NORTE': { latitude: -26.81880, longitude: -65.20732 },
+  'QUALITY BN': { latitude: -26.81880, longitude: -65.20732 },
+  'ONE RESIDENCE': { latitude: -26.82635, longitude: -65.22850 },
+  'TORRE DUO - LINK': { latitude: -26.82635, longitude: -65.22850 },
+  'ALBERDI 152': { latitude: -26.83113, longitude: -65.21440 },
+  'LA RIOJA 846': { latitude: -26.84093, longitude: -65.21516 },
+  'PIEDRAS 1668': { latitude: -26.83149, longitude: -65.22375 },
+  'CLINICA MAYO': { latitude: -26.83441, longitude: -65.20574 },
+  'ARQUITECTOS Y ASOCIADOS': { latitude: -26.82150, longitude: -65.21100 },
+  'ONE BOULEVARD': { latitude: -26.82214, longitude: -65.20907 },
+  'DEPÓSITO DE LA EMPRESA': { latitude: -26.83500, longitude: -65.22500 },
+  'DEPOSITO PEIE': { latitude: -26.83500, longitude: -65.22500 },
+  'OBRA CENTRAL': { latitude: -26.82700, longitude: -65.21900 },
+  'MANTENIMIENTO': { latitude: -26.82900, longitude: -65.22100 },
+  'CAMIONETA': { latitude: -26.82600, longitude: -65.22000 },
 
   // Yerba Buena
-  'ARQUITECTOS Y ASOCIADOS': { latitude: -26.8130, longitude: -65.2890 },
-  'BAMBOO': { latitude: -26.8170, longitude: -65.3040 },
-  'COUNTRY CANTARES': { latitude: -26.8090, longitude: -65.3180 },
-  'COLETTI - WALDHAUS': { latitude: -26.8150, longitude: -65.3120 },
-  'CASA PASAJE': { latitude: -26.8210, longitude: -65.2950 },
-  'DITINIS': { latitude: -26.8140, longitude: -65.2850 },
+  'DOMUS': { latitude: -26.82045, longitude: -65.28450 },
+  'BAMBOO': { latitude: -26.81820, longitude: -65.29050 },
+  '#300 - LINK': { latitude: -26.80500, longitude: -65.27050 },
+  '#300': { latitude: -26.80500, longitude: -65.27050 },
+  'DITINIS': { latitude: -26.81350, longitude: -65.29570 },
+  'PEDRO DE VILLALBA': { latitude: -26.81350, longitude: -65.29570 },
+  'GHO': { latitude: -26.80717, longitude: -65.29570 },
+  'KANTAROSKY - LOPEZ': { latitude: -26.81500, longitude: -65.30350 },
+  'KANTAROSKY - LOPEZ ': { latitude: -26.81500, longitude: -65.30350 },
+  'LIVE': { latitude: -26.82036, longitude: -65.28428 },
+  'COLETTI - WALDHAUS': { latitude: -26.81500, longitude: -65.31200 },
+  'CASA PASAJE': { latitude: -26.82100, longitude: -65.29500 },
+
+  // Tafí Viejo / Los Nogales
+  'COUNTRY CANTARES': { latitude: -26.77850, longitude: -65.23800 },
+  'CANTARES': { latitude: -26.77850, longitude: -65.23800 },
 
   // Este / Aeropuerto / Banda del Río Salí
-  'AEROPUERTO': { latitude: -26.8410, longitude: -65.1050 },
-  'CIRCUNVALACION': { latitude: -26.8120, longitude: -65.1780 },
-  'GHO': { latitude: -26.8040, longitude: -65.1850 },
-  'SHELL OASIS': { latitude: -26.8490, longitude: -65.1820 },
+  'AEROPUERTO': { latitude: -26.82184, longitude: -65.18377 },
+  'SHELL OASIS': { latitude: -26.85018, longitude: -65.16777 },
+  'OASIS': { latitude: -26.85018, longitude: -65.16777 },
+  'CIRCUNVALACION': { latitude: -26.81200, longitude: -65.17800 },
 
-  // Oeste / San Pablo / Lules
-  'SAN PABLO': { latitude: -26.8680, longitude: -65.3120 },
-  'LIVE': { latitude: -26.8115, longitude: -65.2980 },
-  'AUSENTES / LIC. MEDICA': { latitude: -26.8241, longitude: -65.2226 },
+  // Sur / San Pablo
+  'SAN PABLO': { latitude: -26.85258, longitude: -65.31881 },
+  'COUNTRY SAN PABLO': { latitude: -26.85258, longitude: -65.31881 },
+  'AUSENTES / LIC. MEDICA': { latitude: -26.82414, longitude: -65.22260 },
 };
 
 /**
