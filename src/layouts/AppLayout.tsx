@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Navigate, Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { supabase } from '../lib/supabase';
-import { Home, Wrench, FileText, Truck, Users, Building, LogOut, ShoppingCart, Sparkles, HardHat, ClipboardList, BarChart3, MoreHorizontal, Bell, Key, Eye, EyeOff, DollarSign, Calendar, PhoneCall, Send, Award, ChevronDown } from 'lucide-react';
+import { Home, Wrench, FileText, Truck, Users, Building, LogOut, ShoppingCart, Sparkles, HardHat, ClipboardList, BarChart3, MoreHorizontal, Bell, Key, Eye, EyeOff, DollarSign, Calendar, PhoneCall, Send, Award, ChevronDown, Compass } from 'lucide-react';
 
 
 
@@ -204,6 +204,7 @@ export default function AppLayout() {
 
   const mainNavTop = [
     { name: 'Inicio', path: '/dashboard', icon: Sparkles, show: true },
+    { name: 'Centro de Operaciones', path: '/centro-operaciones', icon: Compass, show: true },
     { name: 'Notificaciones', path: '/notificaciones', icon: Bell, show: true, badge: pendingCount },
     { name: 'Reportes', path: '/reportes', icon: BarChart3, show: isLogistica || isAdmin },
     { name: 'Herramientas', path: '/herramientas', icon: Wrench, show: true },
@@ -552,6 +553,15 @@ export default function AppLayout() {
 
             {/* Listado de links */}
             <div className="grid grid-cols-2 gap-4 py-2">
+              <Link 
+                to="/centro-operaciones" 
+                onClick={() => setShowMas(false)}
+                className="flex flex-col items-center justify-center p-4 bg-blue-950/40 border border-blue-800/80 rounded-2xl hover:bg-blue-900/60 transition-all text-center gap-2"
+              >
+                <Compass size={24} className="text-sky-400" />
+                <span className="text-[11px] font-black uppercase tracking-tight text-sky-200">Centro Operaciones</span>
+              </Link>
+
               <Link 
                 to="/pedidos-herramientas" 
                 onClick={() => setShowMas(false)}

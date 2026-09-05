@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
+
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/auth';
 import { Toaster } from '@/components/ui/toaster';
@@ -39,6 +40,8 @@ import Formularios from './pages/Formularios';
 import Trabajadores from './pages/Trabajadores';
 import CargarHorasPublico from './pages/CargarHorasPublico';
 import LiquidacionSueldos from './pages/LiquidacionSueldos';
+const CentroOperaciones = lazy(() => import('./pages/CentroOperaciones'));
+
 
 
 
@@ -96,6 +99,15 @@ export default function App() {
           <Route path="/logistica" element={<Logistica />} />
           <Route path="/obras" element={<Obras />} />
           <Route path="/mis-obras" element={<MisObras />} />
+          <Route 
+            path="/centro-operaciones" 
+            element={
+              <Suspense fallback={<LogoLoader fullScreen text="Cargando Centro de Operaciones..." size="md" />}>
+                <CentroOperaciones />
+              </Suspense>
+            } 
+          />
+          <Route path="/mapa-operativo" element={<Navigate to="/centro-operaciones" replace />} />
           <Route path="/personal" element={<Personal />} />
           <Route path="/personal/nuevo-asistido" element={<NuevoPersonalAsistido />} />
           <Route path="/personal/busqueda-visual" element={<BusquedaPersonal />} />

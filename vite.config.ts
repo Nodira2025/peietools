@@ -10,7 +10,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {
-        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024, // 4MB
+        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024, // 6MB
         skipWaiting: true,
         clientsClaim: true,
         cleanupOutdatedCaches: true,
