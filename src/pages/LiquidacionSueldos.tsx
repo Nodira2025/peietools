@@ -193,14 +193,20 @@ export default function LiquidacionSueldos() {
     try {
       // 1. Cargar Empleados, Novedades y Semanales en paralelo
       const [empRes, novRes, semRes, oRes, regRes] = await Promise.all([
-        supabase.from('empleados').select('id, full_name, specialty, whatsapp, photo_url, obra_id, valor_hora, valor_hora_extra, obras(name)').order('full_name'),
+        supabase.from('empleados').select('*, obras(name)').order('full_name'),
         supabase.from('novedades_diarias').select('*').order('fecha', { ascending: false }),
         supabase.from('registro_horas_semanales').select('*').order('semana_inicio', { ascending: false }),
         supabase.from('obras').select('id, name').eq('active', true).order('name'),
         supabase.from('reglas_horas_trabajadores').select('*').limit(1).maybeSingle()
       ]);
 
-      const empData = empRes.data || [];
+      let empData = empRes.data || [];
+      // Fallback de seguridad si falla la relación con obras
+      if ((!empData || empData.length === 0) && empRes.error) {
+        console.warn('Reintentando carga básica de empleados:', empRes.error.message);
+        const fallbackEmp = await supabase.from('empleados').select('*').order('full_name');
+        if (fallbackEmp.data) empData = fallbackEmp.data;
+      }
       const novData = (novRes.data || []) as NovedadRegistro[];
       const semData = (semRes.data || []) as SemanalRegistro[];
 
@@ -326,10 +332,14 @@ export default function LiquidacionSueldos() {
       setTarifasEditadas(nextMap);
       localStorage.setItem('peie_tarifas_horas', JSON.stringify(nextMap));
 
-      await supabase
-        .from('empleados')
-        .update({ valor_hora: tarifaMasivaGlobal })
-        .neq('id', '00000000-0000-0000-0000-000000000000');
+      try {
+        await supabase
+          .from('empleados')
+          .update({ valor_hora: tarifaMasivaGlobal })
+          .neq('id', '00000000-0000-0000-0000-000000000000');
+      } catch (e) {
+        console.warn('Columna valor_hora no disponible en BD aún:', e);
+      }
 
       setEmpleados(prev => prev.map(e => ({ ...e, valor_hora: tarifaMasivaGlobal })));
       setIsMasivoModalOpen(false);
@@ -650,7 +660,16 @@ export default function LiquidacionSueldos() {
                     setIsSearchDropdownOpen(true);
                   }}
                   onFocus={() => setIsSearchDropdownOpen(true)}
-                  placeholder="Escribí el nombre del obrero (ej. Jimenez, Lopez) o su DNI..."
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && suggestedWorkers.length > 0) {
+                      e.preventDefault();
+                      const first = suggestedWorkers[0];
+                      setSelectedObreroId(first.id);
+                      setSearchWorkerQuery(first.full_name);
+                      setIsSearchDropdownOpen(false);
+                    }
+                  }}
+                  placeholder="Escribí el nombre del obrero (ej. Acosta, Jimenez) o su DNI..."
                   className="pl-10 pr-10 h-12 rounded-2xl border-slate-200 text-sm font-bold bg-slate-50 focus:bg-white text-slate-900 shadow-inner"
                 />
                 {searchWorkerQuery && (
@@ -693,6 +712,12 @@ export default function LiquidacionSueldos() {
                         return (
                           <div
                             key={emp.id}
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              setSelectedObreroId(emp.id);
+                              setSearchWorkerQuery(emp.full_name);
+                              setIsSearchDropdownOpen(false);
+                            }}
                             onClick={() => {
                               setSelectedObreroId(emp.id);
                               setSearchWorkerQuery(emp.full_name);
