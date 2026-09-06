@@ -95,6 +95,14 @@ export default function OperationsSidebar({
                   <span className="text-[10px] font-extrabold text-sky-700 bg-sky-50 px-2 py-1 rounded-lg border border-sky-200">
                     🛠 {obra.toolsCount}
                   </span>
+                  {obra.totalLaborCost > 0 && (
+                    <span 
+                      className="text-[10px] font-extrabold text-emerald-800 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200" 
+                      title={`Horas trabajadas: ${obra.totalLaborHours} hs`}
+                    >
+                      💰 ${(obra.totalLaborCost >= 1000000 ? `${(obra.totalLaborCost / 1000000).toFixed(1)}M` : obra.totalLaborCost.toLocaleString('es-AR'))}
+                    </span>
+                  )}
                   <ChevronRight size={15} className="text-slate-300 group-hover:text-blue-600 transition-colors" />
                 </div>
               </div>
@@ -123,6 +131,11 @@ export default function OperationsSidebar({
             ) : (
               <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
                 <ShieldCheck size={11} /> Coordenada GPS
+              </span>
+            )}
+            {(selectedWorksite.totalLaborCost || 0) > 0 && (
+              <span className="text-[9px] font-black text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-full border border-emerald-300">
+                Costo M.O.: ${(selectedWorksite.totalLaborCost || 0).toLocaleString('es-AR')}
               </span>
             )}
           </div>
@@ -180,7 +193,7 @@ export default function OperationsSidebar({
         </div>
       </div>
 
-      {/* Resumen Métricas */}
+      {/* Resumen Métricas con Costo de Mano de Obra */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-white border-b border-slate-100">
         <div className="p-3 rounded-xl bg-amber-50/80 border border-amber-150">
           <p className="text-xs font-extrabold text-amber-900">Personal Asignado</p>
@@ -190,12 +203,21 @@ export default function OperationsSidebar({
           <p className="text-xs font-extrabold text-sky-900">Herramientas en Obra</p>
           <p className="text-xl font-black text-sky-700 mt-0.5">🛠 {selectedWorksite.toolsCount}</p>
         </div>
-        <div className="p-3 rounded-xl bg-slate-50 border border-slate-150 col-span-2 sm:col-span-2 flex items-center justify-between">
+        <div className="p-3 rounded-xl bg-emerald-50/80 border border-emerald-200">
+          <p className="text-xs font-extrabold text-emerald-900">Costo Mano de Obra</p>
+          <p className="text-xl font-black text-emerald-700 mt-0.5">
+            ${(selectedWorksite.totalLaborCost || 0).toLocaleString('es-AR')}
+          </p>
+          <p className="text-[10px] text-emerald-700 font-semibold mt-0.5">
+            ⏱ {selectedWorksite.totalLaborHours || 0} hs registradas
+          </p>
+        </div>
+        <div className="p-3 rounded-xl bg-slate-50 border border-slate-150 flex items-center justify-between">
           <div>
-            <p className="text-xs font-extrabold text-slate-700">Índice de Carga Operativa</p>
-            <p className="text-xs text-slate-400 font-medium">Magnitud ponderada de recursos</p>
+            <p className="text-xs font-extrabold text-slate-700">Índice de Carga</p>
+            <p className="text-[10px] text-slate-400 font-medium">Magnitud ponderada</p>
           </div>
-          <span className="text-base font-black text-peie-blue bg-white px-3 py-1 rounded-lg border border-slate-200 shadow-sm">
+          <span className="text-sm font-black text-peie-blue bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-sm">
             {selectedWorksite.magnitudeIndex.toFixed(1)} pts
           </span>
         </div>

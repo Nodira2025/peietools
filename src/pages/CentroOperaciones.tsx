@@ -25,6 +25,26 @@ import {
 
 import { Compass, Sparkles, SlidersHorizontal, ChevronUp, ChevronDown } from 'lucide-react';
 
+function normalizeText(text: string | null | undefined): string {
+  if (!text) return '';
+  return text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[,.-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const RATE_BY_SPEC: Record<string, number> = {
+  'electricista': 5000,
+  'oficial': 4800,
+  'medio oficial': 4400,
+  'ayudante': 4000,
+  'capataz': 6000,
+  'general': 4500,
+};
+
 export default function CentroOperaciones() {
   const [loading, setLoading] = useState(true);
   const [worksites, setWorksites] = useState<OperationalWorksite[]>([]);
@@ -53,7 +73,7 @@ export default function CentroOperaciones() {
       try {
         setLoading(true);
 
-        const [obrasRes, empsRes, toolsRes] = await Promise.all([
+        const [obrasRes, empsRes, toolsRes, novsRes] = await Promise.all([
           supabase
             .from('obras')
             .select('id, code, name, address, encargado_name, phone, latitude, longitude, photo_url, active, status')
@@ -66,6 +86,9 @@ export default function CentroOperaciones() {
             .from('herramientas')
             .select('id, code, name, description, brand, model, photo_url, status, current_obra_id, category, last_latitude, last_longitude')
             .order('name'),
+          supabase
+            .from('novedades_diarias')
+            .select('*'),
         ]);
 
         const rawObras = obrasRes.data || [];
@@ -77,15 +100,50 @@ export default function CentroOperaciones() {
         const rawTools: OperationalTool[] = (toolsRes.data || []).map((t: any) => ({
           ...t,
         }));
+        const rawNovs = novsRes.data || [];
+
+        // Tarifas personalizadas guardadas en localStorage como respaldo
+        const localTarifasSaved: Record<string, number> = {};
+        try {
+          const raw = localStorage.getItem('peie_tarifas_horas');
+          if (raw) Object.assign(localTarifasSaved, JSON.parse(raw));
+        } catch {}
+
+        const empMap = new Map<string, any>();
+        rawEmps.forEach((e) => {
+          empMap.set(e.id, e);
+          empMap.set(normalizeText(e.full_name), e);
+        });
 
         setAllEmployees(rawEmps);
         setAllTools(rawTools);
 
-        // Map workers and tools to worksites
+        // Map workers, tools and labor cost to worksites
         const initialWorksites: Omit<OperationalWorksite, 'bubbleRadiusPx'>[] = rawObras.map((obra: any) => {
           const assignedWorkers = rawEmps.filter((e) => e.obra_id === obra.id);
           const assignedTools = rawTools.filter((t) => t.current_obra_id === obra.id);
           const { coordinates, isSimulated } = resolveWorksiteCoordinates(obra);
+
+          const obraWorkerIds = new Set(assignedWorkers.map((w) => w.id));
+          const normObraName = normalizeText(obra.name);
+
+          // Novedades de asistencia para calcular horas y costo acumulado de la obra
+          const obraNovs = rawNovs.filter((n: any) => {
+            if (n.obra_id && n.obra_id === obra.id) return true;
+            if (n.empleado_id && obraWorkerIds.has(n.empleado_id)) return true;
+            if (n.obra_nombre && normalizeText(n.obra_nombre) === normObraName) return true;
+            return false;
+          });
+
+          const totalLaborHours = obraNovs.reduce((acc: number, curr: any) => acc + (Number(curr.horas_trabajadas) || 0), 0);
+          const totalLaborCost = obraNovs.reduce((acc: number, curr: any) => {
+            const hours = Number(curr.horas_trabajadas) || 0;
+            if (hours <= 0) return acc;
+            const emp = curr.empleado_id ? empMap.get(curr.empleado_id) : null;
+            const spec = (emp?.specialty || 'general').toLowerCase().trim();
+            const rate = (emp?.id && localTarifasSaved[emp.id]) || RATE_BY_SPEC[spec] || 4500;
+            return acc + (hours * rate);
+          }, 0);
 
           const rawMagnitude = calculateRawMagnitude(
             assignedWorkers.length,
@@ -110,6 +168,8 @@ export default function CentroOperaciones() {
             assignedWorkers,
             assignedTools,
             magnitudeIndex: rawMagnitude,
+            totalLaborHours,
+            totalLaborCost,
           };
         });
 
@@ -202,6 +262,8 @@ export default function CentroOperaciones() {
       (w) => (!w.active && (w.workersCount > 0 || w.toolsCount > 0)) || (w.active && w.workersCount === 0)
     ).length;
 
+    const totalLaborCost = worksites.reduce((acc, curr) => acc + (curr.totalLaborCost || 0), 0);
+
     return {
       totalActiveWorksites,
       totalFieldWorkers,
@@ -210,6 +272,7 @@ export default function CentroOperaciones() {
       totalAvailableTools,
       alertsCount,
       suggestionsCount: 0,
+      totalLaborCost,
     };
   }, [worksites, allEmployees, allTools]);
 

@@ -49,6 +49,8 @@ export interface OperationalWorksite {
   assignedTools: OperationalTool[];
   magnitudeIndex: number;
   bubbleRadiusPx: number;
+  totalLaborHours: number;
+  totalLaborCost: number;
 }
 
 export interface MagnitudeWeights {
@@ -66,6 +68,7 @@ export interface OperationsKPIs {
   totalAvailableTools: number;
   alertsCount: number;
   suggestionsCount: number;
+  totalLaborCost: number;
 }
 
 export interface OperationsFilterState {

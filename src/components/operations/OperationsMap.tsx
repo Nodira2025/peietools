@@ -166,6 +166,12 @@ export default function OperationsMap({
               <span class="text-sky-600 font-black">🛠</span> ${worksite.toolsCount} equipos
             </div>
           </div>
+          ${(worksite.totalLaborCost || 0) > 0 ? `
+            <div class="mt-1.5 p-1.5 bg-emerald-50 rounded-lg border border-emerald-150 text-[10px] flex items-center justify-between text-emerald-900 font-bold">
+              <span>Costo M.O.:</span>
+              <span class="font-black text-emerald-700">$${(worksite.totalLaborCost || 0).toLocaleString('es-AR')}</span>
+            </div>
+          ` : ''}
           <p class="text-[9px] text-blue-600 font-bold mt-1 text-center">Click para abrir panel operativo</p>
         </div>
       `);
