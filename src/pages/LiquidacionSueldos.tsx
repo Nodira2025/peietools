@@ -23,13 +23,17 @@ import {
   AlertCircle,
   HelpCircle,
   Sparkles,
-  Award
+  Award,
+  ChevronDown,
+  X,
+  UserCheck
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { buildWhatsAppLink } from '../lib/whatsapp';
+import { ObreroSueldoProyecciones } from '../components/ObreroSueldoProyecciones';
 import * as XLSX from 'xlsx';
 
-interface EmpleadoSueldo {
+export interface EmpleadoSueldo {
   id: string;
   full_name: string;
   specialty?: string | null;
@@ -39,6 +43,8 @@ interface EmpleadoSueldo {
   obras?: { name: string } | null;
   valor_hora?: number | null;
   valor_hora_extra?: number | null;
+  dni?: string | null;
+  fecha_ingreso?: string | null;
 }
 
 interface NovedadRegistro {
@@ -109,6 +115,33 @@ export default function LiquidacionSueldos() {
   const [selectedObraId, setSelectedObraId] = useState<string>('TODAS');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
+  // Buscador de Obrero con Precarga / Autocomplete
+  const [searchWorkerQuery, setSearchWorkerQuery] = useState<string>('');
+  const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState<boolean>(false);
+  const [selectedObreroId, setSelectedObreroId] = useState<string | null>(null);
+
+  // Obrero seleccionado actualmente para ver su proyección detallada
+  const selectedObrero = useMemo(() => {
+    if (!selectedObreroId) return null;
+    return empleados.find(e => e.id === selectedObreroId) || null;
+  }, [empleados, selectedObreroId]);
+
+  // Obreros sugeridos con precarga en vivo
+  const suggestedWorkers = useMemo(() => {
+    if (!searchWorkerQuery.trim()) {
+      return empleados.slice(0, 8); // Precarga los primeros 8
+    }
+    const q = normalizeText(searchWorkerQuery);
+    return empleados.filter(emp => {
+      const matchName = normalizeText(emp.full_name).includes(q);
+      const matchDni = emp.dni && emp.dni.includes(q);
+      const matchPhone = emp.whatsapp && emp.whatsapp.replace(/\D/g, '').includes(q);
+      const matchSpec = normalizeText(emp.specialty).includes(q);
+      const matchObra = normalizeText(emp.obras?.name).includes(q);
+      return matchName || matchDni || matchPhone || matchSpec || matchObra;
+    });
+  }, [empleados, searchWorkerQuery]);
+
   // Tarifas en memoria / edición
   const [tarifasEditadas, setTarifasEditadas] = useState<Record<string, number>>({});
   const [horasManualesMap, setHorasManualesMap] = useState<Record<string, number>>(() => {
@@ -158,13 +191,28 @@ export default function LiquidacionSueldos() {
   const loadData = async () => {
     setLoading(true);
     try {
-      // 1. Cargar Empleados
-      const { data: empData, error: empErr } = await supabase
-        .from('empleados')
-        .select('id, full_name, specialty, whatsapp, photo_url, obra_id, valor_hora, valor_hora_extra, obras(name)')
-        .order('full_name');
+      // 1. Cargar Empleados, Novedades y Semanales en paralelo
+      const [empRes, novRes, semRes, oRes, regRes] = await Promise.all([
+        supabase.from('empleados').select('id, full_name, specialty, whatsapp, photo_url, obra_id, valor_hora, valor_hora_extra, obras(name)').order('full_name'),
+        supabase.from('novedades_diarias').select('*').order('fecha', { ascending: false }),
+        supabase.from('registro_horas_semanales').select('*').order('semana_inicio', { ascending: false }),
+        supabase.from('obras').select('id, name').eq('active', true).order('name'),
+        supabase.from('reglas_horas_trabajadores').select('*').limit(1).maybeSingle()
+      ]);
 
-      if (empErr) console.warn('Error al cargar empleados:', empErr.message);
+      const empData = empRes.data || [];
+      const novData = (novRes.data || []) as NovedadRegistro[];
+      const semData = (semRes.data || []) as SemanalRegistro[];
+
+      setNovedades(novData);
+      setSemanales(semData);
+      if (oRes.data) setObrasList(oRes.data);
+
+      if (regRes.data) {
+        if (regRes.data.valor_hora_defecto) setValorHoraDefecto(Number(regRes.data.valor_hora_defecto));
+        if (regRes.data.porcentaje_bono) setPorcentajeBonoPresentismo(Number(regRes.data.porcentaje_bono));
+        if (regRes.data.horas_objetivo_quincena) setHorasObjetivoQuincena(Number(regRes.data.horas_objetivo_quincena));
+      }
 
       // Cargar tarifas guardadas en localStorage como backup/fallback
       const localTarifasSaved: Record<string, number> = {};
@@ -175,11 +223,23 @@ export default function LiquidacionSueldos() {
         console.error(e);
       }
 
-      const formattedEmps: EmpleadoSueldo[] = (empData || []).map((e: any) => {
+      const formattedEmps: EmpleadoSueldo[] = empData.map((e: any) => {
         const obraObj = Array.isArray(e.obras) ? e.obras[0] : e.obras;
         const vHora = Number(e.valor_hora) || localTarifasSaved[e.id] || 4500;
+        
+        // Buscar si hay un DNI registrado en novedades o semanales para este empleado
+        const normName = normalizeText(e.full_name);
+        const novMatching = novData.find(n => 
+          (n.empleado_id === e.id || normalizeText(n.empleado_nombre) === normName) && n.empleado_dni
+        );
+        const semMatching = semData.find(s => 
+          (s.empleado_id === e.id || normalizeText(s.empleado_nombre) === normName) && s.empleado_dni
+        );
+        const foundDni = e.dni || novMatching?.empleado_dni || semMatching?.empleado_dni || null;
+
         return {
           ...e,
+          dni: foundDni,
           obras: obraObj,
           valor_hora: vHora
         };
@@ -193,24 +253,6 @@ export default function LiquidacionSueldos() {
         mapInicial[emp.id] = emp.valor_hora || 4500;
       });
       setTarifasEditadas(mapInicial);
-
-      // 2. Cargar Novedades Diarias y Semanales
-      const [novRes, semRes, oRes, regRes] = await Promise.all([
-        supabase.from('novedades_diarias').select('*').order('fecha', { ascending: false }),
-        supabase.from('registro_horas_semanales').select('*').order('semana_inicio', { ascending: false }),
-        supabase.from('obras').select('id, name').eq('active', true).order('name'),
-        supabase.from('reglas_horas_trabajadores').select('*').limit(1).maybeSingle()
-      ]);
-
-      if (novRes.data) setNovedades(novRes.data as NovedadRegistro[]);
-      if (semRes.data) setSemanales(semRes.data as SemanalRegistro[]);
-      if (oRes.data) setObrasList(oRes.data);
-
-      if (regRes.data) {
-        if (regRes.data.valor_hora_defecto) setValorHoraDefecto(Number(regRes.data.valor_hora_defecto));
-        if (regRes.data.porcentaje_bono) setPorcentajeBonoPresentismo(Number(regRes.data.porcentaje_bono));
-        if (regRes.data.horas_objetivo_quincena) setHorasObjetivoQuincena(Number(regRes.data.horas_objetivo_quincena));
-      }
     } catch (err: any) {
       console.error('Error al sincronizar datos de sueldos:', err);
       toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar los datos de liquidación.' });
@@ -238,8 +280,8 @@ export default function LiquidacionSueldos() {
   };
 
   // Guardar Tarifa de un empleado individual
-  const handleSaveTarifaIndividual = async (empId: string) => {
-    const valor = Number(tarifasEditadas[empId]) || valorHoraDefecto;
+  const handleSaveTarifaIndividual = async (empId: string, customValor?: number) => {
+    const valor = customValor !== undefined ? customValor : (Number(tarifasEditadas[empId]) || valorHoraDefecto);
     try {
       const localTarifas: Record<string, number> = {};
       try {
@@ -248,6 +290,9 @@ export default function LiquidacionSueldos() {
       } catch {}
       localTarifas[empId] = valor;
       localStorage.setItem('peie_tarifas_horas', JSON.stringify(localTarifas));
+
+      const nextMap = { ...tarifasEditadas, [empId]: valor };
+      setTarifasEditadas(nextMap);
 
       const { error } = await supabase
         .from('empleados')
@@ -583,8 +628,163 @@ export default function LiquidacionSueldos() {
         </div>
       </div>
 
-      {/* Tarjetas de Métricas Resumen */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* =================================================================== */}
+      {/* BUSCADOR PROMINENTE DE OBRERO (NOMBRE O DNI CON PRECARGA)           */}
+      {/* =================================================================== */}
+      <div className="relative z-30">
+        <Card className="rounded-3xl border border-slate-200/90 bg-white shadow-md p-4 sm:p-5">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            
+            <div className="flex-1 relative">
+              <Label className="text-xs font-black uppercase tracking-wider text-slate-500 mb-1.5 flex items-center gap-1.5">
+                <Search className="h-4 w-4 text-peie-blue" />
+                <span>Buscar Obrero por Nombre o DNI (Cálculo y Proyecciones Salariales)</span>
+              </Label>
+              <div className="relative">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  type="text"
+                  value={searchWorkerQuery}
+                  onChange={(e) => {
+                    setSearchWorkerQuery(e.target.value);
+                    setIsSearchDropdownOpen(true);
+                  }}
+                  onFocus={() => setIsSearchDropdownOpen(true)}
+                  placeholder="Escribí el nombre del obrero (ej. Jimenez, Lopez) o su DNI..."
+                  className="pl-10 pr-10 h-12 rounded-2xl border-slate-200 text-sm font-bold bg-slate-50 focus:bg-white text-slate-900 shadow-inner"
+                />
+                {searchWorkerQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchWorkerQuery('');
+                      setSelectedObreroId(null);
+                      setIsSearchDropdownOpen(false);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* LISTA DESPLEGABLE CON PRECARGA / SUGERENCIAS */}
+              {isSearchDropdownOpen && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-40" 
+                    onClick={() => setIsSearchDropdownOpen(false)} 
+                  />
+                  <div className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl shadow-2xl border border-slate-200/90 max-h-80 overflow-y-auto divide-y divide-slate-100 z-50 animate-fadeIn">
+                    <div className="p-2.5 px-3 bg-slate-50 text-[11px] font-black text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                      <span>{searchWorkerQuery ? 'Obreros Coincidentes' : '⚡ Precarga de Obreros sugeridos'}</span>
+                      <span className="text-[10px] text-slate-400 font-semibold">{suggestedWorkers.length} encontrados</span>
+                    </div>
+
+                    {suggestedWorkers.length === 0 ? (
+                      <div className="p-6 text-center text-xs text-slate-500 space-y-1">
+                        <p className="font-bold">No encontramos obreros con esa búsqueda.</p>
+                        <p className="text-[11px] text-slate-400">Probá con el apellido o parte del DNI.</p>
+                      </div>
+                    ) : (
+                      suggestedWorkers.map(emp => {
+                        const vHora = Number(tarifasEditadas[emp.id]) || Number(emp.valor_hora) || valorHoraDefecto;
+                        const isSelected = emp.id === selectedObreroId;
+                        return (
+                          <div
+                            key={emp.id}
+                            onClick={() => {
+                              setSelectedObreroId(emp.id);
+                              setSearchWorkerQuery(emp.full_name);
+                              setIsSearchDropdownOpen(false);
+                            }}
+                            className={`p-3 px-4 flex items-center justify-between hover:bg-blue-50/70 cursor-pointer transition-colors ${
+                              isSelected ? 'bg-blue-50/90 border-l-4 border-l-peie-blue' : ''
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-800 font-black text-sm flex items-center justify-center shrink-0">
+                                {emp.full_name.slice(0, 2).toUpperCase()}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-black text-sm text-slate-900">{emp.full_name}</span>
+                                  {emp.dni && (
+                                    <span className="text-[10px] font-mono bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md font-bold">
+                                      DNI: {emp.dni}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-slate-500 font-medium">
+                                  {emp.specialty || 'Personal de Obra'} • {emp.obras?.name || 'Obra Asignada'}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="text-right">
+                              <span className="text-xs font-black text-emerald-700 block">
+                                ${vHora.toLocaleString('es-AR')}/h
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-semibold flex items-center gap-0.5 justify-end">
+                                Ver Sueldo <ChevronRight className="w-3 h-3" />
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {selectedObrero && (
+              <Button
+                type="button"
+                onClick={() => {
+                  setSelectedObreroId(null);
+                  setSearchWorkerQuery('');
+                }}
+                variant="outline"
+                className="h-12 rounded-2xl border-slate-300 text-slate-700 text-xs font-bold shrink-0 self-end md:self-auto gap-2"
+              >
+                <Users className="w-4 h-4 text-peie-blue" />
+                <span>Ver Nómina General</span>
+              </Button>
+            )}
+
+          </div>
+        </Card>
+      </div>
+
+      {/* =================================================================== */}
+      {/* VISTA DETALLADA DEL OBRERO O VISTA GENERAL DE LA NÓMINA             */}
+      {/* =================================================================== */}
+      {selectedObrero ? (
+        <ObreroSueldoProyecciones
+          empleado={selectedObrero}
+          novedades={novedades}
+          valorHora={Number(tarifasEditadas[selectedObrero.id]) || Number(selectedObrero.valor_hora) || valorHoraDefecto}
+          onUpdateValorHora={(val) => handleSaveTarifaIndividual(selectedObrero.id, val)}
+          adelanto={Number(adelantosMap[selectedObrero.id]) || 0}
+          onUpdateAdelanto={(val) => handleAdelantoChange(selectedObrero.id, val)}
+          porcentajeBonoPresentismo={porcentajeBonoPresentismo}
+          onClose={() => {
+            setSelectedObreroId(null);
+            setSearchWorkerQuery('');
+          }}
+          onPrintReceipt={() => {
+            const liq = liquidaciones.find(l => l.empleado.id === selectedObrero.id);
+            if (liq) {
+              setSelectedLiquidacionForReceipt(liq);
+              setIsReceiptModalOpen(true);
+            }
+          }}
+        />
+      ) : (
+        <>
+          {/* Tarjetas de Métricas Resumen */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
         {/* Total a Pagar */}
         <Card className="rounded-2xl border-slate-200 shadow-sm bg-gradient-to-br from-emerald-50 to-white overflow-hidden border-l-4 border-l-emerald-500">
@@ -963,6 +1163,19 @@ export default function LiquidacionSueldos() {
                       {/* Acciones */}
                       <td className="py-3 px-3 text-center">
                         <div className="flex items-center justify-center gap-1.5">
+                          {/* Ver Proyecciones & Sueldo Detallado */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedObreroId(emp.id);
+                              setSearchWorkerQuery(emp.full_name);
+                            }}
+                            className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-all"
+                            title="Ver proyecciones, cuánto cobrará este mes, próximos meses e historial"
+                          >
+                            <TrendingUp className="h-4 w-4" />
+                          </button>
+
                           {/* Recibo Individual */}
                           <button
                             type="button"
@@ -1028,6 +1241,8 @@ export default function LiquidacionSueldos() {
           </table>
         </div>
       </Card>
+      </>
+      )}
 
       {/* MODAL 1: ASIGNACIÓN MASIVA DE TARIFAS */}
       <Dialog open={isMasivoModalOpen} onOpenChange={setIsMasivoModalOpen}>
