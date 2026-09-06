@@ -4,17 +4,29 @@ import { supabase } from '../lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Edit, Truck, AlertTriangle, MapPin, Navigation, Building2, Download, Camera, CheckCircle, Save, X, Trash2, Calendar, FileSpreadsheet } from 'lucide-react';
+import { ArrowLeft, Edit, Truck, AlertTriangle, MapPin, Navigation, Building2, Download, Camera, CheckCircle, Save, X, Trash2, Calendar, FileSpreadsheet, DollarSign, Wrench, Plus, Receipt, Sparkles, History } from 'lucide-react';
 import * as XLSX from 'xlsx';
-
-
 
 import { useAuthStore } from '../store/auth';
 import { compressImage } from '../lib/imageUtils';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useCategories } from '../lib/useCategories';
+import { ModalNuevaReserva } from '../components/ModalNuevaReserva';
+import {
+  getToolPriceInfo,
+  saveToolCustomPrice,
+  removeToolCustomPrice,
+  getToolRepairs,
+  addToolRepair,
+  deleteToolRepair,
+  formatARS,
+  type ToolRepairExpense,
+  type ToolPriceInfo
+} from '../services/tools/toolPriceReference';
 
 interface Herramienta {
 
@@ -67,6 +79,107 @@ export default function HerramientaDetail() {
   const [editObraId, setEditObraId] = useState('');
   const [editStatus, setEditStatus] = useState('');
   const [obras, setObras] = useState<any[]>([]);
+
+  // Financial & Repair State
+  const [priceInfo, setPriceInfo] = useState<ToolPriceInfo | null>(null);
+  const [repairsList, setRepairsList] = useState<ToolRepairExpense[]>([]);
+  const [isEditingPrice, setIsEditingPrice] = useState(false);
+  const [customPriceInput, setCustomPriceInput] = useState('');
+
+  // Repair Modal State
+  const [isRepairModalOpen, setIsRepairModalOpen] = useState(false);
+  const [repairMonto, setRepairMonto] = useState('');
+  const [repairTipo, setRepairTipo] = useState<ToolRepairExpense['tipo']>('Reparación Mecánica');
+  const [repairTaller, setRepairTaller] = useState('');
+  const [repairDescripcion, setRepairDescripcion] = useState('');
+  const [repairComprobante, setRepairComprobante] = useState('');
+  const [repairFecha, setRepairFecha] = useState(new Date().toISOString().slice(0, 10));
+  const [repairEstado, setRepairEstado] = useState<'Completado' | 'En proceso' | 'Pendiente'>('Completado');
+
+  // Reservation modal state
+  const [isModalReservaOpen, setIsModalReservaOpen] = useState(false);
+
+  const refreshFinancials = (tool: Herramienta) => {
+    const info = getToolPriceInfo(tool);
+    setPriceInfo(info);
+    setCustomPriceInput(info.customPrice !== null ? String(info.customPrice) : '');
+    setRepairsList(getToolRepairs(tool.id));
+  };
+
+  const handleSaveCustomPrice = () => {
+    if (!herramienta) return;
+    const cleanNum = parseFloat(customPriceInput.replace(/[^0-9.]/g, ''));
+    if (isNaN(cleanNum) || cleanNum < 0) {
+      toast({ variant: 'destructive', title: 'Precio inválido', description: 'Ingresá un monto numérico válido.' });
+      return;
+    }
+    saveToolCustomPrice(herramienta.id, cleanNum, profile?.full_name || 'Usuario');
+    toast({ title: 'Precio guardado', description: `Se asignó el precio real de compra: ${formatARS(cleanNum)}.` });
+    setIsEditingPrice(false);
+    refreshFinancials(herramienta);
+  };
+
+  const handleResetToMarketPrice = () => {
+    if (!herramienta) return;
+    removeToolCustomPrice(herramienta.id);
+    toast({ title: 'Restablecido', description: 'Se utiliza ahora el precio de referencia de Mercado Libre.' });
+    setIsEditingPrice(false);
+    refreshFinancials(herramienta);
+  };
+
+  const handleAddRepair = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!herramienta) return;
+    const cleanMonto = parseFloat(repairMonto.replace(/[^0-9.]/g, ''));
+    if (isNaN(cleanMonto) || cleanMonto <= 0) {
+      toast({ variant: 'destructive', title: 'Monto requerido', description: 'Ingresá el costo total del service o arreglo.' });
+      return;
+    }
+    if (!repairDescripcion.trim()) {
+      toast({ variant: 'destructive', title: 'Descripción requerida', description: 'Detallá el arreglo o repuesto cambiado.' });
+      return;
+    }
+
+    addToolRepair({
+      herramienta_id: herramienta.id,
+      fecha: repairFecha || new Date().toISOString().slice(0, 10),
+      monto: cleanMonto,
+      tipo: repairTipo,
+      taller: repairTaller.trim() || 'Taller Técnico / S/D',
+      descripcion: repairDescripcion.trim(),
+      comprobante: repairComprobante.trim() || undefined,
+      estado: repairEstado,
+      creado_por: profile?.full_name || 'Personal PEIE',
+    });
+
+    try {
+      await supabase.from('movimientos').insert([{
+        herramienta_id: herramienta.id,
+        user_id: profile?.id,
+        action: `Gasto de Reparación: ${formatARS(cleanMonto)}`,
+        notes: `${repairTipo} en ${repairTaller || 'Taller'}: ${repairDescripcion}`
+      }]);
+    } catch (err) {
+      console.warn('Could not record to movimientos table', err);
+    }
+
+    toast({ title: 'Reparación Registrada', description: `Se cargó el gasto de ${formatARS(cleanMonto)}.` });
+    setIsRepairModalOpen(false);
+    setRepairMonto('');
+    setRepairDescripcion('');
+    setRepairTaller('');
+    setRepairComprobante('');
+    refreshFinancials(herramienta);
+    fetchMovimientos();
+  };
+
+  const handleDeleteRepair = (repairId: string) => {
+    if (!herramienta) return;
+    if (!window.confirm('¿Deseás eliminar este registro de reparación?')) return;
+    deleteToolRepair(herramienta.id, repairId);
+    toast({ title: 'Registro eliminado', description: 'Se eliminó el gasto de reparación.' });
+    refreshFinancials(herramienta);
+  };
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'logistica' || profile?.role === 'compras';
   const canEdit = isAdmin || profile?.role === 'solicitante' || profile?.role === 'encargado' || profile?.role === 'coordinador';
@@ -168,6 +281,7 @@ export default function HerramientaDetail() {
         obras: Array.isArray(data?.obras) ? data.obras[0] : data?.obras
       };
       setHerramienta(normalizedData);
+      refreshFinancials(normalizedData);
     }
     setLoading(false);
   };
@@ -733,8 +847,244 @@ export default function HerramientaDetail() {
               </div>
             )}
           </div>
+
+          {/* 💰 TARJETA DE VALUACIÓN Y PRECIOS */}
+          {priceInfo && (
+            <Card className="rounded-2xl shadow-sm border-slate-200 bg-white overflow-hidden">
+              <CardHeader className="bg-gradient-to-r from-blue-50/70 to-indigo-50/50 border-b border-slate-100 p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-peie-blue text-white shadow-xs">
+                      <DollarSign className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-sm font-black text-slate-800">Valuación del Equipo</CardTitle>
+                      <CardDescription className="text-[11px] text-slate-500">
+                        {priceInfo.isCustom ? 'Precio Real de Compra Registrado' : 'Precio de Referencia Mercado Libre'}
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <span className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full border ${
+                    priceInfo.isCustom 
+                      ? 'bg-purple-50 text-purple-700 border-purple-200' 
+                      : 'bg-amber-50 text-amber-700 border-amber-200'
+                  }`}>
+                    {priceInfo.isCustom ? 'Manual' : 'Ref. Mercado Libre'}
+                  </span>
+                </div>
+              </CardHeader>
+
+              <CardContent className="p-4 space-y-3">
+                <div>
+                  <div className="flex items-center justify-between text-xs text-slate-500 font-semibold mb-1">
+                    <span>{priceInfo.isCustom ? 'Precio Real de Compra' : 'Valor de Referencia ML'}</span>
+                    {canEdit && !isEditingPrice && (
+                      <button 
+                        onClick={() => {
+                          setCustomPriceInput(String(priceInfo.effectivePrice));
+                          setIsEditingPrice(true);
+                        }}
+                        className="text-peie-blue hover:text-blue-700 text-xs font-bold flex items-center gap-1 transition-colors"
+                      >
+                        <Edit className="w-3 h-3" /> {priceInfo.isCustom ? 'Editar' : 'Cargar Precio Real'}
+                      </button>
+                    )}
+                  </div>
+
+                  {isEditingPrice ? (
+                    <div className="space-y-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                      <Label className="text-[11px] font-bold text-slate-700">Precio de compra real (ARS $):</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="number"
+                          value={customPriceInput}
+                          onChange={(e) => setCustomPriceInput(e.target.value)}
+                          placeholder="Ej: 185000"
+                          className="h-9 text-sm font-mono font-bold"
+                          autoFocus
+                        />
+                        <Button size="sm" onClick={handleSaveCustomPrice} className="bg-peie-blue hover:bg-peie-blue/90 text-white h-9 px-3">
+                          <Save className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setIsEditingPrice(false)} className="h-9 px-2">
+                          <X className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                      {priceInfo.isCustom && (
+                        <button
+                          onClick={handleResetToMarketPrice}
+                          className="text-[11px] text-slate-500 hover:text-red-600 underline font-medium block"
+                        >
+                          Volver al valor sugerido ML ({formatARS(priceInfo.referencePrice)})
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-xl font-black text-slate-900 font-mono tracking-tight">
+                          {formatARS(priceInfo.effectivePrice)}
+                        </span>
+                        {!priceInfo.isCustom && (
+                          <span className="text-[10px] bg-amber-100/70 text-amber-800 font-bold px-1.5 py-0.5 rounded">
+                            Estimado ML
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-slate-400 font-medium mt-1">
+                        {priceInfo.isCustom 
+                          ? 'Cargado por administración para el inventario PEIE' 
+                          : `Rango ML: ${formatARS(priceInfo.priceRange.min)} - ${formatARS(priceInfo.priceRange.max)}`}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Resumen de Reparaciones e Inversión Total */}
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div className="p-2.5 rounded-xl bg-orange-50/70 border border-orange-100">
+                    <p className="text-[10px] uppercase font-bold text-orange-600">Total Reparaciones</p>
+                    <p className="text-sm font-black text-orange-950 font-mono mt-0.5">
+                      {formatARS(priceInfo.totalRepairs)}
+                    </p>
+                    <p className="text-[10px] text-orange-600/80 font-semibold">{repairsList.length} registros</p>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-100">
+                    <p className="text-[10px] uppercase font-bold text-emerald-700">Inversión Total</p>
+                    <p className="text-sm font-black text-emerald-950 font-mono mt-0.5">
+                      {formatARS(priceInfo.totalInvestment)}
+                    </p>
+                    <p className="text-[10px] text-emerald-600/80 font-semibold">Compra + Arreglos</p>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-100">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setIsRepairModalOpen(true)}
+                    className="w-full h-9 rounded-xl border-orange-200 text-orange-800 hover:bg-orange-50 font-bold text-xs gap-1.5 shadow-xs"
+                  >
+                    <Wrench className="w-3.5 h-3.5 text-orange-600" /> + Registrar Reparación / Service
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
+
+      {/* 🔧 SECCIÓN: HISTORIAL DE REPARACIONES Y GASTOS DE SERVICE */}
+      <Card className="rounded-2xl shadow-sm border-slate-200 bg-white overflow-hidden">
+        <CardHeader className="bg-orange-50/40 border-b border-slate-100 p-4 sm:p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+          <div>
+            <CardTitle className="text-base font-black text-slate-800 flex items-center gap-2">
+              <span className="p-1.5 rounded-lg bg-orange-100 text-orange-700">🔧</span> Gastos de Reparación y Mantenimiento
+            </CardTitle>
+            <CardDescription className="text-xs text-slate-500 mt-0.5">
+              Historial de gastos en talleres, repuestos, bobinados y mantenimiento preventivo
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              onClick={() => setIsRepairModalOpen(true)}
+              className="rounded-xl text-xs gap-1.5 font-bold bg-orange-600 hover:bg-orange-700 text-white shadow-sm"
+            >
+              <Plus className="w-3.5 h-3.5" /> Registrar Reparación
+            </Button>
+            <span className="bg-orange-100/80 text-orange-900 font-extrabold text-xs px-3 py-1.5 rounded-full border border-orange-200 flex items-center gap-1.5">
+              <Receipt className="w-3.5 h-3.5 text-orange-700" /> Total: {formatARS(priceInfo?.totalRepairs || 0)}
+            </span>
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-0">
+          {repairsList.length === 0 ? (
+            <div className="p-8 text-center space-y-2">
+              <div className="w-10 h-10 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center mx-auto">
+                <Wrench className="w-5 h-5" />
+              </div>
+              <p className="text-sm font-bold text-slate-700">Sin gastos de reparación registrados aún</p>
+              <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                Registrá aquí services de mantenimiento, reparaciones de bobinado, cambio de carbones o compra de repuestos.
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setIsRepairModalOpen(true)}
+                className="mt-2 text-xs font-bold border-orange-200 text-orange-700 hover:bg-orange-50"
+              >
+                + Cargar Primer Gasto
+              </Button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[10px] border-b border-slate-100">
+                  <tr>
+                    <th className="py-3 px-4">Fecha</th>
+                    <th className="py-3 px-4">Tipo de Servicio</th>
+                    <th className="py-3 px-4">Taller / Proveedor</th>
+                    <th className="py-3 px-4">Descripción / Diagnóstico</th>
+                    <th className="py-3 px-4">Comprobante</th>
+                    <th className="py-3 px-4">Monto (ARS)</th>
+                    <th className="py-3 px-4">Estado</th>
+                    {canEdit && <th className="py-3 px-4 text-right">Acción</th>}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                  {repairsList.map((r) => (
+                    <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-3 px-4 whitespace-nowrap text-slate-500 font-mono">
+                        {new Date(r.fecha + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                      </td>
+                      <td className="py-3 px-4 font-bold text-slate-800">
+                        {r.tipo}
+                      </td>
+                      <td className="py-3 px-4 text-slate-600 font-medium">
+                        {r.taller}
+                      </td>
+                      <td className="py-3 px-4 text-slate-700 max-w-xs">
+                        {r.descripcion}
+                      </td>
+                      <td className="py-3 px-4 font-mono text-slate-500">
+                        {r.comprobante || '-'}
+                      </td>
+                      <td className="py-3 px-4 font-mono font-black text-slate-900 whitespace-nowrap">
+                        {formatARS(r.monto)}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black border ${
+                          r.estado === 'Completado'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : r.estado === 'En proceso'
+                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                            : 'bg-slate-100 text-slate-600 border-slate-200'
+                        }`}>
+                          {r.estado}
+                        </span>
+                      </td>
+                      {canEdit && (
+                        <td className="py-3 px-4 text-right">
+                          <button
+                            onClick={() => handleDeleteRepair(r.id)}
+                            className="p-1 text-slate-400 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50"
+                            title="Eliminar registro de reparación"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* 📋 SECCIÓN: HISTORIAL DE MOVIMIENTOS Y TRASLADOS DE ESTA HERRAMIENTA */}
       <Card className="rounded-2xl shadow-sm border-slate-200 bg-white overflow-hidden">
@@ -858,6 +1208,146 @@ export default function HerramientaDetail() {
           </div>
         </div>
       )}
+      {/* Modal / Dialog para Cargar Gasto de Reparación */}
+      <Dialog open={isRepairModalOpen} onOpenChange={setIsRepairModalOpen}>
+        <DialogContent className="max-w-md w-[95vw] rounded-2xl p-5">
+          <DialogHeader className="space-y-1">
+            <DialogTitle className="text-base font-black text-slate-800 flex items-center gap-2">
+              <span className="p-1.5 rounded-lg bg-orange-100 text-orange-700">🔧</span>
+              Registrar Gasto de Reparación / Service
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              {herramienta.name} ({herramienta.code})
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleAddRepair} className="space-y-3.5 pt-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs font-bold text-slate-700">Monto del Arreglo (ARS) *</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-xs font-black text-slate-400">$</span>
+                  <Input
+                    type="number"
+                    required
+                    value={repairMonto}
+                    onChange={(e) => setRepairMonto(e.target.value)}
+                    placeholder="Ej: 35000"
+                    className="h-10 pl-7 text-sm font-mono font-bold rounded-xl"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-bold text-slate-700">Fecha del Trabajo *</Label>
+                <Input
+                  type="date"
+                  required
+                  value={repairFecha}
+                  onChange={(e) => setRepairFecha(e.target.value)}
+                  className="h-10 text-xs rounded-xl"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs font-bold text-slate-700">Tipo de Reparación o Mantenimiento *</Label>
+              <Select value={repairTipo} onValueChange={(val: any) => setRepairTipo(val)}>
+                <SelectTrigger className="h-10 text-xs rounded-xl text-slate-800">
+                  <SelectValue placeholder="Seleccioná tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Reparación de Motor/Bobinado">Reparación de Motor / Bobinado</SelectItem>
+                  <SelectItem value="Cambio de Carbones/Cables">Cambio de Carbones / Cable / Ficha</SelectItem>
+                  <SelectItem value="Mantenimiento Preventivo">Mantenimiento Preventivo / Engrase</SelectItem>
+                  <SelectItem value="Reparación Mecánica">Reparación Mecánica / Mandril / Corona</SelectItem>
+                  <SelectItem value="Batería / Cargador">Batería / Cargador</SelectItem>
+                  <SelectItem value="Calibración / Prueba">Calibración / Prueba Eléctrica</SelectItem>
+                  <SelectItem value="Otro">Otro arreglo general</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs font-bold text-slate-700">Taller o Proveedor</Label>
+                <Input
+                  value={repairTaller}
+                  onChange={(e) => setRepairTaller(e.target.value)}
+                  placeholder="Ej: Bobinados Tucumán"
+                  className="h-10 text-xs rounded-xl"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-bold text-slate-700">Comprobante / Factura</Label>
+                <Input
+                  value={repairComprobante}
+                  onChange={(e) => setRepairComprobante(e.target.value)}
+                  placeholder="Ej: Factura B 0001-4481"
+                  className="h-10 text-xs font-mono rounded-xl"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs font-bold text-slate-700">Detalle del Arreglo / Repuestos *</Label>
+              <Textarea
+                required
+                value={repairDescripcion}
+                onChange={(e) => setRepairDescripcion(e.target.value)}
+                placeholder="Describí qué se le hizo a la máquina, repuestos cambiados, etc."
+                rows={2}
+                className="text-xs rounded-xl resize-none"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs font-bold text-slate-700">Estado del Trabajo</Label>
+              <Select value={repairEstado} onValueChange={(val: any) => setRepairEstado(val)}>
+                <SelectTrigger className="h-10 text-xs rounded-xl text-slate-800">
+                  <SelectValue placeholder="Estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Completado">Completado (Reparada)</SelectItem>
+                  <SelectItem value="En proceso">En proceso en taller</SelectItem>
+                  <SelectItem value="Pendiente">Pendiente de retiro/pago</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <DialogFooter className="pt-2 flex flex-row gap-2 justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsRepairModalOpen(false)}
+                className="h-10 rounded-xl text-xs font-bold"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                className="h-10 rounded-xl text-xs font-bold bg-orange-600 hover:bg-orange-700 text-white"
+              >
+                Guardar Gasto
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Reserva con Fecha */}
+      <ModalNuevaReserva
+        isOpen={isModalReservaOpen}
+        onClose={() => setIsModalReservaOpen(false)}
+        herramientaId={herramienta.id}
+        herramientaNombre={herramienta.name}
+        obraIdInicial={herramienta.current_obra_id || undefined}
+        onReservaCreada={() => {
+          fetchHerramienta();
+          fetchMovimientos();
+        }}
+      />
     </div>
   );
 }
