@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Navigate, Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { supabase } from '../lib/supabase';
-import { Home, Wrench, FileText, Truck, Users, Building, LogOut, ShoppingCart, Sparkles, HardHat, ClipboardList, BarChart3, MoreHorizontal, Bell, Key, Eye, EyeOff, DollarSign, Calendar, CalendarRange, PhoneCall, Send, Award, ChevronDown, Compass } from 'lucide-react';
+import { Home, Wrench, FileText, Truck, Users, Building, LogOut, ShoppingCart, Sparkles, HardHat, ClipboardList, BarChart3, MoreHorizontal, Bell, Key, Eye, EyeOff, DollarSign, Calendar, CalendarRange, PhoneCall, Send, Award, ChevronDown, Compass, UserCheck } from 'lucide-react';
 
 
 
@@ -193,6 +193,7 @@ export default function AppLayout() {
 
   const rrhhItems = [
     { name: 'Personal', path: '/personal', icon: HardHat },
+    { name: 'Entrevistas & CVs', path: '/entrevistas', icon: UserCheck },
     { name: 'Movimiento de Personal', path: '/pedidos-personal', icon: FileText },
     { name: 'Formularios', path: '/formularios', icon: Send },
     { name: 'Trabajadores', path: '/trabajadores', icon: Award },
@@ -588,6 +589,15 @@ export default function AppLayout() {
               >
                 <HardHat size={24} className="text-emerald-400" />
                 <span className="text-[11px] font-black uppercase tracking-tight">Mov. Personal</span>
+              </Link>
+
+              <Link 
+                to="/entrevistas" 
+                onClick={() => setShowMas(false)}
+                className="flex flex-col items-center justify-center p-4 bg-purple-950/40 border border-purple-800/80 rounded-2xl hover:bg-purple-900/60 transition-all text-center gap-2"
+              >
+                <UserCheck size={24} className="text-purple-400" />
+                <span className="text-[11px] font-black uppercase tracking-tight text-purple-200">Entrevistas & CVs</span>
               </Link>
 
               <Link 

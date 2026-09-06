@@ -42,6 +42,8 @@ import CargarHorasPublico from './pages/CargarHorasPublico';
 import LiquidacionSueldos from './pages/LiquidacionSueldos';
 const CentroOperaciones = lazy(() => import('./pages/CentroOperaciones'));
 const Coordinadores = lazy(() => import('./pages/Coordinadores'));
+const PostulacionPublica = lazy(() => import('./pages/PostulacionPublica'));
+const Entrevistas = lazy(() => import('./pages/Entrevistas'));
 
 
 
@@ -67,6 +69,15 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/cargar-horas" element={<CargarHorasPublico />} />
+        <Route 
+          path="/postulacion" 
+          element={
+            <Suspense fallback={<LogoLoader fullScreen text="Cargando Postulación..." size="md" />}>
+              <PostulacionPublica />
+            </Suspense>
+          } 
+        />
+        <Route path="/cargar-cv" element={<Navigate to="/postulacion" replace />} />
         
         <Route element={<AppLayout />}>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -114,6 +125,14 @@ export default function App() {
             element={
               <Suspense fallback={<LogoLoader fullScreen text="Cargando Coordinadores..." size="md" />}>
                 <Coordinadores />
+              </Suspense>
+            } 
+          />
+          <Route 
+            path="/entrevistas" 
+            element={
+              <Suspense fallback={<LogoLoader fullScreen text="Cargando Entrevistas..." size="md" />}>
+                <Entrevistas />
               </Suspense>
             } 
           />
