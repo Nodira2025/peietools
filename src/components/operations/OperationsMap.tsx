@@ -34,12 +34,10 @@ export default function OperationsMap({
           'osm-tiles': {
             type: 'raster',
             tiles: [
-              'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
-              'https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
-              'https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
+              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
             ],
             tileSize: 256,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
           },
         },
         layers: [
@@ -48,12 +46,12 @@ export default function OperationsMap({
             type: 'raster',
             source: 'osm-tiles',
             minzoom: 0,
-            maxzoom: 20,
+            maxzoom: 19,
           },
         ],
       },
       center: [TUCUMAN_CENTER.longitude, TUCUMAN_CENTER.latitude],
-      zoom: 12.2,
+      zoom: 12.6,
       minZoom: 8,
       maxZoom: 18,
     });
@@ -61,7 +59,16 @@ export default function OperationsMap({
     map.addControl(new NavigationControl({ showCompass: false }), 'bottom-right');
     mapRef.current = map;
 
+    // Observer para auto-redimensionar el mapa al cambiar ancho de pantalla o contenedor
+    const resizeObserver = new ResizeObserver(() => {
+      map.resize();
+    });
+    if (mapContainerRef.current) {
+      resizeObserver.observe(mapContainerRef.current);
+    }
+
     return () => {
+      resizeObserver.disconnect();
       map.remove();
       mapRef.current = null;
     };
@@ -89,7 +96,7 @@ export default function OperationsMap({
 
     worksites.forEach((worksite) => {
       const isSelected = worksite.id === selectedWorksiteId;
-      const size = Math.max(38, worksite.bubbleRadiusPx || 48);
+      const size = Math.max(34, Math.round((worksite.bubbleRadiusPx || 46) * 0.88));
 
       // Outer Marker Wrapper
       const el = document.createElement('div');
@@ -99,7 +106,7 @@ export default function OperationsMap({
 
       // Bubble styling with dynamic magnitude
       const hasPhoto = Boolean(worksite.photo_url);
-      const isCompact = size < 46;
+      const isCompact = size < 42;
 
       const innerContent = `
         <div class="relative w-full h-full rounded-full transition-all duration-300 transform group hover:scale-110 flex items-center justify-center ${

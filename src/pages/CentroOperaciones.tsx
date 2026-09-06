@@ -226,6 +226,10 @@ export default function CentroOperaciones() {
     setSelectedWorksiteId(worksite.id);
     setFlyToCoords({ latitude: worksite.latitude, longitude: worksite.longitude });
     setShowMobileDrawer(true);
+    // Auto scroll suave al panel debajo del mapa para ver los detalles
+    setTimeout(() => {
+      document.getElementById('panel-operativo')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 120);
   };
 
   if (loading) {
@@ -233,7 +237,7 @@ export default function CentroOperaciones() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] md:h-[calc(100vh-2rem)] overflow-hidden font-sans space-y-2 p-2 sm:p-3">
+    <div className="flex flex-col min-h-[calc(100vh-4rem)] overflow-y-auto font-sans space-y-4 p-2 sm:p-4 pb-20">
       {/* 1. Header & KPIs */}
       <div className="space-y-2 shrink-0">
         <div className="flex items-center justify-between gap-2 px-1">
@@ -284,41 +288,24 @@ export default function CentroOperaciones() {
         </div>
       )}
 
-      {/* 2. Main Map & Contextual Panel Area */}
-      <div className="flex-1 flex flex-col md:flex-row gap-3 min-h-0 relative">
-        {/* Geographic MapLibre Container */}
-        <div className="flex-1 h-full min-h-[350px] rounded-2xl overflow-hidden shadow-sm border border-slate-200">
-          <OperationsMap
-            worksites={filteredWorksites}
-            selectedWorksiteId={selectedWorksiteId}
-            onSelectWorksite={handleSelectWorksite}
-            flyToCoords={flyToCoords}
-          />
-        </div>
+      {/* 2. Main Map a Ancho Completo (Full Width) */}
+      <div className="w-full h-[520px] sm:h-[580px] lg:h-[640px] rounded-2xl overflow-hidden shadow-sm border border-slate-200 shrink-0">
+        <OperationsMap
+          worksites={filteredWorksites}
+          selectedWorksiteId={selectedWorksiteId}
+          onSelectWorksite={handleSelectWorksite}
+          flyToCoords={flyToCoords}
+        />
+      </div>
 
-        {/* Desktop Contextual Sidebar (Hidden on Mobile) */}
-        <div className="hidden md:block w-80 lg:w-96 h-full rounded-2xl overflow-hidden shadow-sm border border-slate-200 shrink-0 bg-white">
-          <OperationsSidebar
-            selectedWorksite={selectedWorksite}
-            onClose={() => setSelectedWorksiteId(null)}
-            allWorksites={worksites}
-            onSelectWorksite={handleSelectWorksite}
-          />
-        </div>
-
-        {/* Mobile Floating Drawer Trigger & Drawer */}
-        <div className="md:hidden">
-          {selectedWorksite && showMobileDrawer && (
-            <div className="fixed inset-x-0 bottom-0 z-50 max-h-[75vh] bg-white rounded-t-3xl shadow-2xl border-t border-slate-200 overflow-hidden flex flex-col animate-in slide-in-from-bottom duration-300">
-              <OperationsSidebar
-                selectedWorksite={selectedWorksite}
-                onClose={() => setShowMobileDrawer(false)}
-                allWorksites={worksites}
-                onSelectWorksite={handleSelectWorksite}
-              />
-            </div>
-          )}
-        </div>
+      {/* 3. Panel Operativo Contextual (Debajo del mapa) */}
+      <div id="panel-operativo" className="w-full rounded-2xl overflow-hidden shadow-sm border border-slate-200 bg-white">
+        <OperationsSidebar
+          selectedWorksite={selectedWorksite}
+          onClose={() => setSelectedWorksiteId(null)}
+          allWorksites={worksites}
+          onSelectWorksite={handleSelectWorksite}
+        />
       </div>
     </div>
   );
