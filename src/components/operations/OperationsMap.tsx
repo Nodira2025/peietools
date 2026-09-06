@@ -9,6 +9,8 @@ interface OperationsMapProps {
   selectedWorksiteId: string | null;
   onSelectWorksite: (worksite: OperationalWorksite) => void;
   flyToCoords?: { latitude: number; longitude: number } | null;
+  originCoords?: { latitude: number; longitude: number } | null;
+  onMapClick?: (coords: { latitude: number; longitude: number }) => void;
 }
 
 export default function OperationsMap({
@@ -16,10 +18,13 @@ export default function OperationsMap({
   selectedWorksiteId,
   onSelectWorksite,
   flyToCoords,
+  originCoords,
+  onMapClick,
 }: OperationsMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markersRef = useRef<Marker[]>([]);
+  const originMarkerRef = useRef<Marker | null>(null);
 
   // 1. Initialize MapLibre GL
   useEffect(() => {
@@ -194,6 +199,54 @@ export default function OperationsMap({
 
     });
   }, [worksites, selectedWorksiteId, onSelectWorksite]);
+
+  // 4. Render Origin Marker (Punto de Búsqueda / Tu Ubicación)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    if (originMarkerRef.current) {
+      originMarkerRef.current.remove();
+      originMarkerRef.current = null;
+    }
+
+    if (!originCoords) return;
+
+    const el = document.createElement('div');
+    el.className = 'peie-origin-marker flex flex-col items-center select-none cursor-pointer';
+    el.innerHTML = `
+      <div class="relative flex items-center justify-center">
+        <span class="animate-ping absolute inline-flex h-8 w-8 rounded-full bg-red-400 opacity-75"></span>
+        <div class="relative w-6 h-6 rounded-full bg-red-600 border-2 border-white shadow-lg flex items-center justify-center text-white text-xs font-black">
+          📍
+        </div>
+      </div>
+      <div class="bg-slate-900/90 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-md whitespace-nowrap mt-0.5">
+        Tu Origen
+      </div>
+    `;
+
+    const marker = new Marker({ element: el })
+      .setLngLat([originCoords.longitude, originCoords.latitude])
+      .addTo(map);
+
+    originMarkerRef.current = marker;
+  }, [originCoords]);
+
+  // 5. Handle clicks on map to set origin coordinates
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !onMapClick) return;
+
+    const handleClick = (e: any) => {
+      onMapClick({ latitude: e.lngLat.lat, longitude: e.lngLat.lng });
+    };
+
+    map.on('click', handleClick);
+    return () => {
+      map.off('click', handleClick);
+    };
+  }, [onMapClick]);
 
   const handleResetCenter = () => {
     if (!mapRef.current) return;

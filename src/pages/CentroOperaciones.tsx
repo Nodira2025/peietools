@@ -22,8 +22,9 @@ import {
   generateOperationalSuggestions,
   type OperationalSuggestion,
 } from '../services/operations/recommendationEngine';
+import NearestToolFinder from '../components/operations/NearestToolFinder';
 
-import { Compass, Sparkles, SlidersHorizontal, ChevronUp, ChevronDown } from 'lucide-react';
+import { Compass, Sparkles, SlidersHorizontal, ChevronUp, ChevronDown, MapPin } from 'lucide-react';
 
 function normalizeText(text: string | null | undefined): string {
   if (!text) return '';
@@ -54,6 +55,9 @@ export default function CentroOperaciones() {
   const [flyToCoords, setFlyToCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [showMobileDrawer, setShowMobileDrawer] = useState(false);
   const [showSuggestionsDrawer, setShowSuggestionsDrawer] = useState(false);
+  const [showToolFinder, setShowToolFinder] = useState(false);
+  const [mapOriginCoords, setMapOriginCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [mapClickCoords, setMapClickCoords] = useState<{ latitude: number; longitude: number } | null>(null);
 
   // Filters State
   const [filters, setFilters] = useState<OperationsFilterState>({
@@ -318,14 +322,28 @@ export default function CentroOperaciones() {
             </div>
           </div>
 
-          <button
-            onClick={() => setShowSuggestionsDrawer(!showSuggestionsDrawer)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-black shadow-sm transition-all"
-          >
-            <Sparkles size={14} className="text-amber-600" />
-            <span>Sugerencias ({suggestions.length})</span>
-            {showSuggestionsDrawer ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowToolFinder(!showToolFinder)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-black shadow-sm transition-all ${
+                showToolFinder
+                  ? 'bg-peie-blue text-white border-peie-blue ring-2 ring-blue-300'
+                  : 'border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-900'
+              }`}
+            >
+              <MapPin size={14} className={showToolFinder ? 'text-white' : 'text-blue-600'} />
+              <span>Herramienta Cercana</span>
+            </button>
+
+            <button
+              onClick={() => setShowSuggestionsDrawer(!showSuggestionsDrawer)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-black shadow-sm transition-all"
+            >
+              <Sparkles size={14} className="text-amber-600" />
+              <span>Sugerencias ({suggestions.length})</span>
+              {showSuggestionsDrawer ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+          </div>
         </div>
 
         {/* Top KPIs Banner */}
@@ -352,13 +370,53 @@ export default function CentroOperaciones() {
       )}
 
       {/* 2. Main Map a Ancho Completo (Full Width) */}
-      <div className="w-full h-[520px] sm:h-[580px] lg:h-[640px] rounded-2xl overflow-hidden shadow-sm border border-slate-200 shrink-0">
+      <div className="w-full h-[520px] sm:h-[580px] lg:h-[640px] rounded-2xl overflow-hidden shadow-sm border border-slate-200 shrink-0 relative">
         <OperationsMap
           worksites={filteredWorksites}
           selectedWorksiteId={selectedWorksiteId}
           onSelectWorksite={handleSelectWorksite}
           flyToCoords={flyToCoords}
+          originCoords={mapOriginCoords}
+          onMapClick={(coords) => {
+            setMapClickCoords(coords);
+            setMapOriginCoords(coords);
+          }}
         />
+
+        {/* Floating Toggle Button directly on top-left of the Map */}
+        <button
+          onClick={() => setShowToolFinder(!showToolFinder)}
+          className="absolute top-4 left-4 z-10 bg-white/95 backdrop-blur-md shadow-md hover:bg-slate-50 border border-slate-200 text-peie-blue text-xs font-black px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 hover:scale-[1.02]"
+        >
+          <span className="w-2 h-2 rounded-full bg-blue-600 animate-ping"></span>
+          <span>{showToolFinder ? 'Ocultar Buscador' : '📍 Buscar Herramienta Más Cercana'}</span>
+        </button>
+
+        {/* Floating Nearest Tool Finder Panel */}
+        {showToolFinder && (
+          <div className="absolute top-16 left-4 z-20 max-w-md w-[calc(100%-2rem)] sm:w-[420px] shadow-2xl animate-in fade-in slide-in-from-top-3 duration-200">
+            <NearestToolFinder
+              worksites={worksites}
+              allTools={allTools}
+              onFlyTo={(coords, obraId) => {
+                setFlyToCoords(coords);
+                if (obraId) {
+                  const target = worksites.find((w) => w.id === obraId);
+                  if (target) {
+                    setSelectedWorksiteId(obraId);
+                    setTimeout(() => {
+                      document.getElementById('panel-operativo')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 150);
+                  }
+                }
+              }}
+              onSelectWorksite={handleSelectWorksite}
+              onSetMapOrigin={setMapOriginCoords}
+              mapClickCoords={mapClickCoords}
+              onClose={() => setShowToolFinder(false)}
+            />
+          </div>
+        )}
       </div>
 
       {/* 3. Panel Operativo Contextual (Debajo del mapa) */}
