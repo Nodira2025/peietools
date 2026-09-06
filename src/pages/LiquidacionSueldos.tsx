@@ -25,6 +25,7 @@ import {
   Sparkles,
   Award,
   ChevronDown,
+  ChevronRight,
   X,
   UserCheck
 } from 'lucide-react';
