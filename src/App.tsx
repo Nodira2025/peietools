@@ -41,6 +41,7 @@ import Trabajadores from './pages/Trabajadores';
 import CargarHorasPublico from './pages/CargarHorasPublico';
 import LiquidacionSueldos from './pages/LiquidacionSueldos';
 const CentroOperaciones = lazy(() => import('./pages/CentroOperaciones'));
+const Coordinadores = lazy(() => import('./pages/Coordinadores'));
 
 
 
@@ -108,6 +109,14 @@ export default function App() {
             } 
           />
           <Route path="/mapa-operativo" element={<Navigate to="/centro-operaciones" replace />} />
+          <Route 
+            path="/coordinadores" 
+            element={
+              <Suspense fallback={<LogoLoader fullScreen text="Cargando Coordinadores..." size="md" />}>
+                <Coordinadores />
+              </Suspense>
+            } 
+          />
           <Route path="/personal" element={<Personal />} />
           <Route path="/personal/nuevo-asistido" element={<NuevoPersonalAsistido />} />
           <Route path="/personal/busqueda-visual" element={<BusquedaPersonal />} />
