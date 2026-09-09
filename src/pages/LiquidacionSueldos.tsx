@@ -309,7 +309,7 @@ export default function LiquidacionSueldos() {
     try {
       // 1. Cargar Empleados, Novedades y Semanales en paralelo
       const [empRes, novRes, semRes, oRes, regRes] = await Promise.all([
-        supabase.from('empleados').select('*, obras(name)').order('full_name'),
+        supabase.from('empleados').select('*, obras(name), empleados_legajos(dni, fecha_ingreso)').order('full_name'),
         supabase.from('novedades_diarias').select('*').order('fecha', { ascending: false }),
         supabase.from('registro_horas_semanales').select('*').order('semana_inicio', { ascending: false }),
         supabase.from('obras').select('id, name').eq('active', true).order('name'),
@@ -347,6 +347,7 @@ export default function LiquidacionSueldos() {
 
       const formattedEmps: EmpleadoSueldo[] = empData.map((e: any) => {
         const obraObj = Array.isArray(e.obras) ? e.obras[0] : e.obras;
+        const privateData = Array.isArray(e.empleados_legajos) ? e.empleados_legajos[0] : e.empleados_legajos;
         const vHora = Number(e.valor_hora) || localTarifasSaved[e.id] || 4500;
         
         // Buscar si hay un DNI registrado en novedades o semanales para este empleado
@@ -357,11 +358,12 @@ export default function LiquidacionSueldos() {
         const semMatching = semData.find(s => 
           (s.empleado_id === e.id || normalizeText(s.empleado_nombre) === normName) && s.empleado_dni
         );
-        const foundDni = e.dni || novMatching?.empleado_dni || semMatching?.empleado_dni || null;
+        const foundDni = privateData?.dni || e.dni || novMatching?.empleado_dni || semMatching?.empleado_dni || null;
 
         return {
           ...e,
           dni: foundDni,
+          fecha_ingreso: privateData?.fecha_ingreso || e.fecha_ingreso || null,
           obras: obraObj,
           valor_hora: vHora
         };
