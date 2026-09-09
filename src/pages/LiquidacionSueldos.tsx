@@ -21,16 +21,25 @@ import {
   Check, 
   TrendingUp,
   AlertCircle,
-  HelpCircle,
   Sparkles,
-  Award,
-  ChevronDown,
   ChevronRight,
   X,
-  UserCheck
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { buildWhatsAppLink } from '../lib/whatsapp';
+import {
+  PAYROLL_MONTHS,
+  LAST_CLOSED_PAYROLL_PERIOD,
+  LAST_CLOSED_PAYROLL_PERIOD_LABEL,
+  addPayrollDays,
+  countPayrollBusinessDays,
+  getPayrollDateKey,
+  getPayrollPeriodBounds,
+  isAfterLastClosedPayrollPeriod,
+  isPayrollBusinessDay,
+  parsePayrollDate,
+  type PayrollPeriodMode
+} from '../lib/payroll-period';
 import { ObreroSueldoProyecciones } from '../components/ObreroSueldoProyecciones';
 import * as XLSX from 'xlsx';
 
@@ -52,6 +61,7 @@ interface NovedadRegistro {
   id: string;
   empleado_id?: string;
   empleado_nombre: string;
+  empleado_dni?: string;
   fecha: string;
   mes?: string;
   quincena?: string;
@@ -66,14 +76,25 @@ interface SemanalRegistro {
   id: string;
   empleado_id?: string;
   empleado_nombre: string;
+  empleado_dni?: string;
   semana_inicio: string;
+  lunes?: number | null;
+  martes?: number | null;
+  miercoles?: number | null;
+  jueves?: number | null;
+  viernes?: number | null;
+  sabado?: number | null;
+  domingo?: number | null;
   total_horas: number;
 }
 
-const MESES = [
-  'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
-  'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'
-];
+type PeriodoModo = PayrollPeriodMode;
+
+const MESES = PAYROLL_MONTHS;
+const HORAS_DIARIAS_PROYECCION_DEFAULT = 8.8;
+const CAMPOS_DIAS_SEMANA = [
+  'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'
+] as const;
 
 // Función para normalizar texto (remover acentos y espacios extra)
 function normalizeText(text: string | null | undefined): string {
@@ -85,18 +106,77 @@ function normalizeText(text: string | null | undefined): string {
     .trim();
 }
 
-// Obtener mes y quincena a partir de una fecha YYYY-MM-DD
+// Obtener mes y quincena a partir de una fecha válida YYYY-MM-DD.
 function getPeriodoFromDate(dateStr: string | null | undefined) {
-  if (!dateStr) return { mes: 'AGOSTO', quincena: '2Q', year: 2026 };
-  const parts = dateStr.split('-');
-  const y = Number(parts[0]) || 2026;
-  const m = Number(parts[1]) || 8;
-  const d = Number(parts[2]) || 1;
+  const date = parsePayrollDate(dateStr);
+  if (!date) return null;
   return {
-    mes: MESES[m - 1] || 'AGOSTO',
-    quincena: d <= 15 ? '1Q' : '2Q',
-    year: y
+    mes: MESES[date.getMonth()],
+    quincena: date.getDate() <= 15 ? '1Q' : '2Q',
+    year: date.getFullYear()
   };
+}
+
+function getWeeklyEntriesWithinBounds(registro: SemanalRegistro, start: Date, end: Date) {
+  const weekStart = parsePayrollDate(registro.semana_inicio);
+  if (!weekStart) return [];
+  const totalHours = Number(registro.total_horas) || 0;
+  const hasAnyDailyValue = CAMPOS_DIAS_SEMANA.some(field => registro[field] != null);
+  const dailyHoursSum = CAMPOS_DIAS_SEMANA.reduce(
+    (sum, field) => sum + (Number(registro[field]) || 0),
+    0
+  );
+  const hasDailyBreakdown = hasAnyDailyValue && (dailyHoursSum > 0 || totalHours === 0);
+  const legacyBusinessOffsets = new Set(
+    CAMPOS_DIAS_SEMANA
+      .map((_, offset) => offset)
+      .filter(offset => isPayrollBusinessDay(addPayrollDays(weekStart, offset)))
+  );
+  const legacyBusinessDayHours = totalHours / Math.max(1, legacyBusinessOffsets.size);
+
+  return CAMPOS_DIAS_SEMANA.flatMap((field, offset) => {
+    const date = addPayrollDays(weekStart, offset);
+    if (date < start || date > end) return [];
+    const hours = hasDailyBreakdown
+      ? Number(registro[field]) || 0
+      : legacyBusinessOffsets.has(offset)
+        ? legacyBusinessDayHours
+        : 0;
+    return [{ date, hours }];
+  });
+}
+
+function roundHours(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function getPeriodoEmpleadoKey(
+  empId: string,
+  year: number,
+  month: string,
+  mode: PeriodoModo
+): string {
+  const tramo = mode === 'HISTORICO' ? 'ANUAL' : month;
+  return `${year}:${tramo}:${mode}:${empId}`;
+}
+
+function getScopedValue(
+  map: Record<string, number>,
+  empId: string,
+  year: number,
+  month: string,
+  mode: PeriodoModo
+): number | undefined {
+  const scopedValue = map[getPeriodoEmpleadoKey(empId, year, month, mode)];
+  if (scopedValue !== undefined) return Number(scopedValue);
+
+  // Los valores legados no tenían período. Solo se recuperan en la antigua
+  // pantalla predeterminada para que no contaminen meses posteriores.
+  const canUseLegacyValue = year === LAST_CLOSED_PAYROLL_PERIOD.year &&
+    month === PAYROLL_MONTHS[LAST_CLOSED_PAYROLL_PERIOD.monthIndex] && mode === 'MES';
+  if (canUseLegacyValue && map[empId] !== undefined) return Number(map[empId]);
+
+  return undefined;
 }
 
 export default function LiquidacionSueldos() {
@@ -109,12 +189,47 @@ export default function LiquidacionSueldos() {
   const [obrasList, setObrasList] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Filtros de Período
-  const currentMonthIdx = new Date().getMonth();
-  const [selectedPeriodoModo, setSelectedPeriodoModo] = useState<'MES' | '1Q' | '2Q' | 'HISTORICO'>('HISTORICO');
-  const [selectedMes, setSelectedMes] = useState<string>(MESES[currentMonthIdx] || 'AGOSTO');
+  // Filtros de Período (Liquidación cerrada hasta Agosto; Septiembre en adelante proyectada)
+  const [selectedPeriodoModo, setSelectedPeriodoModo] = useState<PeriodoModo>('MES');
+  const [selectedMes, setSelectedMes] = useState<string>('AGOSTO');
+  const [selectedYear, setSelectedYear] = useState<number>(LAST_CLOSED_PAYROLL_PERIOD.year);
   const [selectedObraId, setSelectedObraId] = useState<string>('TODAS');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const isPeriodoHistorico = selectedPeriodoModo === 'HISTORICO';
+
+  // El corte es absoluto: Agosto de 2026 es la última liquidación cerrada.
+  const isPeriodoProyectado = useMemo(() => {
+    if (isPeriodoHistorico) return false;
+    return isAfterLastClosedPayrollPeriod(selectedYear, selectedMes);
+  }, [isPeriodoHistorico, selectedMes, selectedYear]);
+
+  const availableYears = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const years = new Set<number>([
+      LAST_CLOSED_PAYROLL_PERIOD.year,
+      currentYear - 1,
+      currentYear,
+      currentYear + 1
+    ]);
+
+    novedades.forEach(item => {
+      const periodo = getPeriodoFromDate(item.fecha);
+      if (periodo) years.add(periodo.year);
+    });
+    semanales.forEach(item => {
+      const weekStart = parsePayrollDate(item.semana_inicio);
+      if (!weekStart) return;
+      years.add(weekStart.getFullYear());
+      years.add(addPayrollDays(weekStart, 6).getFullYear());
+    });
+
+    return Array.from(years).sort((a, b) => b - a);
+  }, [novedades, semanales]);
+
+  const selectedPeriodBounds = useMemo(
+    () => getPayrollPeriodBounds(selectedYear, selectedMes, selectedPeriodoModo),
+    [selectedYear, selectedMes, selectedPeriodoModo]
+  );
 
   // Buscador de Obrero con Precarga / Autocomplete
   const [searchWorkerQuery, setSearchWorkerQuery] = useState<string>('');
@@ -273,15 +388,49 @@ export default function LiquidacionSueldos() {
   }, []);
 
   // Guardar cambio de horas manual
-  const handleHorasManualChange = (empId: string, horas: number) => {
-    const next = { ...horasManualesMap, [empId]: horas };
+  const handleHorasManualChange = (empId: string, horas?: number) => {
+    const next = { ...horasManualesMap };
+    const key = getPeriodoEmpleadoKey(empId, selectedYear, selectedMes, selectedPeriodoModo);
+    if (horas === undefined) {
+      delete next[key];
+      if (
+        selectedYear === LAST_CLOSED_PAYROLL_PERIOD.year &&
+        selectedMes === PAYROLL_MONTHS[LAST_CLOSED_PAYROLL_PERIOD.monthIndex] &&
+        selectedPeriodoModo === 'MES'
+      ) {
+        delete next[empId];
+      }
+    } else {
+      next[key] = horas;
+    }
     setHorasManualesMap(next);
     localStorage.setItem('peie_horas_manuales_liquidacion', JSON.stringify(next));
   };
 
   // Guardar mapa de adelantos en localStorage
-  const handleAdelantoChange = (empId: string, valor: number) => {
-    const next = { ...adelantosMap, [empId]: valor };
+  const handleAdelantoChange = (
+    empId: string,
+    valor?: number,
+    scope: { year: number; month: string; mode: PeriodoModo } = {
+      year: selectedYear,
+      month: selectedMes,
+      mode: selectedPeriodoModo
+    }
+  ) => {
+    const next = { ...adelantosMap };
+    const key = getPeriodoEmpleadoKey(empId, scope.year, scope.month, scope.mode);
+    if (valor === undefined) {
+      delete next[key];
+      if (
+        scope.year === LAST_CLOSED_PAYROLL_PERIOD.year &&
+        scope.month === PAYROLL_MONTHS[LAST_CLOSED_PAYROLL_PERIOD.monthIndex] &&
+        scope.mode === 'MES'
+      ) {
+        delete next[empId];
+      }
+    } else {
+      next[key] = valor;
+    }
     setAdelantosMap(next);
     localStorage.setItem('peie_adelantos_sueldos', JSON.stringify(next));
   };
@@ -390,11 +539,13 @@ export default function LiquidacionSueldos() {
   // 2. Filtro de Novedades y Horas con Normalización
   const filteredNovedades = useMemo(() => {
     return novedades.filter(nov => {
-      if (selectedPeriodoModo === 'HISTORICO') return true;
-
       const periodo = getPeriodoFromDate(nov.fecha);
-      const mesNov = (nov.mes || periodo.mes).toUpperCase().trim();
-      const quincenaNov = (nov.quincena || periodo.quincena).toUpperCase().trim();
+      if (!periodo) return false;
+      const mesNov = periodo.mes;
+      const quincenaNov = periodo.quincena;
+      if (periodo.year !== selectedYear) return false;
+
+      if (selectedPeriodoModo === 'HISTORICO') return true;
 
       if (selectedPeriodoModo === 'MES') {
         return mesNov === selectedMes.toUpperCase().trim();
@@ -410,12 +561,22 @@ export default function LiquidacionSueldos() {
 
       return true;
     });
-  }, [novedades, selectedPeriodoModo, selectedMes]);
+  }, [novedades, selectedPeriodoModo, selectedMes, selectedYear]);
+
+  const filteredSemanales = useMemo(() => {
+    return semanales.filter(registro => {
+      const weekStart = parsePayrollDate(registro.semana_inicio);
+      if (!weekStart) return false;
+      const weekEnd = addPayrollDays(weekStart, 6);
+      return weekStart <= selectedPeriodBounds.end && weekEnd >= selectedPeriodBounds.start;
+    });
+  }, [semanales, selectedPeriodBounds]);
 
   // 3. Cómputo y Liquidación para cada empleado
   const liquidaciones = useMemo(() => {
     return empleados
       .filter(emp => {
+        if (selectedObreroId === emp.id) return true;
         if (selectedObraId !== 'TODAS' && emp.obra_id !== selectedObraId) return false;
         if (searchTerm) {
           const term = normalizeText(searchTerm);
@@ -428,45 +589,186 @@ export default function LiquidacionSueldos() {
       })
       .map(emp => {
         const empNormName = normalizeText(emp.full_name);
+        const fechaIngreso = parsePayrollDate(emp.fecha_ingreso);
+        const employeePeriodStart = fechaIngreso && fechaIngreso > selectedPeriodBounds.start
+          ? fechaIngreso
+          : selectedPeriodBounds.start;
+        const employeeHasPeriod = employeePeriodStart <= selectedPeriodBounds.end;
+        const diasHabilesEmpleado = employeeHasPeriod
+          ? countPayrollBusinessDays(employeePeriodStart, selectedPeriodBounds.end)
+          : 0;
 
         // Novedades diarias que pertenecen a este empleado
         const empNovs = filteredNovedades.filter(n => {
-          if (n.empleado_id && n.empleado_id === emp.id) return true;
-          if (n.empleado_nombre && normalizeText(n.empleado_nombre) === empNormName) return true;
-          return false;
+          const belongsToEmployee =
+            (n.empleado_id && n.empleado_id === emp.id) ||
+            (n.empleado_nombre && normalizeText(n.empleado_nombre) === empNormName);
+          if (!belongsToEmployee || !employeeHasPeriod) return false;
+
+          const date = parsePayrollDate(n.fecha);
+          return !!date && date >= employeePeriodStart && date <= selectedPeriodBounds.end;
         });
 
-        // Sumatorias de horas automáticas de asistencia diaria
+        // Sumatorias de horas automáticas de asistencia diaria. Las jornadas se
+        // cuentan por fecha para que dos partes cargados el mismo día no dupliquen
+        // presencia, ausencia ni puntualidad.
         const horasAsistencia = empNovs.reduce((acc, curr) => acc + (Number(curr.horas_trabajadas) || 0), 0);
         const horasAusente = empNovs.reduce((acc, curr) => acc + (Number(curr.horas_ausente) || 0), 0);
-        const diasPresente = empNovs.filter(n => n.estado === 'PRESENTE' || Number(n.horas_trabajadas) > 0).length;
-        const diasAusente = empNovs.filter(n => n.estado === 'AUSENTE').length;
+        const getRecordDateKey = (registro: NovedadRegistro): string | null => {
+          const date = parsePayrollDate(registro.fecha);
+          return date ? getPayrollDateKey(date) : null;
+        };
+        const dailyDateKeys = new Set(
+          empNovs
+            .map(getRecordDateKey)
+            .filter((date): date is string => date !== null)
+        );
+        const diasAusente = new Set(
+          empNovs
+            .filter(n => n.estado === 'AUSENTE')
+            .map(getRecordDateKey)
+            .filter((date): date is string => date !== null)
+        ).size;
+        const diasTarde = new Set(
+          empNovs
+            .filter(n => n.estado === 'LLEGADA TARDE')
+            .map(getRecordDateKey)
+            .filter((date): date is string => date !== null)
+        ).size;
+        // Las horas semanales ya están limitadas al mismo año/mes/quincena.
+        const empSems = filteredSemanales.filter(s => {
+          if (s.empleado_id && s.empleado_id === emp.id) return true;
+          if (s.empleado_nombre && normalizeText(s.empleado_nombre) === empNormName) return true;
+          return false;
+        });
+        const weeklyEntries = employeeHasPeriod
+          ? empSems.flatMap(registro => getWeeklyEntriesWithinBounds(
+              registro,
+              employeePeriodStart,
+              selectedPeriodBounds.end
+            ))
+          : [];
+        // La novedad diaria prevalece solo en su fecha. Los consolidados semanales
+        // completan las fechas sin parte diario, evitando tanto perder una semana
+        // entera como duplicar horas del mismo día.
+        const weeklyEntriesWithoutDaily = weeklyEntries.filter(entry =>
+          !dailyDateKeys.has(getPayrollDateKey(entry.date)) &&
+          (entry.hours !== 0 || isPayrollBusinessDay(entry.date))
+        );
+        const horasSemanalesComplementarias = weeklyEntriesWithoutDaily.reduce(
+          (acc, entry) => acc + entry.hours,
+          0
+        );
+        const horasCalculadasBase = roundHours(horasAsistencia + horasSemanalesComplementarias);
+        const horasManuales = getScopedValue(
+          horasManualesMap,
+          emp.id,
+          selectedYear,
+          selectedMes,
+          selectedPeriodoModo
+        );
 
-        // Horas Semanales (respaldo si novedades diarias es 0)
-        let horasSemanalesTotal = 0;
-        if (horasAsistencia === 0) {
-          const empSems = semanales.filter(s => {
-            if (s.empleado_id && s.empleado_id === emp.id) return true;
-            if (s.empleado_nombre && normalizeText(s.empleado_nombre) === empNormName) return true;
-            return false;
-          });
-          horasSemanalesTotal = empSems.reduce((acc, curr) => acc + (Number(curr.total_horas) || 0), 0);
+        const horasRegistradasPorFechaMap = new Map<string, number>();
+        empNovs.forEach(registro => {
+          const dateKey = getRecordDateKey(registro);
+          if (!dateKey) return;
+          horasRegistradasPorFechaMap.set(
+            dateKey,
+            (horasRegistradasPorFechaMap.get(dateKey) || 0) + (Number(registro.horas_trabajadas) || 0)
+          );
+        });
+        weeklyEntriesWithoutDaily.forEach(entry => {
+          const dateKey = getPayrollDateKey(entry.date);
+          horasRegistradasPorFechaMap.set(
+            dateKey,
+            (horasRegistradasPorFechaMap.get(dateKey) || 0) + entry.hours
+          );
+        });
+
+        const horasHabilesPorFecha = new Map(
+          Array.from(horasRegistradasPorFechaMap.entries()).filter(([dateKey]) => {
+            const date = parsePayrollDate(dateKey);
+            return !!date &&
+              date >= employeePeriodStart &&
+              date <= selectedPeriodBounds.end &&
+              isPayrollBusinessDay(date);
+          })
+        );
+        const diasCubiertos = Math.min(diasHabilesEmpleado, horasHabilesPorFecha.size);
+        const horasHabilesPositivas = Array.from(horasHabilesPorFecha.values()).filter(horas => horas > 0);
+        const promedioHorasDia = horasHabilesPositivas.length > 0
+          ? horasHabilesPositivas.reduce((acc, horas) => acc + horas, 0) / horasHabilesPositivas.length
+          : HORAS_DIARIAS_PROYECCION_DEFAULT;
+        const horasRegistradasHabiles = roundHours(
+          Array.from(horasHabilesPorFecha.values()).reduce((acc, horas) => acc + horas, 0)
+        );
+        const diasPresentismo = horasHabilesPositivas.length;
+        const diasPresente = Array.from(horasRegistradasPorFechaMap.values()).filter(horas => horas > 0).length;
+        const horasRegistradasPorFecha = Object.fromEntries(
+          Array.from(horasRegistradasPorFechaMap.entries()).map(([dateKey, horas]) => [
+            dateKey,
+            roundHours(horas)
+          ])
+        );
+
+        let horasProyectadas = 0;
+        if (isPeriodoProyectado && horasManuales === undefined) {
+          const diasPendientes = Math.max(0, diasHabilesEmpleado - diasCubiertos);
+          horasProyectadas = roundHours(diasPendientes * promedioHorasDia);
         }
 
-        // Horas Computadas (Asistencia > Semanales > Manual)
-        const horasCalculadasBase = horasAsistencia > 0 ? horasAsistencia : horasSemanalesTotal;
-        const horasFinales = horasManualesMap[emp.id] !== undefined ? horasManualesMap[emp.id] : horasCalculadasBase;
+        // Un ajuste manual es el total explícito para este período. En su ausencia,
+        // los períodos abiertos completan los días hábiles que todavía no tienen datos.
+        const horasFinales = horasManuales !== undefined
+          ? horasManuales
+          : roundHours(horasCalculadasBase + horasProyectadas);
 
         // Tarifa / Valor Hora
         const valorHora = Number(tarifasEditadas[emp.id]) || Number(emp.valor_hora) || valorHoraDefecto;
         const sueldoBruto = Math.round(horasFinales * valorHora);
 
         // Bono Presentismo
-        const cumplePresentismo = diasAusente === 0 && (horasFinales >= horasObjetivoQuincena || diasPresente >= 10);
+        const objetivoHorasConfigurado = selectedPeriodoModo === 'MES'
+          ? horasObjetivoQuincena * 2
+          : horasObjetivoQuincena;
+        const objetivoDias = Math.min(
+          selectedPeriodoModo === 'MES' ? 20 : 10,
+          diasHabilesEmpleado
+        );
+        const objetivoHoras = Math.min(
+          objetivoHorasConfigurado,
+          roundHours(diasHabilesEmpleado * HORAS_DIARIAS_PROYECCION_DEFAULT)
+        );
+        // Las horas proyectadas y los ajustes manuales no habilitan el premio:
+        // solo cuentan registros reales/consolidados. Así un período sin evidencia
+        // de asistencia no obtiene presentismo automáticamente.
+        const horasElegiblesPresentismo = horasRegistradasHabiles;
+        const tieneAsistenciaComprobable = horasElegiblesPresentismo > 0 || diasPresente > 0;
+        const cumplePresentismo = !isPeriodoHistorico &&
+          diasHabilesEmpleado > 0 &&
+          tieneAsistenciaComprobable &&
+          diasAusente === 0 &&
+          diasTarde <= 1 &&
+          (horasElegiblesPresentismo >= objetivoHoras || diasPresentismo >= objetivoDias);
         const bonoPresentismo = cumplePresentismo ? Math.round((sueldoBruto * porcentajeBonoPresentismo) / 100) : 0;
+        const estadoBonoPresentismo = isPeriodoHistorico
+          ? 'NO APLICA AL HISTÓRICO'
+          : cumplePresentismo
+            ? isPeriodoProyectado
+              ? 'INCLUIDO: REQUISITO CUMPLIDO CON REGISTROS REALES/CONSOLIDADOS'
+              : 'CONFIRMADO'
+            : isPeriodoProyectado
+              ? 'PENDIENTE: NO INCLUIDO EN LA PROYECCIÓN'
+              : 'NO CORRESPONDE';
 
         // Adelantos / deducciones
-        const adelanto = Number(adelantosMap[emp.id]) || 0;
+        const adelanto = getScopedValue(
+          adelantosMap,
+          emp.id,
+          selectedYear,
+          selectedMes,
+          selectedPeriodoModo
+        ) || 0;
 
         // Total Neto a Cobrar
         const totalNeto = Math.max(0, sueldoBruto + bonoPresentismo - adelanto);
@@ -474,7 +776,12 @@ export default function LiquidacionSueldos() {
         return {
           empleado: emp,
           horasCalculadasBase,
+          horasProyectadas,
           horasFinales,
+          promedioHorasDia: roundHours(promedioHorasDia),
+          diasHabilesPeriodo: diasHabilesEmpleado,
+          diasCubiertos,
+          ajusteManualHoras: horasManuales !== undefined,
           horasAusente,
           diasPresente,
           diasAusente,
@@ -482,15 +789,18 @@ export default function LiquidacionSueldos() {
           sueldoBruto,
           bonoPresentismo,
           cumplePresentismo,
+          estadoBonoPresentismo,
           adelanto,
           totalNeto,
+          horasRegistradasPorFecha,
           novedadesList: empNovs
         };
       });
   }, [
     empleados, 
     filteredNovedades, 
-    semanales,
+    filteredSemanales,
+    selectedObreroId,
     selectedObraId, 
     searchTerm, 
     tarifasEditadas, 
@@ -498,7 +808,13 @@ export default function LiquidacionSueldos() {
     valorHoraDefecto, 
     porcentajeBonoPresentismo, 
     horasObjetivoQuincena,
-    adelantosMap
+    adelantosMap,
+    isPeriodoProyectado,
+    isPeriodoHistorico,
+    selectedPeriodoModo,
+    selectedMes,
+    selectedYear,
+    selectedPeriodBounds
   ]);
 
   // Métricas Consolidadas
@@ -509,6 +825,10 @@ export default function LiquidacionSueldos() {
     const sum = liquidaciones.reduce((acc, curr) => acc + curr.valorHora, 0);
     return Math.round(sum / liquidaciones.length);
   }, [liquidaciones]);
+  const selectedObreroLiquidacion = useMemo(
+    () => selectedObrero ? liquidaciones.find(liq => liq.empleado.id === selectedObrero.id) || null : null,
+    [liquidaciones, selectedObrero]
+  );
 
   // Exportar a Excel
   const handleExportExcel = () => {
@@ -517,6 +837,20 @@ export default function LiquidacionSueldos() {
       return;
     }
 
+    const periodoLabel = selectedPeriodoModo === 'HISTORICO'
+      ? `Histórico informativo ${selectedYear}`
+      : `${selectedPeriodoModo} - ${selectedMes} ${selectedYear}${isPeriodoProyectado ? ' (PROYECCIÓN ESTIMATIVA)' : ''}`;
+    const tipoRegistro = selectedPeriodoModo === 'HISTORICO'
+      ? 'HISTÓRICO INFORMATIVO'
+      : isPeriodoProyectado
+        ? 'PROYECCIÓN PROVISORIA'
+        : 'LIQUIDACIÓN CERRADA';
+    const totalColumn = selectedPeriodoModo === 'HISTORICO'
+      ? 'TOTAL HISTÓRICO INFORMATIVO ($)'
+      : isPeriodoProyectado
+        ? 'TOTAL ESTIMADO A COBRAR ($)'
+        : 'TOTAL NETO FACTURADO / A PAGAR ($)';
+
     const rows: any[] = liquidaciones.map((liq, idx) => ({
       'N°': idx + 1,
       'Trabajador': liq.empleado.full_name,
@@ -524,13 +858,18 @@ export default function LiquidacionSueldos() {
       'Obra Asignada': liq.empleado.obras?.name || 'Base / Sin Asignar',
       'Días Asistidos': liq.diasPresente,
       'Días Ausente': liq.diasAusente,
+      'Días Hábiles del Período (sin feriados nacionales/UOCRA)': liq.diasHabilesPeriodo,
+      'Horas Registradas / Consolidadas': liq.horasCalculadasBase,
+      'Horas Proyectadas': liq.horasProyectadas,
       'Horas Computadas': liq.horasFinales,
       'Valor Hora ($)': liq.valorHora,
       'Subtotal Bruto ($)': liq.sueldoBruto,
       'Bono Presentismo ($)': liq.bonoPresentismo,
+      'Estado Bono Presentismo': liq.estadoBonoPresentismo,
       'Adelantos / Descuentos ($)': liq.adelanto,
-      'TOTAL NETO FACTURADO / A PAGAR ($)': liq.totalNeto,
-      'Período': selectedPeriodoModo === 'HISTORICO' ? 'Histórico Completo' : `${selectedPeriodoModo} - ${selectedMes}`
+      [totalColumn]: liq.totalNeto,
+      'Período': periodoLabel,
+      'Tipo de Registro': tipoRegistro
     }));
 
     // Fila de Totales
@@ -541,23 +880,34 @@ export default function LiquidacionSueldos() {
       'Obra Asignada': '',
       'Días Asistidos': '',
       'Días Ausente': '',
+      'Días Hábiles del Período (sin feriados nacionales/UOCRA)': '',
+      'Horas Registradas / Consolidadas': liquidaciones.reduce((a, b) => a + b.horasCalculadasBase, 0),
+      'Horas Proyectadas': liquidaciones.reduce((a, b) => a + b.horasProyectadas, 0),
       'Horas Computadas': totalHorasLiquidadas,
       'Valor Hora ($)': promedioValorHora,
       'Subtotal Bruto ($)': liquidaciones.reduce((a, b) => a + b.sueldoBruto, 0),
       'Bono Presentismo ($)': liquidaciones.reduce((a, b) => a + b.bonoPresentismo, 0),
+      'Estado Bono Presentismo': '',
       'Adelantos / Descuentos ($)': liquidaciones.reduce((a, b) => a + b.adelanto, 0),
-      'TOTAL NETO FACTURADO / A PAGAR ($)': totalMontoPagar,
-      'Período': ''
+      [totalColumn]: totalMontoPagar,
+      'Período': periodoLabel,
+      'Tipo de Registro': tipoRegistro
     });
 
     const worksheet = XLSX.utils.json_to_sheet(rows);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Liquidacion_Sueldos');
 
-    const fileName = `PEIE_Liquidacion_Sueldos_${selectedMes}_${selectedPeriodoModo}.xlsx`;
+    const periodoArchivo = selectedPeriodoModo === 'HISTORICO'
+      ? `HISTORICO_${selectedYear}`
+      : `${selectedMes}_${selectedYear}_${selectedPeriodoModo}`;
+    const fileName = `PEIE_Liquidacion_Sueldos_${periodoArchivo}${isPeriodoProyectado ? '_PROYECCION' : ''}.xlsx`;
     XLSX.writeFile(workbook, fileName);
 
-    toast({ title: 'Planilla Descargada', description: `Se exportó ${fileName} con éxito.` });
+    toast({
+      title: 'Planilla Descargada',
+      description: `Se exportó ${fileName} con éxito${isPeriodoProyectado ? ' (marcado como proyección provisoria)' : ''}.`
+    });
   };
 
   // Generar Mensaje de WhatsApp con el recibo
@@ -568,23 +918,55 @@ export default function LiquidacionSueldos() {
     }
 
     const periodoText = selectedPeriodoModo === 'HISTORICO' 
-      ? 'Liquidación Histórica Acumulada' 
+      ? `Histórico informativo ${selectedYear}`
       : selectedPeriodoModo === 'MES' 
-        ? `Mes de ${selectedMes}` 
-        : `${selectedPeriodoModo} (${selectedPeriodoModo === '1Q' ? '1 al 15' : '16 al fin de mes'}) de ${selectedMes}`;
+        ? `Mes de ${selectedMes} ${selectedYear}`
+        : `${selectedPeriodoModo} (${selectedPeriodoModo === '1Q' ? '1 al 15' : '16 al fin de mes'}) de ${selectedMes} ${selectedYear}`;
 
-    const text = `*PEIE TOOLS - RESUMEN DE LIQUIDACIÓN DE SUELDO*\n\n` +
+    const avisoPeriodo = isPeriodoProyectado
+      ? `⚠️ *NOTA DE PROYECCIÓN:* Este cálculo para *${selectedMes} ${selectedYear}* es una *ESTIMACIÓN PROVISORIA*. La última liquidación formal cerrada corresponde a *${LAST_CLOSED_PAYROLL_PERIOD_LABEL}*. Los valores de ${selectedMes} ${selectedYear} están sujetos a la asistencia final y paritarias.\n\n`
+      : isPeriodoHistorico
+        ? `ℹ️ *RESUMEN HISTÓRICO INFORMATIVO:* Este acumulado anual no constituye una liquidación ni un importe definitivo a pagar.\n\n`
+        : '';
+    const tituloMensaje = isPeriodoHistorico
+      ? '*PEIE TOOLS - RESUMEN HISTÓRICO INFORMATIVO*'
+      : `*PEIE TOOLS - RESUMEN DE LIQUIDACIÓN DE SUELDO*${isPeriodoProyectado ? ' (PROYECCIÓN)' : ''}`;
+    const horasLabel = isPeriodoHistorico
+      ? 'Horas acumuladas'
+      : isPeriodoProyectado
+        ? 'Horas estimadas'
+        : 'Horas trabajadas';
+    const subtotalLabel = isPeriodoHistorico
+      ? 'Monto histórico informativo'
+      : isPeriodoProyectado
+        ? 'Subtotal Estimado'
+        : 'Subtotal Facturado';
+    const totalLabel = isPeriodoHistorico
+      ? 'TOTAL HISTÓRICO INFORMATIVO'
+      : isPeriodoProyectado
+        ? 'TOTAL ESTIMADO A COBRAR'
+        : 'TOTAL NETO FACTURADO';
+
+    const text = `${tituloMensaje}\n\n` +
+      avisoPeriodo +
       `👤 *Trabajador:* ${liq.empleado.full_name}\n` +
-      `📅 *Período:* ${periodoText}\n` +
+      `📅 *Período:* ${periodoText}${isPeriodoProyectado ? ' *(Proyección en curso)*' : ''}\n` +
       `🏗️ *Obra:* ${liq.empleado.obras?.name || 'Base Central'}\n` +
       `---------------------------------------\n` +
-      `⏱️ *Horas Trabajadas:* ${liq.horasFinales} hs\n` +
+      `⏱️ *${horasLabel}:* ${liq.horasFinales} hs\n` +
+      (isPeriodoProyectado && liq.horasProyectadas > 0
+        ? `   _${liq.horasCalculadasBase} hs registradas/consolidadas + ${liq.horasProyectadas} hs proyectadas_\n`
+        : '') +
       `💵 *Valor Hora:* $${liq.valorHora.toLocaleString('es-AR')}\n` +
-      `💰 *Subtotal Facturado:* $${liq.sueldoBruto.toLocaleString('es-AR')}\n` +
-      (liq.bonoPresentismo > 0 ? `🎁 *Bono Presentismo (+):* $${liq.bonoPresentismo.toLocaleString('es-AR')}\n` : '') +
+      `💰 *${subtotalLabel}:* $${liq.sueldoBruto.toLocaleString('es-AR')}\n` +
+      (liq.bonoPresentismo > 0
+        ? `🎁 *Bono Presentismo (+):* $${liq.bonoPresentismo.toLocaleString('es-AR')}\n`
+        : isPeriodoProyectado
+          ? `🎁 *Bono Presentismo:* pendiente; no incluido por falta de registros reales/consolidados suficientes.\n`
+          : '') +
       (liq.adelanto > 0 ? `🔻 *Adelantos/Descuentos (-):* $${liq.adelanto.toLocaleString('es-AR')}\n` : '') +
       `---------------------------------------\n` +
-      `💲 *TOTAL NETO FACTURADO: $${liq.totalNeto.toLocaleString('es-AR')}*\n\n` +
+      `💲 *${totalLabel}: $${liq.totalNeto.toLocaleString('es-AR')}*\n\n` +
       `_Por cualquier duda sobre el cómputo de horas, comunicate con el área de Recursos Humanos de PEIE._`;
 
     const url = buildWhatsAppLink(liq.empleado.whatsapp, text);
@@ -786,46 +1168,93 @@ export default function LiquidacionSueldos() {
       {/* =================================================================== */}
       {/* VISTA DETALLADA DEL OBRERO O VISTA GENERAL DE LA NÓMINA             */}
       {/* =================================================================== */}
-      {selectedObrero ? (
+      {selectedObrero && selectedObreroLiquidacion ? (
         <ObreroSueldoProyecciones
           empleado={selectedObrero}
           novedades={novedades}
           valorHora={Number(tarifasEditadas[selectedObrero.id]) || Number(selectedObrero.valor_hora) || valorHoraDefecto}
           onUpdateValorHora={(val) => handleSaveTarifaIndividual(selectedObrero.id, val)}
-          adelanto={Number(adelantosMap[selectedObrero.id]) || 0}
-          onUpdateAdelanto={(val) => handleAdelantoChange(selectedObrero.id, val)}
+          adelanto={getScopedValue(
+            adelantosMap,
+            selectedObrero.id,
+            selectedYear,
+            selectedMes,
+            selectedPeriodoModo
+          ) || 0}
+          onUpdateAdelanto={(val) => handleAdelantoChange(
+            selectedObrero.id,
+            val,
+            { year: selectedYear, month: selectedMes, mode: selectedPeriodoModo }
+          )}
           porcentajeBonoPresentismo={porcentajeBonoPresentismo}
+          periodYear={selectedYear}
+          periodMonth={selectedMes}
+          availableYears={availableYears}
+          periodMode={selectedPeriodoModo}
+          resumenPeriodo={selectedObreroLiquidacion}
+          onChangePeriodYear={setSelectedYear}
+          onChangePeriodMonth={setSelectedMes}
+          onChangePeriodMode={setSelectedPeriodoModo}
           onClose={() => {
             setSelectedObreroId(null);
             setSearchWorkerQuery('');
           }}
-          onPrintReceipt={() => {
-            const liq = liquidaciones.find(l => l.empleado.id === selectedObrero.id);
-            if (liq) {
-              setSelectedLiquidacionForReceipt(liq);
-              setIsReceiptModalOpen(true);
-            }
-          }}
         />
       ) : (
         <>
+          {/* Banner Prominente de Período en Proyección (Septiembre en adelante) */}
+          {isPeriodoProyectado && (
+            <div className="bg-gradient-to-r from-amber-50 via-amber-100/50 to-orange-50 border-2 border-amber-300 p-5 rounded-3xl flex items-start gap-4 text-amber-950 shadow-sm animate-in fade-in">
+              <div className="p-2.5 bg-amber-200/90 rounded-2xl text-amber-900 shrink-0 mt-0.5 shadow-inner">
+                <AlertCircle className="h-6 w-6" />
+              </div>
+              <div className="space-y-1.5 flex-1">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <span className="font-black text-sm sm:text-base text-amber-900 tracking-tight uppercase">
+                    Período en Proyección Salarial ({selectedMes} {selectedYear})
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-200 text-amber-900 uppercase tracking-wider border border-amber-300">
+                    Provisorio / No Definitivo
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    Última liquidación en firme: {LAST_CLOSED_PAYROLL_PERIOD_LABEL}
+                  </span>
+                </div>
+                <p className="text-xs text-amber-800/95 leading-relaxed font-medium">
+                  La liquidación salarial formal y consolidada corresponde hasta <strong>{LAST_CLOSED_PAYROLL_PERIOD_LABEL}</strong>.
+                  Los cómputos de horas, tarifas y montos a cobrar para <strong>{selectedMes} {selectedYear}</strong> se calculan en carácter de <strong>proyección estimativa</strong> en curso. Se completan los días hábiles sin registro —excluyendo fines de semana, feriados nacionales y el día UOCRA— usando el promedio observado o, si todavía no hay datos, {HORAS_DIARIAS_PROYECCION_DEFAULT} horas por día.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Tarjetas de Métricas Resumen */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
-        {/* Total a Pagar */}
-        <Card className="rounded-2xl border-slate-200 shadow-sm bg-gradient-to-br from-emerald-50 to-white overflow-hidden border-l-4 border-l-emerald-500">
+        {/* Total a Pagar / Estimado */}
+        <Card className={`rounded-2xl border-slate-200 shadow-sm overflow-hidden border-l-4 ${
+          isPeriodoProyectado
+            ? 'bg-gradient-to-br from-amber-50 to-white border-l-amber-500'
+            : 'bg-gradient-to-br from-emerald-50 to-white border-l-emerald-500'
+        }`}>
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Facturado</p>
-              <div className="p-2 bg-emerald-100 rounded-xl text-emerald-600">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                {isPeriodoHistorico ? 'Total Histórico' : isPeriodoProyectado ? 'Total Proyectado' : 'Total Facturado'}
+              </p>
+              <div className={`p-2 rounded-xl ${isPeriodoProyectado ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-600'}`}>
                 <DollarSign className="h-5 w-5" />
               </div>
             </div>
             <p className="text-2xl font-black text-slate-900 mt-2">
               ${totalMontoPagar.toLocaleString('es-AR')}
             </p>
-            <p className="text-[11px] font-semibold text-emerald-700 mt-1">
-              Neto total para {liquidaciones.length} trabajadores
+            <p className={`text-[11px] font-semibold mt-1 ${isPeriodoProyectado ? 'text-amber-700 font-bold' : 'text-emerald-700'}`}>
+              {isPeriodoHistorico
+                ? `Acumulado informativo de ${selectedYear}`
+                : isPeriodoProyectado
+                  ? '⚡ Estimación provisoria de nómina'
+                  : `Neto total para ${liquidaciones.length} trabajadores`}
             </p>
           </CardContent>
         </Card>
@@ -843,7 +1272,7 @@ export default function LiquidacionSueldos() {
               {totalHorasLiquidadas.toLocaleString('es-AR')} hs
             </p>
             <p className="text-[11px] font-semibold text-blue-700 mt-1">
-              {selectedPeriodoModo === 'HISTORICO' ? 'Histórico acumulado' : `${selectedPeriodoModo} - ${selectedMes}`}
+              {selectedPeriodoModo === 'HISTORICO' ? `Histórico ${selectedYear}` : `${selectedPeriodoModo} - ${selectedMes} ${selectedYear}`}
             </p>
           </CardContent>
         </Card>
@@ -906,7 +1335,7 @@ export default function LiquidacionSueldos() {
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              Histórico / Todos los Registros
+              Histórico / Año Completo
             </Button>
 
             <Button
@@ -949,7 +1378,22 @@ export default function LiquidacionSueldos() {
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Año */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5 text-peie-blue" /> Año
+              </Label>
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-bold bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-peie-blue text-slate-800"
+              >
+                {availableYears.map(year => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
+            </div>
             
             {/* Mes (si no es histórico) */}
             {selectedPeriodoModo !== 'HISTORICO' && (
@@ -962,8 +1406,14 @@ export default function LiquidacionSueldos() {
                   onChange={(e) => setSelectedMes(e.target.value)}
                   className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-bold bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-peie-blue text-slate-800"
                 >
-                  {MESES.map(m => (
-                    <option key={m} value={m}>{m}</option>
+                  {MESES.map((m, idx) => (
+                    <option key={m} value={m}>
+                      {m} {selectedYear === LAST_CLOSED_PAYROLL_PERIOD.year && idx === LAST_CLOSED_PAYROLL_PERIOD.monthIndex
+                        ? '• (Última liquidación en firme)'
+                        : isAfterLastClosedPayrollPeriod(selectedYear, m)
+                          ? '• (Proyección provisoria)'
+                          : ''}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -1022,11 +1472,22 @@ export default function LiquidacionSueldos() {
       <Card className="rounded-3xl border-slate-200 shadow-sm bg-white overflow-hidden">
         <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
           <div>
-            <h2 className="text-base font-black text-slate-900">
-              Planilla de Liquidación y Sueldos ({selectedPeriodoModo === 'HISTORICO' ? 'Histórico Completo' : `${selectedPeriodoModo} - ${selectedMes}`})
-            </h2>
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h2 className="text-base font-black text-slate-900">
+                Planilla de Liquidación y Sueldos ({selectedPeriodoModo === 'HISTORICO' ? `Histórico ${selectedYear}` : `${selectedPeriodoModo} - ${selectedMes} ${selectedYear}`})
+              </h2>
+              {isPeriodoProyectado && (
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300">
+                  ⚡ PROYECCIÓN ESTIMATIVA
+                </span>
+              )}
+            </div>
             <p className="text-xs text-slate-500 font-medium">
-              Podés ajustar horas, valor por hora y deducciones por operario.
+              {isPeriodoHistorico
+                ? 'Resumen anual informativo; no representa una liquidación ni un importe definitivo a pagar.'
+                : isPeriodoProyectado
+                ? 'Valores proyectados provisorios. Podés ajustar horas y tarifas para simular la liquidación.'
+                : 'Podés ajustar horas, valor por hora y deducciones por operario.'}
             </p>
           </div>
           <span className="px-3 py-1 bg-peie-blue/10 text-peie-blue font-black text-xs rounded-full border border-peie-blue/20">
@@ -1040,13 +1501,19 @@ export default function LiquidacionSueldos() {
               <tr className="bg-slate-100 text-slate-700 font-black uppercase text-[10px] tracking-wider border-b border-slate-200">
                 <th className="py-3.5 px-4">Operario</th>
                 <th className="py-3.5 px-3">Obra</th>
-                <th className="py-3.5 px-3 text-center">Horas Trabajadas</th>
+                <th className="py-3.5 px-3 text-center">
+                  {isPeriodoHistorico ? 'Horas Acumuladas' : isPeriodoProyectado ? 'Horas Estimadas' : 'Horas Trabajadas'}
+                </th>
                 <th className="py-3.5 px-3 text-center">Asistencias</th>
                 <th className="py-3.5 px-3 text-right">Valor Hora ($)</th>
-                <th className="py-3.5 px-3 text-right">Subtotal Facturado</th>
+                <th className="py-3.5 px-3 text-right">
+                  {isPeriodoHistorico ? 'Monto Histórico' : isPeriodoProyectado ? 'Subtotal Estimado' : 'Subtotal Facturado'}
+                </th>
                 <th className="py-3.5 px-3 text-right">Presentismo ($)</th>
                 <th className="py-3.5 px-3 text-right">Adelantos ($)</th>
-                <th className="py-3.5 px-4 text-right bg-emerald-50/60 text-emerald-950 font-extrabold">Total a Cobrar</th>
+                <th className={`py-3.5 px-4 text-right ${isPeriodoProyectado ? 'bg-amber-100/70 text-amber-950 border-b border-amber-300' : 'bg-emerald-50/60 text-emerald-950'} font-extrabold`}>
+                  {isPeriodoHistorico ? 'Total Informativo' : isPeriodoProyectado ? 'Total Estimado' : 'Total a Cobrar'}
+                </th>
                 <th className="py-3.5 px-3 text-center">Acciones</th>
               </tr>
             </thead>
@@ -1090,18 +1557,28 @@ export default function LiquidacionSueldos() {
 
                       {/* Input / Botón de Horas Trabajadas */}
                       <td className="py-3 px-3 text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.5"
-                            value={liq.horasFinales || ''}
-                            placeholder="0"
-                            onChange={(e) => handleHorasManualChange(emp.id, Number(e.target.value) || 0)}
-                            className="w-16 h-8 text-center font-black text-xs rounded-lg border-blue-300 bg-blue-50/50 px-1 text-blue-900"
-                            title="Editar horas computadas"
-                          />
-                          <span className="text-[11px] font-bold text-slate-400">hs</span>
+                        <div>
+                          <div className="flex items-center justify-center gap-1">
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.5"
+                              value={liq.horasFinales || ''}
+                              placeholder="0"
+                              onChange={(e) => handleHorasManualChange(
+                                emp.id,
+                                e.target.value === '' ? undefined : Number(e.target.value)
+                              )}
+                              className="w-16 h-8 text-center font-black text-xs rounded-lg border-blue-300 bg-blue-50/50 px-1 text-blue-900"
+                              title="Editar horas computadas"
+                            />
+                            <span className="text-[11px] font-bold text-slate-400">hs</span>
+                          </div>
+                          {isPeriodoProyectado && !liq.ajusteManualHoras && (
+                            <p className="mt-1 text-[9px] font-semibold text-amber-700 whitespace-nowrap">
+                              {liq.horasCalculadasBase} reales + {liq.horasProyectadas} proy.
+                            </p>
+                          )}
                         </div>
                       </td>
 
@@ -1159,7 +1636,9 @@ export default function LiquidacionSueldos() {
                             +${liq.bonoPresentismo.toLocaleString('es-AR')}
                           </span>
                         ) : (
-                          <span className="text-slate-400 font-medium">$0</span>
+                          <span className="text-slate-400 font-medium">
+                            {isPeriodoProyectado ? 'Pendiente' : '$0'}
+                          </span>
                         )}
                       </td>
 
@@ -1173,17 +1652,25 @@ export default function LiquidacionSueldos() {
                             step="500"
                             placeholder="0"
                             value={liq.adelanto || ''}
-                            onChange={(e) => handleAdelantoChange(emp.id, Number(e.target.value) || 0)}
+                            onChange={(e) => handleAdelantoChange(
+                              emp.id,
+                              e.target.value === '' ? undefined : Number(e.target.value)
+                            )}
                             className="w-20 h-8 text-right font-semibold text-xs rounded-lg border-slate-200 px-2 text-rose-600 bg-white"
                           />
                         </div>
                       </td>
 
                       {/* Total Neto */}
-                      <td className="py-3 px-4 text-right bg-emerald-50/50">
-                        <span className="text-sm font-black text-emerald-900">
+                      <td className={`py-3 px-4 text-right ${isPeriodoProyectado ? 'bg-amber-50/80 border-l border-amber-200' : 'bg-emerald-50/50'}`}>
+                        <span className={`text-sm font-black ${isPeriodoProyectado ? 'text-amber-950' : 'text-emerald-900'}`}>
                           ${liq.totalNeto.toLocaleString('es-AR')}
                         </span>
+                        {isPeriodoProyectado && (
+                          <span className="block text-[9px] font-black text-amber-700 uppercase tracking-tighter">
+                            Proyectado
+                          </span>
+                        )}
                       </td>
 
                       {/* Acciones */}
@@ -1257,7 +1744,7 @@ export default function LiquidacionSueldos() {
                   <td className="py-4 px-3 text-right text-rose-300">
                     -${liquidaciones.reduce((a, b) => a + b.adelanto, 0).toLocaleString('es-AR')}
                   </td>
-                  <td className="py-4 px-4 text-right text-emerald-400 text-base">
+                  <td className={`py-4 px-4 text-right text-base ${isPeriodoProyectado ? 'text-amber-300' : 'text-emerald-400'}`}>
                     ${totalMontoPagar.toLocaleString('es-AR')}
                   </td>
                   <td className="py-4 px-3"></td>
@@ -1369,16 +1856,48 @@ export default function LiquidacionSueldos() {
             <div className="space-y-4">
               <div className="border-b border-slate-200 pb-4 flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-black text-slate-900">Recibo de Liquidación</h3>
+                  <h3 className="text-lg font-black text-slate-900">
+                    {isPeriodoHistorico
+                      ? 'Resumen Histórico Informativo'
+                      : isPeriodoProyectado
+                        ? 'Proyección Provisoria de Liquidación'
+                        : 'Recibo de Liquidación'}
+                  </h3>
                   <p className="text-xs text-slate-500 font-semibold">PEIE - Soluciones Eléctricas e Industriales</p>
                 </div>
                 <div className="text-right">
-                  <span className="px-2.5 py-1 rounded-full bg-blue-100 text-peie-blue font-black text-xs">
-                    {selectedPeriodoModo === 'HISTORICO' ? 'Histórico' : selectedPeriodoModo}
+                  <span className={`px-2.5 py-1 rounded-full font-black text-xs ${
+                    isPeriodoHistorico
+                      ? 'bg-slate-100 text-slate-700 border border-slate-300'
+                      : isPeriodoProyectado
+                        ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                        : 'bg-blue-100 text-peie-blue'
+                  }`}>
+                    {isPeriodoHistorico ? 'INFORMATIVO / NO PAGABLE' : isPeriodoProyectado ? 'PROVISORIO / NO DEFINITIVO' : selectedPeriodoModo}
                   </span>
-                  <p className="text-[10px] text-slate-400 font-bold mt-0.5">{selectedMes} 2026</p>
+                  <p className="text-[10px] text-slate-400 font-bold mt-1">
+                    {selectedPeriodoModo === 'HISTORICO' ? `Año ${selectedYear}` : `${selectedMes} ${selectedYear}`}
+                  </p>
                 </div>
               </div>
+
+              {isPeriodoProyectado && (
+                <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+                  <p className="font-black uppercase tracking-wide">Estimación sin valor de liquidación definitiva</p>
+                  <p className="mt-1 font-medium">
+                    Incluye horas proyectadas para completar los días hábiles de {selectedMes} {selectedYear}. La última liquidación cerrada es {LAST_CLOSED_PAYROLL_PERIOD_LABEL}.
+                  </p>
+                </div>
+              )}
+
+              {isPeriodoHistorico && (
+                <div className="rounded-2xl border-2 border-slate-300 bg-slate-50 p-3 text-xs text-slate-800">
+                  <p className="font-black uppercase tracking-wide">Resumen anual sin valor de recibo</p>
+                  <p className="mt-1 font-medium">
+                    Este acumulado de {selectedYear} es informativo y no representa una liquidación ni un importe definitivo a pagar.
+                  </p>
+                </div>
+              )}
 
               {/* Datos del Trabajador */}
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-1 text-xs">
@@ -1393,19 +1912,35 @@ export default function LiquidacionSueldos() {
               {/* Desglose de Liquidación */}
               <div className="border border-slate-200 rounded-2xl overflow-hidden text-xs">
                 <div className="bg-slate-100 px-4 py-2 font-black text-slate-700 uppercase tracking-wider text-[10px]">
-                  Conceptos Liquidados
+                  {isPeriodoHistorico ? 'Conceptos Históricos' : isPeriodoProyectado ? 'Conceptos Estimados' : 'Conceptos Liquidados'}
                 </div>
                 <div className="divide-y divide-slate-100 p-4 space-y-2">
                   
                   <div className="flex justify-between items-center text-slate-700">
-                    <span>Horas Trabajadas ({selectedLiquidacionForReceipt.horasFinales} hs x ${selectedLiquidacionForReceipt.valorHora.toLocaleString('es-AR')})</span>
+                    <span>{isPeriodoHistorico ? 'Horas acumuladas' : isPeriodoProyectado ? 'Horas estimadas' : 'Horas trabajadas'} ({selectedLiquidacionForReceipt.horasFinales} hs x ${selectedLiquidacionForReceipt.valorHora.toLocaleString('es-AR')})</span>
                     <span className="font-bold">${selectedLiquidacionForReceipt.sueldoBruto.toLocaleString('es-AR')}</span>
                   </div>
+
+                  {isPeriodoProyectado && selectedLiquidacionForReceipt.horasProyectadas > 0 && (
+                    <div className="flex justify-between items-center text-amber-800 text-[11px]">
+                      <span>Detalle de horas: registradas/consolidadas + proyectadas</span>
+                      <span className="font-bold">
+                        {selectedLiquidacionForReceipt.horasCalculadasBase} + {selectedLiquidacionForReceipt.horasProyectadas} hs
+                      </span>
+                    </div>
+                  )}
 
                   {selectedLiquidacionForReceipt.bonoPresentismo > 0 && (
                     <div className="flex justify-between items-center text-emerald-700 pt-2">
                       <span>Bono Presentismo y Puntualidad (+{porcentajeBonoPresentismo}%)</span>
                       <span className="font-bold">+${selectedLiquidacionForReceipt.bonoPresentismo.toLocaleString('es-AR')}</span>
+                    </div>
+                  )}
+
+                  {isPeriodoProyectado && selectedLiquidacionForReceipt.bonoPresentismo === 0 && (
+                    <div className="flex justify-between items-center text-amber-800 pt-2">
+                      <span>Bono Presentismo y Puntualidad</span>
+                      <span className="font-bold">Pendiente · no incluido</span>
                     </div>
                   )}
 
@@ -1417,8 +1952,10 @@ export default function LiquidacionSueldos() {
                   )}
 
                   <div className="flex justify-between items-center text-slate-900 pt-3 text-sm font-black border-t border-slate-200">
-                    <span>TOTAL FACTURADO / A COBRAR:</span>
-                    <span className="text-emerald-700 text-base">${selectedLiquidacionForReceipt.totalNeto.toLocaleString('es-AR')}</span>
+                    <span>{isPeriodoHistorico ? 'TOTAL HISTÓRICO INFORMATIVO:' : isPeriodoProyectado ? 'TOTAL ESTIMADO A COBRAR:' : 'TOTAL FACTURADO / A COBRAR:'}</span>
+                    <span className={`${isPeriodoHistorico ? 'text-slate-700' : isPeriodoProyectado ? 'text-amber-800' : 'text-emerald-700'} text-base`}>
+                      ${selectedLiquidacionForReceipt.totalNeto.toLocaleString('es-AR')}
+                    </span>
                   </div>
 
                 </div>
@@ -1458,7 +1995,7 @@ export default function LiquidacionSueldos() {
                   Asistencia Diaria: {selectedEmpleadoNovedades.emp.full_name}
                 </DialogTitle>
                 <DialogDescription className="text-xs text-slate-500">
-                  Registros computados en {selectedMes} ({selectedPeriodoModo})
+                  Registros computados en {selectedPeriodoModo === 'HISTORICO' ? `el año ${selectedYear}` : `${selectedMes} ${selectedYear}`} ({selectedPeriodoModo})
                 </DialogDescription>
               </DialogHeader>
 

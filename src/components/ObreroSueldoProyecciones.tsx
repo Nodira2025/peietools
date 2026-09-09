@@ -1,33 +1,32 @@
 import { useState, useMemo } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { 
   DollarSign, 
   Clock, 
-  Calendar, 
   TrendingUp, 
-  Award, 
-  CheckCircle2, 
   AlertTriangle, 
-  Building2, 
   Sparkles, 
-  ChevronRight, 
-  Download, 
-  Printer, 
   X,
   History,
   Calculator,
   CalendarDays,
   Coins,
-  ArrowUpRight,
   ShieldCheck,
   Send,
-  Phone,
   FileSpreadsheet
 } from 'lucide-react';
 import { buildWhatsAppLink } from '../lib/whatsapp';
+import {
+  PAYROLL_MONTHS,
+  LAST_CLOSED_PAYROLL_PERIOD,
+  LAST_CLOSED_PAYROLL_PERIOD_LABEL,
+  isAfterLastClosedPayrollPeriod,
+  isPayrollBusinessDay,
+  parsePayrollDate,
+  type PayrollPeriodMode
+} from '../lib/payroll-period';
 import * as XLSX from 'xlsx';
 
 export interface EmpleadoSueldo {
@@ -62,6 +61,25 @@ export interface NovedadRegistro {
   observaciones?: string;
 }
 
+export interface ResumenPeriodoSueldo {
+  horasCalculadasBase: number;
+  horasProyectadas: number;
+  horasFinales: number;
+  promedioHorasDia: number;
+  diasHabilesPeriodo: number;
+  diasCubiertos: number;
+  ajusteManualHoras: boolean;
+  horasAusente: number;
+  diasPresente: number;
+  diasAusente: number;
+  sueldoBruto: number;
+  bonoPresentismo: number;
+  cumplePresentismo: boolean;
+  estadoBonoPresentismo: string;
+  totalNeto: number;
+  horasRegistradasPorFecha: Record<string, number>;
+}
+
 interface ObreroSueldoProyeccionesProps {
   empleado: EmpleadoSueldo;
   novedades: NovedadRegistro[];
@@ -70,17 +88,30 @@ interface ObreroSueldoProyeccionesProps {
   adelanto: number;
   onUpdateAdelanto: (val: number) => void;
   porcentajeBonoPresentismo: number;
+  periodYear: number;
+  periodMonth: string;
+  availableYears: number[];
+  periodMode: PayrollPeriodMode;
+  resumenPeriodo: ResumenPeriodoSueldo;
+  onChangePeriodYear: (year: number) => void;
+  onChangePeriodMonth: (month: string) => void;
+  onChangePeriodMode: (mode: PayrollPeriodMode) => void;
   onClose: () => void;
-  onPrintReceipt?: () => void;
 }
 
-const MESES = [
-  'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
-  'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'
-];
+const MESES = PAYROLL_MONTHS;
 
 const DIAS_SEMANA = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 const DIAS_SEMANA_COMPLETO = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+function getFechaParts(fecha: string | null | undefined): { year: number; monthIndex: number; day: number } | null {
+  const date = parsePayrollDate(fecha);
+  if (!date) return null;
+  return { year: date.getFullYear(), monthIndex: date.getMonth(), day: date.getDate() };
+}
+
+function isPeriodoPosteriorAlCierre(year: number, mes: string): boolean {
+  return isAfterLastClosedPayrollPeriod(year, mes);
+}
 
 function normalizeText(text: string | null | undefined): string {
   if (!text) return '';
@@ -101,29 +132,48 @@ export function ObreroSueldoProyecciones({
   adelanto,
   onUpdateAdelanto,
   porcentajeBonoPresentismo,
-  onClose,
-  onPrintReceipt
+  periodYear: selectedYear,
+  periodMonth: selectedMes,
+  availableYears,
+  periodMode,
+  resumenPeriodo,
+  onChangePeriodYear,
+  onChangePeriodMonth,
+  onChangePeriodMode,
+  onClose
 }: ObreroSueldoProyeccionesProps) {
   
   // Pestañas internas del detalle del obrero
-  const [activeSubTab, setActiveSubTab] = useState<'mes_actual' | 'quincena_dia' | 'historico' | 'proyecciones'>('mes_actual');
+  const [activeSubTab, setActiveSubTab] = useState<'mes_actual' | 'quincena_dia' | 'historico' | 'proyecciones'>(
+    periodMode === 'HISTORICO' ? 'historico' : 'mes_actual'
+  );
   
-  // Período de análisis
-  const [selectedYear, setSelectedYear] = useState<number>(2026);
-  const [selectedMes, setSelectedMes] = useState<string>('AGOSTO');
-  const [selectedQuincena, setSelectedQuincena] = useState<'1Q' | '2Q'>('2Q');
+  // La nómina y la ficha comparten año y mes para evitar cálculos cruzados.
+  const [selectedQuincena, setSelectedQuincena] = useState<'1Q' | '2Q'>(
+    periodMode === '1Q' ? '1Q' : '2Q'
+  );
 
   // Tarifa editable temporal
   const [tempValorHora, setTempValorHora] = useState<number>(valorHora || 4500);
   const [isEditingTarifa, setIsEditingTarifa] = useState(false);
+
+  // El corte compartido define qué períodos son cerrados y cuáles proyectados.
+  const isPeriodoProyectado = useMemo(() => {
+    return periodMode !== 'HISTORICO' && isPeriodoPosteriorAlCierre(selectedYear, selectedMes);
+  }, [periodMode, selectedMes, selectedYear]);
 
   // 1. Novedades del empleado (matching inteligente por ID, DNI o palabras clave del nombre)
   const empNovedadesHistoricas = useMemo(() => {
     const empNorm = normalizeText(empleado.full_name);
     const empWords = empNorm.split(' ').filter(w => w.length > 2);
     const empDni = empleado.dni?.trim();
+    const fechaIngreso = parsePayrollDate(empleado.fecha_ingreso);
 
     return novedades.filter(n => {
+      const fechaParts = getFechaParts(n.fecha);
+      if (!fechaParts || fechaParts.year !== selectedYear) return false;
+      const fechaRegistro = parsePayrollDate(n.fecha);
+      if (!fechaRegistro || (fechaIngreso && fechaRegistro < fechaIngreso)) return false;
       if (n.empleado_id && n.empleado_id === empleado.id) return true;
       if (empDni && n.empleado_dni && n.empleado_dni.trim() === empDni) return true;
       
@@ -134,53 +184,59 @@ export function ObreroSueldoProyecciones({
       const matchingWords = empWords.filter(w => novNorm.includes(w));
       return matchingWords.length >= 2;
     }).sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
-  }, [novedades, empleado]);
+  }, [novedades, empleado, selectedYear]);
 
   // 2. Novedades del mes seleccionado
   const empNovedadesMes = useMemo(() => {
     return empNovedadesHistoricas.filter(n => {
-      if (n.mes && n.mes.toUpperCase().trim() === selectedMes) return true;
-      if (n.fecha) {
-        const parts = n.fecha.split('-');
-        const mIdx = Number(parts[1]) - 1;
-        return MESES[mIdx] === selectedMes;
-      }
-      return false;
+      const fechaParts = getFechaParts(n.fecha);
+      if (!fechaParts || fechaParts.year !== selectedYear) return false;
+
+      const mesFecha = MESES[fechaParts.monthIndex];
+      return mesFecha === selectedMes;
     });
-  }, [empNovedadesHistoricas, selectedMes]);
+  }, [empNovedadesHistoricas, selectedMes, selectedYear]);
 
   // 3. Novedades de la quincena seleccionada
   const empNovedadesQuincena = useMemo(() => {
     return empNovedadesMes.filter(n => {
-      if (n.quincena && n.quincena.toUpperCase().trim() === selectedQuincena) return true;
-      if (n.fecha) {
-        const day = Number(n.fecha.split('-')[2]);
-        const q = day <= 15 ? '1Q' : '2Q';
-        return q === selectedQuincena;
-      }
-      return false;
+      const fechaParts = getFechaParts(n.fecha);
+      if (!fechaParts) return false;
+      const q = fechaParts.day <= 15 ? '1Q' : '2Q';
+      return q === selectedQuincena;
     });
   }, [empNovedadesMes, selectedQuincena]);
 
   // =========================================================================
   // CÁLCULO 1: ¿CUÁNTO VA A COBRAR ESTE MES? (Real Devengado + Proyección)
   // =========================================================================
-  const mesActualCalculos = useMemo(() => {
+  const mesActualCalculosLocales = useMemo(() => {
     // Horas reales ya registradas en el mes
     const horasReales = empNovedadesMes.reduce((acc, curr) => acc + (Number(curr.horas_trabajadas) || 0), 0);
-    const diasTrabajadosReales = empNovedadesMes.filter(n => (Number(n.horas_trabajadas) || 0) > 0).length;
+    const diasTrabajadosReales = new Set(
+      empNovedadesMes
+        .filter(n => (Number(n.horas_trabajadas) || 0) > 0)
+        .map(n => getFechaParts(n.fecha)?.day)
+        .filter((day): day is number => day !== undefined)
+    ).size;
     const inasistencias = empNovedadesMes.filter(n => n.estado === 'AUSENTE').length;
     const llegadasTarde = empNovedadesMes.filter(n => n.estado === 'LLEGADA TARDE').length;
 
-    // Estimar días hábiles del mes completo (Lunes a Viernes = 21 o 22 días laborables)
+    // Estimar los días hábiles del mes con el calendario laboral compartido.
     const mIdx = MESES.indexOf(selectedMes);
     const totalDiasMes = new Date(selectedYear, mIdx + 1, 0).getDate();
+    const inicioMes = new Date(selectedYear, mIdx, 1);
+    const finMes = new Date(selectedYear, mIdx, totalDiasMes);
+    const ingresoParts = getFechaParts(empleado.fecha_ingreso);
+    const fechaIngreso = ingresoParts
+      ? new Date(ingresoParts.year, ingresoParts.monthIndex, ingresoParts.day)
+      : null;
+    const inicioComputable = fechaIngreso && fechaIngreso > inicioMes ? fechaIngreso : inicioMes;
     
     let diasHabilesTotales = 0;
-    for (let day = 1; day <= totalDiasMes; day++) {
+    for (let day = inicioComputable <= finMes ? inicioComputable.getDate() : totalDiasMes + 1; day <= totalDiasMes; day++) {
       const d = new Date(selectedYear, mIdx, day);
-      const dayOfWeek = d.getDay();
-      if (dayOfWeek >= 1 && dayOfWeek <= 5) { // Lunes a Viernes
+      if (isPayrollBusinessDay(d)) {
         diasHabilesTotales++;
       }
     }
@@ -190,8 +246,22 @@ export function ObreroSueldoProyecciones({
       ? Math.round((horasReales / diasTrabajadosReales) * 10) / 10 
       : 8.8;
 
-    // Días hábiles que faltan completar
-    const diasHabilesRestantes = Math.max(0, diasHabilesTotales - diasTrabajadosReales);
+    // Para períodos abiertos, proyectar únicamente días hábiles que no tienen ningún
+    // registro. En períodos cerrados nunca se completan horas faltantes artificialmente.
+    const diasHabilesConRegistro = new Set(
+      empNovedadesMes
+        .map(n => getFechaParts(n.fecha))
+        .filter((parts): parts is { year: number; monthIndex: number; day: number } => parts !== null)
+        .filter(parts => {
+          const fecha = new Date(parts.year, parts.monthIndex, parts.day);
+          if (fecha < inicioComputable || fecha > finMes) return false;
+          return isPayrollBusinessDay(fecha);
+        })
+        .map(parts => parts.day)
+    ).size;
+    const diasHabilesRestantes = isPeriodoProyectado
+      ? Math.max(0, diasHabilesTotales - diasHabilesConRegistro)
+      : 0;
     const horasProyectadasRestantes = Math.round(diasHabilesRestantes * promedioHorasPorDia * 10) / 10;
     const horasTotalesEstimadasMes = Math.round((horasReales + horasProyectadasRestantes) * 10) / 10;
 
@@ -228,65 +298,146 @@ export function ObreroSueldoProyecciones({
       totalNetoDevengadoHoy,
       totalNetoEstimadoMes
     };
-  }, [empNovedadesMes, selectedMes, selectedYear, valorHora, porcentajeBonoPresentismo, adelanto]);
+  }, [empNovedadesMes, selectedMes, selectedYear, empleado.fecha_ingreso, valorHora, porcentajeBonoPresentismo, adelanto, isPeriodoProyectado]);
+
+  // La nómina es la fuente única para los importes del período: así se respetan
+  // consolidados semanales, ajustes manuales y la misma regla de presentismo.
+  const mesActualCalculos = useMemo(() => {
+    const subtotalDevengadoHoy = Math.round(resumenPeriodo.horasCalculadasBase * valorHora);
+    const subtotalProyectadoRestante = Math.round(resumenPeriodo.horasProyectadas * valorHora);
+    const bonoDevengadoHoy = resumenPeriodo.cumplePresentismo
+      ? Math.round((subtotalDevengadoHoy * porcentajeBonoPresentismo) / 100)
+      : 0;
+
+    return {
+      ...mesActualCalculosLocales,
+      horasReales: resumenPeriodo.horasCalculadasBase,
+      diasTrabajadosReales: resumenPeriodo.diasPresente,
+      inasistencias: resumenPeriodo.diasAusente,
+      diasHabilesTotales: resumenPeriodo.diasHabilesPeriodo,
+      diasHabilesRestantes: Math.max(0, resumenPeriodo.diasHabilesPeriodo - resumenPeriodo.diasCubiertos),
+      promedioHorasPorDia: resumenPeriodo.promedioHorasDia,
+      horasProyectadasRestantes: resumenPeriodo.horasProyectadas,
+      horasTotalesEstimadasMes: resumenPeriodo.horasFinales,
+      subtotalDevengadoHoy,
+      subtotalProyectadoRestante,
+      subtotalBrutoEstimadoMes: resumenPeriodo.sueldoBruto,
+      cumplePresentismo: resumenPeriodo.cumplePresentismo,
+      bonoPresentismo: resumenPeriodo.bonoPresentismo,
+      bonoDevengadoHoy,
+      estadoBonoPresentismo: resumenPeriodo.estadoBonoPresentismo,
+      totalNetoDevengadoHoy: Math.max(0, subtotalDevengadoHoy + bonoDevengadoHoy - adelanto),
+      totalNetoEstimadoMes: resumenPeriodo.totalNeto
+    };
+  }, [mesActualCalculosLocales, resumenPeriodo, valorHora, porcentajeBonoPresentismo, adelanto]);
 
   // =========================================================================
-  // CÁLCULO 2: ¿CUÁNTO VA COBRANDO DESDE QUE SE TIENE REGISTRO? (HISTÓRICO)
+  // CÁLCULO 2: HISTÓRICO DEL AÑO SELECCIONADO
   // =========================================================================
   const historicoCalculos = useMemo(() => {
-    const totalHoras = empNovedadesHistoricas.reduce((acc, curr) => acc + (Number(curr.horas_trabajadas) || 0), 0);
-    const totalAusencias = empNovedadesHistoricas.filter(n => n.estado === 'AUSENTE').length;
-    const totalLlegadasTarde = empNovedadesHistoricas.filter(n => n.estado === 'LLEGADA TARDE').length;
-    const totalMontoHistorico = Math.round(totalHoras * valorHora);
+    // En modo histórico, el mapa conciliado de la nómina incorpora tanto partes
+    // diarios como consolidados semanales. En los demás modos se conserva el
+    // historial diario anual para esta pestaña informativa.
+    const horasPorFecha = new Map<string, number>();
+    if (periodMode === 'HISTORICO') {
+      Object.entries(resumenPeriodo.horasRegistradasPorFecha).forEach(([fecha, horas]) => {
+        horasPorFecha.set(fecha, Number(horas) || 0);
+      });
+    } else {
+      empNovedadesHistoricas.forEach(n => {
+        const parts = getFechaParts(n.fecha);
+        if (!parts) return;
+        const fecha = `${parts.year}-${String(parts.monthIndex + 1).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
+        horasPorFecha.set(fecha, (horasPorFecha.get(fecha) || 0) + (Number(n.horas_trabajadas) || 0));
+      });
+    }
 
-    // Agrupar por mes y quincena
     const periodosMap = new Map<string, {
       periodoKey: string;
+      year: number;
       mes: string;
       quincena: string;
+      estadoPeriodo: 'LIQUIDACIÓN CERRADA' | 'PERÍODO ABIERTO / PROVISORIO';
       horas: number;
       dias: number;
       monto: number;
       ausencias: number;
+      fechasTrabajadas: Set<string>;
+      fechasAusentes: Set<string>;
     }>();
 
-    empNovedadesHistoricas.forEach(n => {
-      let m = (n.mes || 'AGOSTO').toUpperCase().trim();
-      let q = (n.quincena || '2Q').toUpperCase().trim();
-      if (n.fecha) {
-        const parts = n.fecha.split('-');
-        m = MESES[Number(parts[1]) - 1] || m;
-        q = Number(parts[2]) <= 15 ? '1Q' : '2Q';
-      }
-
-      const key = `${m}_${q}`;
+    const ensurePeriodo = (year: number, monthIndex: number, day: number) => {
+      const mes = MESES[monthIndex];
+      const quincena = day <= 15 ? '1Q' : '2Q';
+      const key = `${year}_${mes}_${quincena}`;
       let p = periodosMap.get(key);
       if (!p) {
         p = {
           periodoKey: key,
-          mes: m,
-          quincena: q,
+          year,
+          mes,
+          quincena,
+          estadoPeriodo: isPeriodoPosteriorAlCierre(year, mes)
+            ? 'PERÍODO ABIERTO / PROVISORIO'
+            : 'LIQUIDACIÓN CERRADA',
           horas: 0,
           dias: 0,
           monto: 0,
-          ausencias: 0
+          ausencias: 0,
+          fechasTrabajadas: new Set<string>(),
+          fechasAusentes: new Set<string>()
         };
         periodosMap.set(key, p);
       }
+      return p;
+    };
 
-      const hs = Number(n.horas_trabajadas) || 0;
-      p.horas += hs;
-      if (hs > 0) p.dias += 1;
-      if (n.estado === 'AUSENTE') p.ausencias += 1;
-      p.monto += Math.round(hs * valorHora);
+    horasPorFecha.forEach((horas, fecha) => {
+      const parts = getFechaParts(fecha);
+      if (!parts) return;
+      const p = ensurePeriodo(parts.year, parts.monthIndex, parts.day);
+      p.horas += horas;
+      if (horas > 0) p.fechasTrabajadas.add(fecha);
     });
 
-    const periodosList = Array.from(periodosMap.values()).sort((a, b) => {
+    const fechasTarde = new Set<string>();
+    empNovedadesHistoricas.forEach(n => {
+      const parts = getFechaParts(n.fecha);
+      if (!parts) return;
+      const fecha = `${parts.year}-${String(parts.monthIndex + 1).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
+      const p = ensurePeriodo(parts.year, parts.monthIndex, parts.day);
+      if (n.estado === 'AUSENTE') p.fechasAusentes.add(fecha);
+      if (n.estado === 'LLEGADA TARDE') fechasTarde.add(fecha);
+    });
+
+    const periodosList = Array.from(periodosMap.values()).map(p => ({
+      periodoKey: p.periodoKey,
+      year: p.year,
+      mes: p.mes,
+      quincena: p.quincena,
+      estadoPeriodo: p.estadoPeriodo,
+      horas: Math.round(p.horas * 100) / 100,
+      dias: p.fechasTrabajadas.size,
+      monto: Math.round(p.horas * valorHora),
+      ausencias: p.fechasAusentes.size
+    })).sort((a, b) => {
+      if (a.year !== b.year) return b.year - a.year;
       const idxA = MESES.indexOf(a.mes);
       const idxB = MESES.indexOf(b.mes);
       if (idxA !== idxB) return idxB - idxA;
       return b.quincena.localeCompare(a.quincena);
     });
+
+    const totalHoras = Math.round(
+      Array.from(horasPorFecha.values()).reduce((acc, horas) => acc + horas, 0) * 100
+    ) / 100;
+    const totalAusencias = new Set(
+      empNovedadesHistoricas
+        .filter(n => n.estado === 'AUSENTE')
+        .map(n => n.fecha.slice(0, 10))
+    ).size;
+    const totalLlegadasTarde = fechasTarde.size;
+    const totalMontoHistorico = Math.round(totalHoras * valorHora);
 
     return {
       totalHoras,
@@ -296,31 +447,42 @@ export function ObreroSueldoProyecciones({
       totalQuincenas: periodosList.length,
       periodosList
     };
-  }, [empNovedadesHistoricas, valorHora]);
+  }, [empNovedadesHistoricas, valorHora, periodMode, resumenPeriodo.horasRegistradasPorFecha]);
 
   // =========================================================================
   // CÁLCULO 3: ¿CUÁNTO COBRARÁ LOS PRÓXIMOS MESES? (PROYECCIONES A FUTURO)
   // =========================================================================
   const proyeccionesFuturas = useMemo(() => {
     const list = [];
+    const fechaIngreso = parsePayrollDate(empleado.fecha_ingreso);
     const currentMIdx = MESES.indexOf(selectedMes);
+    const selectedPeriodo = selectedYear * 12 + currentMIdx;
+    const primerPeriodoProyectable = LAST_CLOSED_PAYROLL_PERIOD.year * 12 + LAST_CLOSED_PAYROLL_PERIOD.monthIndex + 1;
+    const primerPeriodoObjetivo = Math.max(selectedPeriodo + 1, primerPeriodoProyectable);
 
-    for (let offset = 1; offset <= 4; offset++) {
-      const targetMIdx = (currentMIdx + offset) % 12;
-      const targetYear = selectedYear + Math.floor((currentMIdx + offset) / 12);
+    for (let offset = 0; offset < 4; offset++) {
+      const targetPeriodo = primerPeriodoObjetivo + offset;
+      const targetMIdx = targetPeriodo % 12;
+      const targetYear = Math.floor(targetPeriodo / 12);
       const mesName = MESES[targetMIdx];
 
       // Días hábiles del mes objetivo
       const totalDias = new Date(targetYear, targetMIdx + 1, 0).getDate();
+      const inicioMes = new Date(targetYear, targetMIdx, 1);
+      const finMes = new Date(targetYear, targetMIdx, totalDias);
+      const inicioComputable = fechaIngreso && fechaIngreso > inicioMes ? fechaIngreso : inicioMes;
       let diasHabiles = 0;
-      for (let day = 1; day <= totalDias; day++) {
+      for (
+        let day = inicioComputable <= finMes ? inicioComputable.getDate() : totalDias + 1;
+        day <= totalDias;
+        day++
+      ) {
         const d = new Date(targetYear, targetMIdx, day);
-        const dayOfWeek = d.getDay();
-        if (dayOfWeek >= 1 && dayOfWeek <= 5) diasHabiles++;
+        if (isPayrollBusinessDay(d)) diasHabiles++;
       }
 
       // Horas proyectadas a 8.8 hs diarias (44 hs semanales)
-      const horasProyectadas = Math.round(diasHabiles * 8.8);
+      const horasProyectadas = Math.round(diasHabiles * 8.8 * 10) / 10;
       const sueldoBase = Math.round(horasProyectadas * valorHora);
       const bonoAsistencia = Math.round((sueldoBase * porcentajeBonoPresentismo) / 100);
       const sueldoConBono = sueldoBase + bonoAsistencia;
@@ -333,6 +495,7 @@ export function ObreroSueldoProyecciones({
       list.push({
         mes: mesName,
         year: targetYear,
+        distanciaMeses: targetPeriodo - selectedPeriodo,
         diasHabiles,
         horasProyectadas,
         sueldoBase,
@@ -345,7 +508,7 @@ export function ObreroSueldoProyecciones({
     }
 
     return list;
-  }, [selectedMes, selectedYear, valorHora, porcentajeBonoPresentismo]);
+  }, [selectedMes, selectedYear, empleado.fecha_ingreso, valorHora, porcentajeBonoPresentismo]);
 
   // =========================================================================
   // CÁLCULO 4: DESGLOSE DE QUINCENA POR DÍA (DÍA A DÍA CON MONTO DIARIO)
@@ -355,14 +518,44 @@ export function ObreroSueldoProyecciones({
     const startDay = selectedQuincena === '1Q' ? 1 : 16;
     const totalDiasMes = new Date(selectedYear, mIdx + 1, 0).getDate();
     const endDay = selectedQuincena === '1Q' ? 15 : totalDiasMes;
+    const ingresoParts = getFechaParts(empleado.fecha_ingreso);
+    const fechaIngreso = ingresoParts
+      ? new Date(ingresoParts.year, ingresoParts.monthIndex, ingresoParts.day)
+      : null;
 
-    // Mapa de novedades reales indexadas por día
+    // Mapa de novedades reales indexadas por día. Si una jornada tiene varios
+    // partes (por ejemplo, dos obras), se agregan en vez de conservar solo el último.
     const novPorDiaMap = new Map<number, NovedadRegistro>();
     empNovedadesQuincena.forEach(n => {
-      if (n.fecha) {
-        const d = Number(n.fecha.split('-')[2]);
-        novPorDiaMap.set(d, n);
+      const fechaParts = getFechaParts(n.fecha);
+      if (!fechaParts) return;
+
+      const previous = novPorDiaMap.get(fechaParts.day);
+      if (!previous) {
+        novPorDiaMap.set(fechaParts.day, { ...n });
+        return;
       }
+
+      const estados = [previous.estado, n.estado];
+      const obras = Array.from(new Set(
+        [previous.obra_nombre, n.obra_nombre].filter((obra): obra is string => !!obra)
+      ));
+      const licencias = Array.from(new Set(
+        [previous.tipo_licencia, n.tipo_licencia].filter((tipo): tipo is string => !!tipo)
+      ));
+      novPorDiaMap.set(fechaParts.day, {
+        ...previous,
+        id: `${previous.id},${n.id}`,
+        horas_trabajadas: (Number(previous.horas_trabajadas) || 0) + (Number(n.horas_trabajadas) || 0),
+        horas_ausente: (Number(previous.horas_ausente) || 0) + (Number(n.horas_ausente) || 0),
+        estado: estados.includes('AUSENTE')
+          ? 'AUSENTE'
+          : estados.includes('LLEGADA TARDE')
+            ? 'LLEGADA TARDE'
+            : 'PRESENTE',
+        obra_nombre: obras.join(' / ') || undefined,
+        tipo_licencia: licencias.join(' / ') || undefined
+      });
     });
 
     const rows = [];
@@ -375,18 +568,29 @@ export function ObreroSueldoProyecciones({
       const diaNombre = DIAS_SEMANA_COMPLETO[dayOfWeek];
       const esDomingo = dayOfWeek === 0;
       const esSabado = dayOfWeek === 6;
+      const esDiaNoLaborable = !esDomingo && !esSabado && !isPayrollBusinessDay(d);
 
       const dateStr = `${selectedYear}-${String(mIdx + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const novReal = novPorDiaMap.get(day);
+      const tieneConsolidadoSemanal = !novReal &&
+        Object.prototype.hasOwnProperty.call(resumenPeriodo.horasRegistradasPorFecha, dateStr);
 
-      let horasDia = 0;
-      let montoDia = 0;
-      let estadoTipo: 'TRABAJADO' | 'AUSENTE' | 'PROYECTADO' | 'DESCANSO' | 'TARDE' = 'PROYECTADO';
-      let detalle = '';
+      let horasDia: number;
+      let montoDia: number;
+      let estadoTipo: 'TRABAJADO' | 'CONSOLIDADO' | 'AUSENTE' | 'PROYECTADO' | 'SIN_REGISTRO' | 'NO_CORRESPONDE' | 'DESCANSO' | 'TARDE';
+      let detalle: string;
+      let tipoDato: string;
 
-      if (novReal) {
+      if (fechaIngreso && d < fechaIngreso) {
+        estadoTipo = 'NO_CORRESPONDE';
+        horasDia = 0;
+        montoDia = 0;
+        detalle = `Anterior al ingreso (${empleado.fecha_ingreso})`;
+        tipoDato = 'NO CORRESPONDE';
+      } else if (novReal) {
         horasDia = Number(novReal.horas_trabajadas) || 0;
         montoDia = Math.round(horasDia * valorHora);
+        tipoDato = 'REGISTRO DIARIO';
 
         if (novReal.estado === 'AUSENTE') {
           estadoTipo = 'AUSENTE';
@@ -398,22 +602,44 @@ export function ObreroSueldoProyecciones({
           estadoTipo = 'TRABAJADO';
           detalle = novReal.obra_nombre ? `Obra: ${novReal.obra_nombre}` : 'Jornada Cumplida';
         }
+      } else if (tieneConsolidadoSemanal) {
+        horasDia = Number(resumenPeriodo.horasRegistradasPorFecha[dateStr]) || 0;
+        montoDia = Math.round(horasDia * valorHora);
+        estadoTipo = 'CONSOLIDADO';
+        detalle = 'Registro consolidado semanal';
+        tipoDato = 'CONSOLIDADO SEMANAL';
       } else if (esDomingo) {
         estadoTipo = 'DESCANSO';
         horasDia = 0;
         montoDia = 0;
         detalle = 'Franco Semanal';
+        tipoDato = 'DESCANSO';
       } else if (esSabado) {
         estadoTipo = 'DESCANSO';
         horasDia = 0;
         montoDia = 0;
         detalle = 'Sábado no laborable';
+        tipoDato = 'DESCANSO';
+      } else if (esDiaNoLaborable) {
+        estadoTipo = 'DESCANSO';
+        horasDia = 0;
+        montoDia = 0;
+        detalle = 'Día no laborable nacional/UOCRA';
+        tipoDato = 'DÍA NO LABORABLE';
       } else {
-        // Día Hábil sin registro -> Proyección estimada
-        estadoTipo = 'PROYECTADO';
-        horasDia = 8.8; // Estándar 44hs semanales
-        montoDia = Math.round(horasDia * valorHora);
-        detalle = 'Jornada Proyectada (8.8 hs)';
+        if (isPeriodoProyectado) {
+          estadoTipo = 'PROYECTADO';
+          horasDia = mesActualCalculos.promedioHorasPorDia;
+          montoDia = Math.round(horasDia * valorHora);
+          detalle = `Jornada Proyectada (${horasDia} hs)`;
+          tipoDato = 'PROYECCIÓN';
+        } else {
+          estadoTipo = 'SIN_REGISTRO';
+          horasDia = 0;
+          montoDia = 0;
+          detalle = 'Día laborable sin registro';
+          tipoDato = 'SIN REGISTRO';
+        }
       }
 
       horasAcumuladas += horasDia;
@@ -426,7 +652,8 @@ export function ObreroSueldoProyecciones({
         diaAbrev: DIAS_SEMANA[dayOfWeek],
         esDomingo,
         esSabado,
-        tieneRegistroReal: !!novReal,
+        tieneRegistroReal: !!novReal || tieneConsolidadoSemanal,
+        tipoDato,
         estadoTipo,
         detalle,
         horasDia,
@@ -437,29 +664,61 @@ export function ObreroSueldoProyecciones({
     }
 
     return rows;
-  }, [selectedMes, selectedYear, selectedQuincena, empNovedadesQuincena, valorHora]);
+  }, [selectedMes, selectedYear, selectedQuincena, empNovedadesQuincena, empleado.fecha_ingreso, valorHora, isPeriodoProyectado, mesActualCalculos.promedioHorasPorDia, resumenPeriodo.horasRegistradasPorFecha]);
 
   // Exportar ficha del obrero a Excel
   const handleExportObreroExcel = () => {
     const wb = XLSX.utils.book_new();
+    const isHistorico = periodMode === 'HISTORICO';
+    const estadoPeriodo = isHistorico
+      ? 'HISTÓRICO INFORMATIVO'
+      : isPeriodoProyectado
+        ? 'PROYECCIÓN PROVISORIA'
+        : 'LIQUIDACIÓN CERRADA';
+    const periodoLabel = isHistorico
+      ? `Histórico ${selectedYear}`
+      : periodMode === 'MES'
+        ? `${selectedMes} ${selectedYear}`
+        : `${periodMode} - ${selectedMes} ${selectedYear}`;
 
-    // 1. Hoja Desglose Día por Día
-    const dataDias = desgloseQuincenaDiaPorDia.map(r => ({
-      'Fecha': r.fechaStr,
-      'Día': r.diaNombre,
-      'Estado': r.estadoTipo,
-      'Detalle': r.detalle,
-      'Horas': r.horasDia,
-      'Cobro Diario ($)': r.montoDia,
-      'Horas Acumuladas': r.horasAcumuladas,
-      'Acumulado Quincena ($)': r.acumuladoQuincena
-    }));
-    const wsDias = XLSX.utils.json_to_sheet(dataDias);
-    XLSX.utils.book_append_sheet(wb, wsDias, `Quincena_${selectedQuincena}_Dias`);
+    // 1. Hoja resumen con la condición explícita del período.
+    const dataResumen = [{
+      'Empleado': empleado.full_name,
+      'Período': periodoLabel,
+      'Estado del período': estadoPeriodo,
+      'Último período cerrado': LAST_CLOSED_PAYROLL_PERIOD_LABEL,
+      'Horas registradas': mesActualCalculos.horasReales,
+      'Horas proyectadas': mesActualCalculos.horasProyectadasRestantes,
+      'Horas totales del cálculo': mesActualCalculos.horasTotalesEstimadasMes,
+      'Subtotal bruto ($)': mesActualCalculos.subtotalBrutoEstimadoMes,
+      'Estado bono presentismo': mesActualCalculos.estadoBonoPresentismo,
+      'Bono presentismo ($)': mesActualCalculos.bonoPresentismo,
+      [`Total ${isHistorico ? 'histórico informativo' : isPeriodoProyectado ? 'neto estimado' : 'neto liquidado'} ($)`]: mesActualCalculos.totalNetoEstimadoMes
+    }];
+    const wsResumen = XLSX.utils.json_to_sheet(dataResumen);
+    XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen_Periodo');
 
-    // 2. Hoja Historial Quincenas
+    // 2. Hoja Desglose Día por Día (solo para un período mensual/quincenal).
+    if (!isHistorico) {
+      const dataDias = desgloseQuincenaDiaPorDia.map(r => ({
+        'Fecha': r.fechaStr,
+        'Día': r.diaNombre,
+        'Estado': r.estadoTipo,
+        'Tipo de dato': r.tipoDato,
+        'Detalle': r.detalle,
+        'Horas': r.horasDia,
+        'Cobro Diario ($)': r.montoDia,
+        'Horas Acumuladas': r.horasAcumuladas,
+        'Acumulado Quincena ($)': r.acumuladoQuincena
+      }));
+      const wsDias = XLSX.utils.json_to_sheet(dataDias);
+      XLSX.utils.book_append_sheet(wb, wsDias, `Quincena_${selectedQuincena}_Dias`);
+    }
+
+    // 3. Hoja Historial Quincenas
     const dataHist = historicoCalculos.periodosList.map(p => ({
-      'Período': `${p.mes} - ${p.quincena}`,
+      'Período': `${p.mes} ${p.year ?? 'SIN AÑO'} - ${p.quincena}`,
+      'Estado del período': p.estadoPeriodo,
       'Horas Computadas': p.horas,
       'Jornadas Trabajadas': p.dias,
       'Ausencias': p.ausencias,
@@ -468,13 +727,13 @@ export function ObreroSueldoProyecciones({
     const wsHist = XLSX.utils.json_to_sheet(dataHist);
     XLSX.utils.book_append_sheet(wb, wsHist, 'Historial_Quincenas');
 
-    // 3. Hoja Proyecciones Futuras
+    // 4. Hoja Proyecciones Futuras
     const dataProy = proyeccionesFuturas.map(p => ({
       'Mes': `${p.mes} ${p.year}`,
-      'Días Hábiles': p.diasHabiles,
+      'Días Hábiles (sin feriados nacionales/UOCRA)': p.diasHabiles,
       'Horas Proyectadas': p.horasProyectadas,
       'Sueldo Base ($)': p.sueldoBase,
-      'Bono Asistencia (+10%)': p.bonoAsistencia,
+      [`Bono potencial de asistencia (+${porcentajeBonoPresentismo}%, sujeto a cumplimiento)`]: p.bonoAsistencia,
       'Sueldo con Premio ($)': p.sueldoConBono,
       'Aguinaldo SAC ($)': p.aguinaldoProyectado,
       'Total Proyectado ($)': p.totalConAguinaldo
@@ -482,20 +741,48 @@ export function ObreroSueldoProyecciones({
     const wsProy = XLSX.utils.json_to_sheet(dataProy);
     XLSX.utils.book_append_sheet(wb, wsProy, 'Proyecciones_Futuras');
 
-    XLSX.writeFile(wb, `Ficha_Salarial_${normalizeText(empleado.full_name).replace(/\s+/g, '_')}_${selectedMes}.xlsx`);
+    XLSX.writeFile(
+      wb,
+      `Ficha_Salarial_${normalizeText(empleado.full_name).replace(/\s+/g, '_')}_${isHistorico ? `HISTORICO_${selectedYear}` : `${selectedMes}_${selectedYear}_${isPeriodoProyectado ? 'PROYECCION' : 'CERRADA'}`}.xlsx`
+    );
   };
 
   const handleSendWhatsAppInfo = () => {
     if (!empleado.whatsapp) return;
+    const isHistorico = periodMode === 'HISTORICO';
+    const avisoPeriodo = isHistorico
+      ? `ℹ️ *Resumen histórico informativo ${selectedYear}:* este acumulado no constituye una liquidación ni un importe definitivo a pagar.\n\n`
+      : isPeriodoProyectado
+      ? `⚠️ *Nota:* Este cálculo es una *PROYECCIÓN ESTIMATIVA* para ${selectedMes} ${selectedYear}. La última liquidación cerrada corresponde a ${LAST_CLOSED_PAYROLL_PERIOD_LABEL}.\n\n`
+      : `✅ *Liquidación cerrada:* ${selectedMes} ${selectedYear}. No incluye horas proyectadas.\n\n`;
+    const descripcionHoras = isHistorico
+      ? `${mesActualCalculos.horasReales} hs acumuladas`
+      : isPeriodoProyectado
+      ? `${mesActualCalculos.horasReales} hs registradas + ${mesActualCalculos.horasProyectadasRestantes} hs estimadas`
+      : `${mesActualCalculos.horasReales} hs registradas`;
+    const periodoLabel = isHistorico
+      ? `${selectedYear}`
+      : periodMode === 'MES'
+        ? `${selectedMes} ${selectedYear}`
+        : `${periodMode} de ${selectedMes} ${selectedYear}`;
+    const bonoTexto = isHistorico
+      ? 'No aplica al resumen histórico'
+      : mesActualCalculos.cumplePresentismo
+        ? `$${mesActualCalculos.bonoPresentismo.toLocaleString('es-AR')} (requisito cumplido con registros reales/consolidados)`
+        : isPeriodoProyectado
+          ? 'Pendiente; no incluido por falta de registros reales suficientes'
+          : 'Sin premio';
+
     const msg = 
       `👋 *Hola ${empleado.full_name.split(' ')[0]}!*\n\n` +
-      `Te compartimos la proyección estimada de tus haberes para *${selectedMes} (${selectedQuincena})*:\n` +
-      `• *Horas Computadas:* ${mesActualCalculos.horasReales} hs reales + ${mesActualCalculos.horasProyectadasRestantes} hs estimadas\n` +
+      avisoPeriodo +
+      `Te compartimos ${isHistorico ? 'el resumen histórico informativo' : isPeriodoProyectado ? 'la proyección estimada' : 'la liquidación cerrada'} de tus haberes para *${periodoLabel}*:\n` +
+      `• *Horas Computadas:* ${descripcionHoras}\n` +
       `• *Valor Hora:* $${valorHora.toLocaleString('es-AR')}\n` +
-      `• *Subtotal Bruto Estimado:* $${mesActualCalculos.subtotalBrutoEstimadoMes.toLocaleString('es-AR')}\n` +
-      `• *Bono Asistencia Perfecta (+10%):* ${mesActualCalculos.cumplePresentismo ? `$${mesActualCalculos.bonoPresentismo.toLocaleString('es-AR')} (Califica 🏆)` : 'Sin premio'}\n` +
+      `• *${isHistorico ? 'Monto Histórico Informativo' : `Subtotal Bruto ${isPeriodoProyectado ? 'Estimado' : 'Liquidado'}`}:* $${mesActualCalculos.subtotalBrutoEstimadoMes.toLocaleString('es-AR')}\n` +
+      `• *Bono Asistencia Perfecta (+${porcentajeBonoPresentismo}%):* ${bonoTexto}\n` +
       (adelanto > 0 ? `• *Adelanto a descontar:* -$${adelanto.toLocaleString('es-AR')}\n` : '') +
-      `💰 *Total Neto Estimado a Cobrar:* $${mesActualCalculos.totalNetoEstimadoMes.toLocaleString('es-AR')}\n\n` +
+      `💰 *${isHistorico ? 'Total Histórico Informativo' : `Total Neto ${isPeriodoProyectado ? 'Estimado' : 'Liquidado'}`}:* $${mesActualCalculos.totalNetoEstimadoMes.toLocaleString('es-AR')}\n\n` +
       `_PEIE Tools - Liquidación y Administración de Personal_`;
     
     window.open(buildWhatsAppLink(empleado.whatsapp, msg), '_blank');
@@ -621,18 +908,24 @@ export function ObreroSueldoProyecciones({
       {/* =================================================================== */}
       <div className="flex items-center justify-between flex-wrap gap-3 border-b border-slate-200 pb-2">
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-          {[
-            { id: 'mes_actual', label: '💰 Cuánto cobrará este mes', icon: DollarSign },
+          {([
+            { id: 'mes_actual', label: isPeriodoProyectado ? '💰 Proyección del período' : '💰 Liquidación del período', icon: DollarSign },
             { id: 'quincena_dia', label: '📅 Quincena Día por Día', icon: CalendarDays },
-            { id: 'historico', label: '📜 Histórico Acumulado', icon: History },
+            { id: 'historico', label: `📜 Histórico ${selectedYear}`, icon: History },
             { id: 'proyecciones', label: '📈 Próximos Meses (Proyección)', icon: TrendingUp }
-          ].map(tab => {
+          ] as const).map(tab => {
             const Icon = tab.icon;
             const active = activeSubTab === tab.id;
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveSubTab(tab.id as any)}
+                onClick={() => {
+                  setActiveSubTab(tab.id);
+                  if (tab.id === 'mes_actual') onChangePeriodMode('MES');
+                  if (tab.id === 'quincena_dia') onChangePeriodMode(selectedQuincena);
+                  if (tab.id === 'historico') onChangePeriodMode('HISTORICO');
+                  if (tab.id === 'proyecciones' && periodMode === 'HISTORICO') onChangePeriodMode('MES');
+                }}
                 className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2 shrink-0 ${
                   active
                     ? 'bg-[#031530] text-white shadow-md'
@@ -649,18 +942,36 @@ export function ObreroSueldoProyecciones({
         {/* Selectores de Período Rápido */}
         <div className="flex items-center gap-2 text-xs">
           <select
+            value={selectedYear}
+            onChange={(e) => onChangePeriodYear(Number(e.target.value))}
+            aria-label="Año del período"
+            className="h-9 px-3 rounded-xl border border-slate-200 font-bold bg-white text-slate-800 text-xs shadow-xs"
+          >
+            {availableYears.map(year => (
+              <option key={year} value={year}>{year}</option>
+            ))}
+          </select>
+
+          <select
             value={selectedMes}
-            onChange={(e) => setSelectedMes(e.target.value)}
+            onChange={(e) => onChangePeriodMonth(e.target.value)}
+            aria-label="Mes del período"
             className="h-9 px-3 rounded-xl border border-slate-200 font-bold bg-white text-slate-800 text-xs shadow-xs"
           >
             {MESES.map(m => (
-              <option key={m} value={m}>{m}</option>
+              <option key={m} value={m}>
+                {m} • {isPeriodoPosteriorAlCierre(selectedYear, m) ? 'Proyección' : 'Liquidación cerrada'}
+              </option>
             ))}
           </select>
 
           <select
             value={selectedQuincena}
-            onChange={(e) => setSelectedQuincena(e.target.value as any)}
+            onChange={(e) => {
+              const quincena = e.target.value as '1Q' | '2Q';
+              setSelectedQuincena(quincena);
+              if (periodMode === '1Q' || periodMode === '2Q') onChangePeriodMode(quincena);
+            }}
             className="h-9 px-3 rounded-xl border border-slate-200 font-bold bg-white text-slate-800 text-xs shadow-xs"
           >
             <option value="1Q">1º Quincena (1-15)</option>
@@ -668,6 +979,39 @@ export function ObreroSueldoProyecciones({
           </select>
         </div>
       </div>
+
+      {/* Estado inequívoco del período seleccionado */}
+      {activeSubTab !== 'historico' && (isPeriodoProyectado ? (
+        <div className="bg-amber-50 border border-amber-300 p-3.5 sm:p-4 rounded-2xl flex items-start gap-3 text-amber-950 shadow-xs animate-fadeIn">
+          <AlertTriangle className="h-5 w-5 text-amber-700 shrink-0 mt-0.5" />
+          <div className="text-xs space-y-0.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-extrabold text-amber-900 uppercase">
+                Período en Proyección Salarial: {selectedMes} {selectedYear}
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-200 text-amber-900 uppercase border border-amber-300">
+                Provisorio
+              </span>
+            </div>
+            <p className="text-amber-800 font-medium leading-relaxed">
+              La última liquidación en firme cerrada corresponde a <strong>{LAST_CLOSED_PAYROLL_PERIOD_LABEL}</strong>.
+              Los importes y horas de <strong>{selectedMes} {selectedYear}</strong> se calculan como una estimación provisoria a la espera del cierre de quincena y homologación paritaria UOCRA.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-emerald-50 border border-emerald-200 p-3.5 sm:p-4 rounded-2xl flex items-start gap-3 text-emerald-950 shadow-xs animate-fadeIn">
+          <ShieldCheck className="h-5 w-5 text-emerald-700 shrink-0 mt-0.5" />
+          <div className="text-xs space-y-0.5">
+            <span className="font-extrabold text-emerald-900 uppercase">
+              Liquidación cerrada: {selectedMes} {selectedYear}
+            </span>
+            <p className="text-emerald-800 font-medium leading-relaxed">
+              Se computan exclusivamente las horas registradas. Los días laborables sin novedad quedan en cero y no se proyectan.
+            </p>
+          </div>
+        </div>
+      ))}
 
       {/* =================================================================== */}
       {/* VISTA 1: ¿CUÁNTO COBRARÁ ESTE MES? (MES ACTUAL / EN CURSO)          */}
@@ -678,14 +1022,16 @@ export function ObreroSueldoProyecciones({
           {/* Tarjetas Principales del Mes */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             
-            {/* TOTAL ESTIMADO A COBRAR ESTE MES */}
+            {/* TOTAL DEL PERÍODO */}
             <Card className="bg-gradient-to-br from-emerald-500 to-teal-700 text-white rounded-3xl p-5 shadow-md flex flex-col justify-between relative overflow-hidden">
               <div className="space-y-1 relative z-10">
                 <span className="bg-white/20 text-white text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full border border-white/20 flex items-center gap-1 w-fit">
                   <Sparkles className="w-3 h-3 text-amber-300" />
-                  Estimado Mes Completo ({selectedMes})
+                  {isPeriodoProyectado ? 'Estimado del período' : 'Liquidación cerrada'} ({periodMode === 'MES' ? '' : `${periodMode} · `}{selectedMes} {selectedYear})
                 </span>
-                <span className="text-xs text-emerald-100 font-bold block pt-1">Total Neto Proyectado</span>
+                <span className="text-xs text-emerald-100 font-bold block pt-1">
+                  Total Neto {isPeriodoProyectado ? 'Proyectado' : 'Liquidado'}
+                </span>
                 <div className="text-3xl font-black tracking-tight text-white">
                   ${mesActualCalculos.totalNetoEstimadoMes.toLocaleString('es-AR')}
                 </div>
@@ -693,12 +1039,16 @@ export function ObreroSueldoProyecciones({
 
               <div className="pt-3 mt-3 border-t border-white/20 text-[11px] text-emerald-100 space-y-0.5 relative z-10">
                 <div className="flex justify-between">
-                  <span>Horas estimadas:</span>
+                  <span>{isPeriodoProyectado ? 'Horas estimadas:' : 'Horas liquidadas:'}</span>
                   <strong className="text-white">{mesActualCalculos.horasTotalesEstimadasMes} hs</strong>
                 </div>
                 <div className="flex justify-between">
-                  <span>Bono Asistencia (+10%):</span>
-                  <strong className="text-amber-200">{mesActualCalculos.cumplePresentismo ? `+$${mesActualCalculos.bonoPresentismo.toLocaleString('es-AR')}` : 'Sin bono'}</strong>
+                  <span>Bono Asistencia (+{porcentajeBonoPresentismo}%):</span>
+                  <strong className="text-amber-200">
+                    {mesActualCalculos.cumplePresentismo
+                      ? `+$${mesActualCalculos.bonoPresentismo.toLocaleString('es-AR')}`
+                      : isPeriodoProyectado ? 'Pendiente' : 'Sin bono'}
+                  </strong>
                 </div>
               </div>
             </Card>
@@ -707,7 +1057,9 @@ export function ObreroSueldoProyecciones({
             <Card className="bg-white border border-slate-200/90 rounded-3xl p-5 shadow-xs flex flex-col justify-between">
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Devengado Hoy</span>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                    {isPeriodoProyectado ? 'Devengado Registrado' : 'Subtotal Liquidado'}
+                  </span>
                   <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-black">
                     <Clock className="w-4 h-4" />
                   </div>
@@ -730,7 +1082,9 @@ export function ObreroSueldoProyecciones({
             <Card className="bg-white border border-slate-200/90 rounded-3xl p-5 shadow-xs flex flex-col justify-between">
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Restante Estimado</span>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                    {isPeriodoProyectado ? 'Restante Estimado' : 'Proyección Agregada'}
+                  </span>
                   <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black">
                     <TrendingUp className="w-4 h-4" />
                   </div>
@@ -739,12 +1093,14 @@ export function ObreroSueldoProyecciones({
                   ${mesActualCalculos.subtotalProyectadoRestante.toLocaleString('es-AR')}
                 </div>
                 <p className="text-[11px] text-slate-500 font-medium">
-                  {mesActualCalculos.horasProyectadasRestantes} hs estimadas en {mesActualCalculos.diasHabilesRestantes} días hábiles que faltan.
+                  {isPeriodoProyectado
+                    ? `${mesActualCalculos.horasProyectadasRestantes} hs estimadas en ${mesActualCalculos.diasHabilesRestantes} días hábiles sin registro.`
+                    : 'Período cerrado: no se sintetizan horas faltantes.'}
                 </p>
               </div>
 
               <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-600 flex justify-between">
-                <span>Días hábiles del mes:</span>
+                <span>Días hábiles (sin feriados nacionales/UOCRA):</span>
                 <strong className="text-slate-800">{mesActualCalculos.diasHabilesTotales} días</strong>
               </div>
             </Card>
@@ -770,7 +1126,9 @@ export function ObreroSueldoProyecciones({
               <div className="pt-2 border-t border-slate-100 text-[11px] flex items-center justify-between">
                 <span>Premio Asistencia:</span>
                 <span className={`font-black ${mesActualCalculos.cumplePresentismo ? 'text-emerald-600' : 'text-slate-400'}`}>
-                  {mesActualCalculos.cumplePresentismo ? `+10% ($${mesActualCalculos.bonoPresentismo.toLocaleString('es-AR')})` : 'Perdido'}
+                  {mesActualCalculos.cumplePresentismo
+                    ? `+${porcentajeBonoPresentismo}% ($${mesActualCalculos.bonoPresentismo.toLocaleString('es-AR')})`
+                    : isPeriodoProyectado ? 'Pendiente · no incluido' : 'Sin premio'}
                 </span>
               </div>
             </Card>
@@ -781,7 +1139,9 @@ export function ObreroSueldoProyecciones({
           <Card className="rounded-3xl border border-slate-200/90 bg-white p-5 shadow-xs space-y-4">
             <h4 className="text-sm font-black text-slate-900 flex items-center gap-2">
               <Calculator className="w-4 h-4 text-peie-blue" />
-              <span>Detalle del Cálculo Proyectado ({selectedMes} {selectedYear})</span>
+              <span>
+                Detalle de la {isPeriodoProyectado ? 'Proyección' : 'Liquidación Cerrada'} ({selectedMes} {selectedYear})
+              </span>
             </h4>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
@@ -790,7 +1150,7 @@ export function ObreroSueldoProyecciones({
                   Cómputo de Horas y Asistencia
                 </span>
                 <div className="flex justify-between py-1 border-b border-slate-200/60">
-                  <span className="text-slate-600">Horas trabajadas efectivas (a hoy):</span>
+                  <span className="text-slate-600">Horas trabajadas efectivas {isPeriodoProyectado ? '(registradas):' : '(liquidadas):'}</span>
                   <span className="font-bold text-slate-900">{mesActualCalculos.horasReales} hs</span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-slate-200/60">
@@ -804,11 +1164,11 @@ export function ObreroSueldoProyecciones({
                   </span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-slate-200/60">
-                  <span className="text-slate-600">Días hábiles restantes proyectados:</span>
+                  <span className="text-slate-600">{isPeriodoProyectado ? 'Días hábiles sin registro proyectados:' : 'Días agregados por proyección:'}</span>
                   <span className="font-bold text-indigo-700">{mesActualCalculos.diasHabilesRestantes} días ({mesActualCalculos.horasProyectadasRestantes} hs)</span>
                 </div>
                 <div className="flex justify-between pt-1 text-slate-900 font-black">
-                  <span>Total horas base estimadas:</span>
+                  <span>Total horas base {isPeriodoProyectado ? 'estimadas' : 'liquidadas'}:</span>
                   <span>{mesActualCalculos.horasTotalesEstimadasMes} hs</span>
                 </div>
               </div>
@@ -818,16 +1178,20 @@ export function ObreroSueldoProyecciones({
                   Composición Salarial en Pesos
                 </span>
                 <div className="flex justify-between py-1 border-b border-slate-200/60">
-                  <span className="text-slate-600">Subtotal horas trabajadas (a la fecha):</span>
+                  <span className="text-slate-600">Subtotal horas {isPeriodoProyectado ? 'registradas (a la fecha)' : 'liquidadas'}:</span>
                   <span className="font-bold text-slate-900">${mesActualCalculos.subtotalDevengadoHoy.toLocaleString('es-AR')}</span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-slate-200/60">
-                  <span className="text-slate-600">Subtotal horas proyectadas restantes:</span>
+                  <span className="text-slate-600">Subtotal horas {isPeriodoProyectado ? 'proyectadas restantes' : 'agregadas por proyección'}:</span>
                   <span className="font-bold text-indigo-700">+${mesActualCalculos.subtotalProyectadoRestante.toLocaleString('es-AR')}</span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-slate-200/60">
-                  <span className="text-slate-600">Bono Asistencia (+10%):</span>
-                  <span className="font-bold text-emerald-700">+${mesActualCalculos.bonoPresentismo.toLocaleString('es-AR')}</span>
+                  <span className="text-slate-600">Bono Asistencia (+{porcentajeBonoPresentismo}%):</span>
+                  <span className={`font-bold ${mesActualCalculos.cumplePresentismo ? 'text-emerald-700' : 'text-slate-500'}`}>
+                    {mesActualCalculos.cumplePresentismo
+                      ? `+$${mesActualCalculos.bonoPresentismo.toLocaleString('es-AR')}`
+                      : isPeriodoProyectado ? 'Pendiente · no incluido' : '$0'}
+                  </span>
                 </div>
                 {adelanto > 0 && (
                   <div className="flex justify-between py-1 border-b border-slate-200/60">
@@ -836,7 +1200,7 @@ export function ObreroSueldoProyecciones({
                   </div>
                 )}
                 <div className="flex justify-between pt-1 text-slate-900 font-black text-sm">
-                  <span>Neto Total Proyectado:</span>
+                  <span>Neto Total {isPeriodoProyectado ? 'Proyectado' : 'Liquidado'}:</span>
                   <span className="text-emerald-700">${mesActualCalculos.totalNetoEstimadoMes.toLocaleString('es-AR')}</span>
                 </div>
               </div>
@@ -855,15 +1219,19 @@ export function ObreroSueldoProyecciones({
           <div className="bg-white p-4 rounded-3xl border border-slate-200/90 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
             <div>
               <h4 className="text-sm font-black text-slate-900">
-                Desglose Quincenal Día por Día • {selectedMes} ({selectedQuincena === '1Q' ? '1 al 15' : '16 al fin de mes'})
+                Desglose Quincenal Día por Día • {selectedMes} {selectedYear} ({selectedQuincena === '1Q' ? '1 al 15' : '16 al fin de mes'})
               </h4>
               <p className="text-xs text-slate-500">
-                Seguimiento jornada a jornada con el monto devengado en cada día y el acumulado en tiempo real.
+                {isPeriodoProyectado
+                  ? 'Combina registros reales con jornadas estimadas para el período abierto.'
+                  : 'Liquidación cerrada: los días laborables sin registro se muestran en cero.'}
               </p>
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-600">Total Quincena:</span>
+              <span className="text-xs font-bold text-slate-600">
+                Total Quincena {isPeriodoProyectado ? 'Estimado' : 'Liquidado'}:
+              </span>
               <span className="text-lg font-black text-emerald-700">
                 ${desgloseQuincenaDiaPorDia[desgloseQuincenaDiaPorDia.length - 1]?.acumuladoQuincena.toLocaleString('es-AR') || 0}
               </span>
@@ -900,6 +1268,11 @@ export function ObreroSueldoProyecciones({
                             TRABAJADO
                           </span>
                         )}
+                        {row.estadoTipo === 'CONSOLIDADO' && (
+                          <span className="bg-blue-100 text-blue-800 text-[10px] font-black px-2.5 py-0.5 rounded-full border border-blue-200">
+                            CONSOLIDADO SEMANAL
+                          </span>
+                        )}
                         {row.estadoTipo === 'TARDE' && (
                           <span className="bg-amber-100 text-amber-800 text-[10px] font-black px-2.5 py-0.5 rounded-full border border-amber-200">
                             LLEGADA TARDE
@@ -915,9 +1288,19 @@ export function ObreroSueldoProyecciones({
                             PROYECTADO
                           </span>
                         )}
+                        {row.estadoTipo === 'SIN_REGISTRO' && (
+                          <span className="bg-slate-100 text-slate-600 text-[10px] font-black px-2.5 py-0.5 rounded-full border border-slate-200">
+                            SIN REGISTRO
+                          </span>
+                        )}
+                        {row.estadoTipo === 'NO_CORRESPONDE' && (
+                          <span className="bg-slate-50 text-slate-400 text-[10px] font-black px-2.5 py-0.5 rounded-full border border-slate-200">
+                            NO CORRESPONDE
+                          </span>
+                        )}
                         {row.estadoTipo === 'DESCANSO' && (
                           <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2.5 py-0.5 rounded-full">
-                            FRANCO
+                            {row.detalle === 'Día no laborable nacional/UOCRA' ? 'NO LABORABLE' : 'FRANCO'}
                           </span>
                         )}
                       </td>
@@ -942,7 +1325,7 @@ export function ObreroSueldoProyecciones({
       )}
 
       {/* =================================================================== */}
-      {/* VISTA 3: ¿CUÁNTO VA COBRANDO DESDE QUE SE TIENE REGISTRO?           */}
+      {/* VISTA 3: HISTÓRICO DEL AÑO SELECCIONADO                             */}
       {/* =================================================================== */}
       {activeSubTab === 'historico' && (
         <div className="space-y-4 animate-fadeIn">
@@ -950,7 +1333,7 @@ export function ObreroSueldoProyecciones({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Card className="rounded-3xl border-slate-200 p-5 bg-white shadow-xs">
               <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1">
-                Total Histórico Cobrado
+                Total Histórico {selectedYear}
               </span>
               <div className="text-3xl font-black text-slate-900">
                 ${historicoCalculos.totalMontoHistorico.toLocaleString('es-AR')}
@@ -975,13 +1358,13 @@ export function ObreroSueldoProyecciones({
               <div className="text-3xl font-black text-rose-600">
                 {historicoCalculos.totalAusencias}
               </div>
-              <p className="text-xs text-slate-500 mt-1">Total de días no asistidos en el historial.</p>
+              <p className="text-xs text-slate-500 mt-1">Días no asistidos registrados en {selectedYear}.</p>
             </Card>
           </div>
 
           <Card className="rounded-3xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
             <div className="bg-[#031530] text-white p-4 font-black text-xs uppercase tracking-wide flex justify-between">
-              <span>Historial Período por Período</span>
+              <span>Historial {selectedYear} por período</span>
               <span className="text-blue-200">{historicoCalculos.periodosList.length} Quincenas Registradas</span>
             </div>
 
@@ -990,6 +1373,7 @@ export function ObreroSueldoProyecciones({
                 <thead className="bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-wider">
                   <tr>
                     <th className="py-3 px-4">Período / Quincena</th>
+                    <th className="py-3 px-4">Estado</th>
                     <th className="py-3 px-4 text-center">Jornadas Asistidas</th>
                     <th className="py-3 px-4 text-center">Ausencias</th>
                     <th className="py-3 px-4 text-right">Horas Computadas</th>
@@ -1000,7 +1384,18 @@ export function ObreroSueldoProyecciones({
                   {historicoCalculos.periodosList.map((p, i) => (
                     <tr key={i} className="hover:bg-slate-50 transition-colors">
                       <td className="py-3 px-4 font-black text-slate-900">
-                        {p.mes} • {p.quincena}
+                        {p.mes} {p.year ?? 'SIN AÑO'} • {p.quincena}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${
+                          p.estadoPeriodo === 'LIQUIDACIÓN CERRADA'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : p.estadoPeriodo === 'PERÍODO ABIERTO / PROVISORIO'
+                              ? 'bg-amber-50 text-amber-800 border-amber-200'
+                              : 'bg-slate-100 text-slate-600 border-slate-200'
+                        }`}>
+                          {p.estadoPeriodo}
+                        </span>
                       </td>
                       <td className="py-3 px-4 text-center font-bold text-slate-700">{p.dias} días</td>
                       <td className="py-3 px-4 text-center">
@@ -1044,7 +1439,7 @@ export function ObreroSueldoProyecciones({
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
-                      +{idx + 1} Mes
+                      +{proy.distanciaMeses} {proy.distanciaMeses === 1 ? 'Mes' : 'Meses'}
                     </span>
                     {proy.esMesAguinaldo && (
                       <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
@@ -1067,7 +1462,7 @@ export function ObreroSueldoProyecciones({
                     <strong className="text-slate-900">${proy.sueldoBase.toLocaleString('es-AR')}</strong>
                   </div>
                   <div className="flex justify-between text-slate-600">
-                    <span>Premio Asistencia (+10%):</span>
+                    <span>Bono potencial de asistencia (+{porcentajeBonoPresentismo}%, si cumple):</span>
                     <strong className="text-emerald-700">+${proy.bonoAsistencia.toLocaleString('es-AR')}</strong>
                   </div>
                   {proy.esMesAguinaldo && (
