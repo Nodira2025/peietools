@@ -215,6 +215,7 @@ export default function AppLayout() {
   ].filter(item => item.show);
 
   const mainNavBottom = [
+    { name: 'Legales', path: '/legales', icon: FileText, show: true },
     { name: 'Contactos', path: '/contactos', icon: PhoneCall, show: true },
     { name: 'Logística', path: '/logistica', icon: Truck, show: isLogistica || isAdmin },
     { name: 'Registro de Compras', path: '/compras', icon: ShoppingCart, show: isLogistica || isAdmin || deviceMode !== 'mobile' },
@@ -636,6 +637,15 @@ export default function AppLayout() {
               </Link>
 
               <Link 
+                to="/legales"
+                onClick={() => setShowMas(false)}
+                className="flex flex-col items-center justify-center p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:bg-slate-900 transition-all text-center gap-2"
+              >
+                <FileText size={24} className="text-sky-400" />
+                <span className="text-[11px] font-black uppercase tracking-tight">Legales</span>
+              </Link>
+
+              <Link
                 to="/formularios" 
                 onClick={() => setShowMas(false)}
                 className="flex flex-col items-center justify-center p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:bg-slate-900 transition-all text-center gap-2"

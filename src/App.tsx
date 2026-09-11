@@ -37,6 +37,7 @@ const Notificaciones = lazy(() => import('./pages/Notificaciones'));
 const SeguimientoTraslado = lazy(() => import('./pages/SeguimientoTraslado'));
 const Contactos = lazy(() => import('./pages/Contactos'));
 const Formularios = lazy(() => import('./pages/Formularios'));
+const Legales = lazy(() => import('./pages/Legales'));
 const Trabajadores = lazy(() => import('./pages/Trabajadores'));
 const CargarHorasPublico = lazy(() => import('./pages/CargarHorasPublico'));
 const LiquidacionSueldos = lazy(() => import('./pages/LiquidacionSueldos'));
@@ -101,6 +102,7 @@ export default function App() {
           <Route path="/notificaciones" element={<Notificaciones />} />
 
           <Route path="/formularios" element={<Formularios />} />
+          <Route path="/legales" element={<Legales />} />
           <Route path="/trabajadores" element={<Trabajadores />} />
           <Route path="/liquidacion-sueldos" element={<LiquidacionSueldos />} />
 
