@@ -69,6 +69,7 @@ export default function HerramientaDetail() {
 
   // States for editing mode
   const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [editName, setEditName] = useState('');
   const [editCode, setEditCode] = useState('');
   const [editBrand, setEditBrand] = useState('');
@@ -301,13 +302,13 @@ export default function HerramientaDetail() {
   };
 
   const saveChanges = async () => {
-    if (!herramienta) return;
-    if (!editCode.trim()) {
-      toast({ variant: 'destructive', title: 'Campos incompletos', description: 'El código de la herramienta no puede estar vacío.' });
+    if (!herramienta || saving || !canEdit) return;
+    if (!editCode.trim() || !editName.trim()) {
+      toast({ variant: 'destructive', title: 'Campos incompletos', description: 'El nombre y el código de la herramienta no pueden estar vacíos.' });
       return;
     }
-    setLoading(true);
-    const updatePayload: any = {
+    setSaving(true);
+    const updatePayload: Partial<Herramienta> = {
       name: editName.trim(),
       brand: editBrand.trim() || null,
       model: editModel.trim() || null,
@@ -323,22 +324,42 @@ export default function HerramientaDetail() {
       updatePayload.qr_code = editCode.trim().toUpperCase();
     }
 
-    const { error } = await supabase
-      .from('herramientas')
-      .update(updatePayload)
-      .eq('id', herramienta.id);
+    try {
+      const { data, error } = await supabase
+        .from('herramientas')
+        .update(updatePayload)
+        .eq('id', herramienta.id)
+        .select('*, obras(name)')
+        .single();
 
-    setLoading(false);
-    if (error) {
-      toast({ 
-        variant: 'destructive', 
-        title: 'Error al actualizar', 
-        description: error.code === '23505' ? 'Ya existe una herramienta con ese código.' : error.message 
-      });
-    } else {
+      if (error) {
+        const message = error.code === '23505'
+          ? 'Ya existe una herramienta con ese código.'
+          : error.code === 'PGRST116'
+            ? 'No se pudo confirmar el cambio. Verificá que tengas permiso para editar y que la herramienta siga disponible.'
+            : error.message;
+        throw new Error(message);
+      }
+
+      const updatedTool = {
+        ...data,
+        obras: Array.isArray(data.obras) ? data.obras[0] : data.obras,
+      };
+      setHerramienta(updatedTool);
+      refreshFinancials(updatedTool);
+      try {
+        localStorage.removeItem('peie_cache_herramientas');
+      } catch { /* La caché no debe impedir confirmar un cambio guardado. */ }
       toast({ title: 'Éxito', description: 'Información de la herramienta actualizada.' });
       setIsEditing(false);
-      fetchHerramienta();
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Error al actualizar',
+        description: error instanceof Error ? error.message : 'No se pudo guardar. Tus cambios siguen en el formulario; intentá nuevamente.',
+      });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -463,11 +484,11 @@ export default function HerramientaDetail() {
         {canEdit && (
           isEditing ? (
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setIsEditing(false)} className="rounded-xl">
+              <Button variant="outline" size="sm" disabled={saving} onClick={() => setIsEditing(false)} className="rounded-xl">
                 <X className="mr-2 h-4 w-4" /> Cancelar
               </Button>
-              <Button onClick={saveChanges} size="sm" className="bg-peie-blue hover:bg-peie-blue/90 text-white rounded-xl">
-                <Save className="mr-2 h-4 w-4" /> Guardar
+              <Button onClick={saveChanges} disabled={saving} size="sm" className="bg-peie-blue hover:bg-peie-blue/90 text-white rounded-xl">
+                <Save className="mr-2 h-4 w-4" /> <span>{saving ? 'Guardando…' : 'Guardar'}</span>
               </Button>
             </div>
           ) : (
@@ -574,11 +595,11 @@ export default function HerramientaDetail() {
                   <div className="space-y-1.5">
                     <Label htmlFor="editCategory" className="text-xs font-semibold text-slate-700">Categoría *</Label>
                     <Select value={editCategory} onValueChange={setEditCategory}>
-                      <SelectTrigger className="h-11 rounded-xl text-slate-800">
+                      <SelectTrigger id="editCategory" className="h-11 rounded-xl text-slate-800">
                         <SelectValue placeholder="Categoría" />
                       </SelectTrigger>
                       <SelectContent>
-                        {dynamicCategories.map(cat => (
+                        {Array.from(new Set([...dynamicCategories, editCategory].filter(Boolean))).map(cat => (
                           <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                         ))}
                       </SelectContent>
@@ -588,7 +609,7 @@ export default function HerramientaDetail() {
                   <div className="space-y-1.5">
                     <Label htmlFor="editStatus" className="text-xs font-semibold text-slate-700">Estado *</Label>
                     <Select value={editStatus} onValueChange={setEditStatus}>
-                      <SelectTrigger className="h-11 rounded-xl text-slate-800">
+                      <SelectTrigger id="editStatus" className="h-11 rounded-xl text-slate-800">
                         <SelectValue placeholder="Estado" />
                       </SelectTrigger>
                       <SelectContent>

@@ -12,6 +12,7 @@ const DEFAULT_CATEGORIES = [
   'Prensas y Pinzas',
   'Vehículos',
   'Insumos y Consumibles',
+  'Rotuladora',
   'Otros'
 ];
 
@@ -50,6 +51,9 @@ export function useCategories() {
       if (set.size === 0) {
         DEFAULT_CATEGORIES.forEach(c => set.add(c));
       }
+
+      // Disponible también antes de registrar la primera rotuladora.
+      set.add('Rotuladora');
 
       setCategories(Array.from(set).sort((a, b) => a.localeCompare(b)));
     } catch (err) {

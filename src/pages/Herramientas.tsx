@@ -25,7 +25,8 @@ import {
   Camera,
   Zap,
   Package,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Tag
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
@@ -139,6 +140,7 @@ export default function Herramientas() {
   const { categories: dynamicCategoryNames } = useCategories();
 
   const categoryMetaMap: Record<string, { icon: any; color: string; desc: string }> = {
+    'Rotuladora': { icon: Tag, color: 'from-orange-400 to-amber-600', desc: 'Rotuladoras e impresoras de etiquetas para identificar cables y equipos' },
     'Escaleras': { icon: Layers, color: 'from-amber-400 to-orange-500', desc: 'Escaleras telescópicas, tijeras, andamios' },
     'Amoladoras': { icon: Disc, color: 'from-sky-400 to-blue-600', desc: 'Amoladoras angulares, de banco, discos' },
     'Taladros': { icon: Hammer, color: 'from-rose-400 to-red-600', desc: 'Rotopercutores, atornilladores, brocas' },

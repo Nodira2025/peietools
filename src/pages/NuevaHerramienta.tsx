@@ -156,7 +156,7 @@ export default function NuevaHerramienta() {
 }
 Texto: "${aiText}"
 
-Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Prensas y Pinzas', 'Elementos de seguridad', 'Instrumentos de medición', 'Vehículos', 'Insumos y Consumibles', 'Otros'. Si no podés identificar una propiedad, dejala en blanco ("").`;
+Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Prensas y Pinzas', 'Elementos de seguridad', 'Instrumentos de medición', 'Vehículos', 'Insumos y Consumibles', 'Rotuladora', 'Otros'. Si no podés identificar una propiedad, dejala en blanco ("").`;
 
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
