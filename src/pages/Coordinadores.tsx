@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import type { ObraFase, CoordinadorProfile } from '../types/coordinadores';
+import type { ObraFase, CoordinadorProfile, ObraEstadoFinal } from '../types/coordinadores';
 import { coordinadoresService } from '../services/coordinadores/coordinadoresService';
 import GanttChart from '../components/coordinadores/GanttChart';
 import ModalFaseObra from '../components/coordinadores/ModalFaseObra';
+import ModalEstadoObra from '../components/coordinadores/ModalEstadoObra';
 import CoordinadoresList from '../components/coordinadores/CoordinadoresList';
 import ModalEditarCoordinador from '../components/coordinadores/ModalEditarCoordinador';
 import { 
@@ -12,9 +13,10 @@ import {
   Building, 
   Sparkles, 
   Plus, 
-  Filter, 
-  CheckCircle2,
-  RefreshCw
+  RefreshCw,
+  Trash2,
+  CircleDashed,
+  Circle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { 
@@ -31,6 +33,10 @@ export default function Coordinadores() {
 
   const [activeTab, setActiveTab] = useState<'gantt' | 'coordinadores'>('gantt');
   const [loading, setLoading] = useState(true);
+  const [obrasEstadoLoading, setObrasEstadoLoading] = useState(false);
+  const [obrasEstado, setObrasEstado] = useState<Record<string, ObraEstadoFinal>>({});
+  const [obraEstadoToEdit, setObraEstadoToEdit] = useState<ObraEstadoFinal | null>(null);
+  const [isObraEstadoModalOpen, setIsObraEstadoModalOpen] = useState(false);
 
   // Obras state
   const [obras, setObras] = useState<{ id: string; name: string; encargado_name?: string | null }[]>([]);
@@ -104,6 +110,32 @@ export default function Coordinadores() {
     loadFases();
   }, [selectedObraId, obras]);
 
+  useEffect(() => {
+    if (!obras.length) {
+      setObrasEstado({});
+      return;
+    }
+
+    setObrasEstadoLoading(true);
+    try {
+      const estados = coordinadoresService.getObrasEstado(obras);
+      setObrasEstado(estados);
+    } catch (err: any) {
+      console.error('Error cargando estado final por obra:', err);
+    } finally {
+      setObrasEstadoLoading(false);
+    }
+  }, [obras]);
+
+  const refreshObrasEstado = () => {
+    if (!obras.length) {
+      setObrasEstado({});
+      return;
+    }
+    const estados = coordinadoresService.getObrasEstado(obras);
+    setObrasEstado(estados);
+  };
+
   // Handlers for Fases (Gantt)
   const handleOpenAddFase = () => {
     setSelectedFase(null);
@@ -142,6 +174,53 @@ export default function Coordinadores() {
     }
   };
 
+  // Handlers for Obra Final State (ring data)
+  const handleOpenObraEstado = () => {
+    setObraEstadoToEdit(currentObraEstado || null);
+    setIsObraEstadoModalOpen(true);
+  };
+
+  const handleSaveObraEstado = async (estado: ObraEstadoFinal) => {
+    const success = coordinadoresService.saveObraEstado({
+      ...estado,
+      esMuestra: false
+    });
+    if (success) {
+      refreshObrasEstado();
+      toast({
+        title: 'Estado actualizado',
+        description: `Se guardó el estado final de ${estado.obraName}.`
+      });
+    }
+  };
+
+  const handleDeleteObraEstado = async (obraId: string) => {
+    const success = coordinadoresService.deleteObraEstado(obraId);
+    if (success) {
+      refreshObrasEstado();
+      toast({
+        title: 'Estado eliminado',
+        description: 'Se eliminó el estado cargado para la obra.'
+      });
+    }
+  };
+
+  const handleDeleteAllSampleEstados = () => {
+    const hasItems = Object.keys(obrasEstado).some((id) => obrasEstado[id]?.esMuestra);
+    if (!hasItems) return;
+    const confirmDelete = window.confirm('¿Querés borrar todos los estados de muestra para poder cargar valores manuales desde el formulario?');
+    if (!confirmDelete) return;
+
+    const success = coordinadoresService.deleteAllSampleObraEstados();
+    if (success) {
+      refreshObrasEstado();
+      toast({
+        title: 'Muestras removidas',
+        description: 'Se eliminaron los estados de muestra y se mantuvieron los registrados manualmente.'
+      });
+    }
+  };
+
   // Handlers for Coordinadores
   const handleOpenEditCoord = (coord: CoordinadorProfile) => {
     setSelectedCoordinador(coord);
@@ -163,6 +242,41 @@ export default function Coordinadores() {
   };
 
   const currentObraName = obras.find(o => o.id === selectedObraId)?.name || 'Obra Seleccionada';
+  const hasSampleEstados = Object.values(obrasEstado).some(s => s?.esMuestra);
+  const getEstadoColor = (etapaFinal: ObraEstadoFinal['etapaFinal']) => {
+    if (etapaFinal === 'Finalizada') return 'text-emerald-600';
+    if (etapaFinal === 'Listo para entrega') return 'text-blue-600';
+    if (etapaFinal === 'Pruebas y control') return 'text-amber-600';
+    if (etapaFinal === 'En ejecución') return 'text-indigo-600';
+    return 'text-slate-500';
+  };
+
+  const getRingGradient = (estado: ObraEstadoFinal | null) => {
+    if (!estado) {
+      return 'conic-gradient(#cbd5e1 0deg, #cbd5e1 360deg)';
+    }
+    const doneColor = estado.etapaFinal === 'Finalizada'
+      ? '#059669'
+      : estado.etapaFinal === 'Listo para entrega'
+        ? '#0284c7'
+        : estado.etapaFinal === 'Pruebas y control'
+          ? '#d97706'
+          : estado.etapaFinal === 'En ejecución'
+            ? '#2563eb'
+            : '#94a3b8';
+
+    return `conic-gradient(${doneColor} ${estado.avanceFinal}%, #e2e8f0 ${estado.avanceFinal}% 100%)`;
+  };
+
+  const formatFechaCierre = (fecha: string | null) => {
+    if (!fecha) return 'Sin fecha';
+    try {
+      return new Date(fecha).toLocaleDateString('es-AR');
+    } catch {
+      return fecha;
+    }
+  };
+  const currentObraEstado = selectedObraId ? obrasEstado[selectedObraId] : null;
 
   return (
     <div className="space-y-6 pb-12">
@@ -264,6 +378,165 @@ export default function Coordinadores() {
             </div>
           </div>
 
+          {/* Estado de obra (Anillo de estadio final) + resumen de anillos */}
+          <div className="grid grid-cols-1 xl:grid-cols-[1.6fr_1fr] gap-4">
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 sm:p-5">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm sm:text-base">
+                    Anillo de estadio final: {currentObraName}
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Estado consolidado por obra para visualizar avance final y cierre.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    onClick={handleOpenObraEstado}
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold h-9 shadow-sm"
+                  >
+                    {currentObraEstado ? 'Editar estado' : 'Cargar estado'}
+                  </Button>
+                  {currentObraEstado?.esMuestra && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteObraEstado(selectedObraId)}
+                      className="rounded-xl text-xs h-9 text-rose-600 hover:text-rose-700 border-rose-200 hover:bg-rose-50"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                      Quitar muestra
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-4 items-center">
+                <div className="w-40 h-40 mx-auto sm:mx-0 relative rounded-full p-2 shrink-0" style={{ background: getRingGradient(currentObraEstado) }}>
+                  <div className="w-full h-full rounded-full bg-white/95 flex items-center justify-center border border-slate-100 shadow-sm">
+                    {obrasEstadoLoading ? (
+                      <RefreshCw className="w-6 h-6 text-slate-400 animate-spin" />
+                    ) : currentObraEstado ? (
+                      <div className="text-center">
+                        <p className={`text-3xl font-black ${getEstadoColor(currentObraEstado.etapaFinal)}`}>
+                          {currentObraEstado.avanceFinal}%
+                        </p>
+                        <p className="text-[10px] text-slate-500 font-bold mt-0.5">avance</p>
+                      </div>
+                    ) : (
+                      <CircleDashed className="w-7 h-7 text-slate-300" />
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  {obrasEstadoLoading ? (
+                    <p className="text-xs text-slate-400">Cargando estado de muestra...</p>
+                  ) : currentObraEstado ? (
+                    <div className="space-y-3 text-xs text-slate-600">
+                      <div className="bg-slate-50 rounded-xl border border-slate-200 px-3 py-2">
+                        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Estado final:</span>
+                        <p className={`font-bold text-sm ${getEstadoColor(currentObraEstado.etapaFinal)}`}>
+                          {currentObraEstado.etapaFinal}
+                        </p>
+                      </div>
+                      <p>
+                        Etapas cargadas: <span className="font-semibold text-slate-800">{currentObraEstado.etapasCompletadas}/{currentObraEstado.etapasTotales}</span>
+                      </p>
+                      <p>
+                        Cierre estimado: <span className="font-semibold text-slate-800">{formatFechaCierre(currentObraEstado.fechaEstimadaCierre)}</span>
+                      </p>
+                      <p className="text-slate-500">
+                        Actualizado: {new Date(currentObraEstado.actualizadoEn).toLocaleDateString('es-AR')}
+                      </p>
+                      {currentObraEstado.notas && (
+                        <p className="text-slate-500 line-clamp-2">{currentObraEstado.notas}</p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400">
+                      Esta obra aún no tiene estado cargado para dibujar el anillo.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 sm:p-5">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="font-bold text-slate-900 text-sm sm:text-base">
+                  Anillos por obra
+                </h3>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleDeleteAllSampleEstados}
+                  disabled={!hasSampleEstados}
+                  className="rounded-xl text-xs h-8 text-rose-600 hover:text-rose-700 border-rose-200 hover:bg-rose-50"
+                >
+                  Limpiar muestra
+                </Button>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                Tilde si querés quitar estos datos para cargarlo desde formulario.
+              </p>
+
+              <div className="mt-3 space-y-2 max-h-72 overflow-y-auto pr-1">
+                {obras.length === 0 ? (
+                  <p className="text-xs text-slate-400 text-center py-6">No hay obras cargadas.</p>
+                ) : (
+                  obras.map((obra) => {
+                    const estado = obrasEstado[obra.id];
+                    return (
+                      <button
+                        key={obra.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedObraId(obra.id);
+                        }}
+                        className={`w-full rounded-xl border px-3 py-2.5 text-left transition-all ${
+                          selectedObraId === obra.id
+                            ? 'bg-blue-50 border-blue-200'
+                            : 'bg-slate-50 border-slate-200 hover:border-blue-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-8 h-8 rounded-full shrink-0 border border-slate-200 p-0.5"
+                            style={{ background: estado ? getRingGradient(estado) : 'conic-gradient(#cbd5e1 0deg, #cbd5e1 360deg)' }}
+                          >
+                            <div className="w-full h-full bg-white rounded-full flex items-center justify-center">
+                              {estado ? (
+                                <span className="text-[10px] font-bold text-slate-700">{estado.avanceFinal}%</span>
+                              ) : (
+                                <Circle className="w-3 h-3 text-slate-400" />
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-semibold text-slate-800 truncate">{obra.name}</p>
+                            <p className="text-[11px] text-slate-500 truncate">
+                              {estado ? estado.etapaFinal : 'Sin estado definido'}
+                            </p>
+                          </div>
+
+                          {estado?.esMuestra && (
+                            <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                              muestra
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+
           {/* Gantt Visualization */}
           {fasesLoading ? (
             <div className="bg-white rounded-2xl p-16 text-center border border-slate-200">
@@ -321,6 +594,16 @@ export default function Coordinadores() {
         coordinador={selectedCoordinador}
         obras={obras}
         onSave={handleSaveCoord}
+      />
+
+      <ModalEstadoObra
+        isOpen={isObraEstadoModalOpen}
+        onClose={() => setIsObraEstadoModalOpen(false)}
+        obraId={selectedObraId}
+        obraNombre={currentObraName}
+        estado={obraEstadoToEdit}
+        onSave={handleSaveObraEstado}
+        onDelete={handleDeleteObraEstado}
       />
     </div>
   );

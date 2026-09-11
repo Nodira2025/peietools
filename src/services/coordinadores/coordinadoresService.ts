@@ -1,8 +1,77 @@
 import { supabase } from '../../lib/supabase';
-import type { ObraFase, CoordinadorProfile, ObraWithProgress } from '../../types/coordinadores';
+import type { ObraFase, CoordinadorProfile, ObraWithProgress, ObraEstadoFinal, EstadoFinalObra } from '../../types/coordinadores';
 
 const LOCAL_STORAGE_FASES_KEY = 'peie_obra_fases_cache';
 const LOCAL_STORAGE_PROFILES_KEY = 'peie_coordinadores_profiles_cache';
+const LOCAL_STORAGE_OBRA_ESTADOS_KEY = 'peie_coordinadores_obra_estado_final_cache';
+
+const clampNumber = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+
+const addDays = (d: Date, days: number): string => {
+  const date = new Date(d);
+  date.setDate(date.getDate() + days);
+  return date.toISOString().split('T')[0];
+};
+
+function getDefaultEstadoFinal(index: number, obraId: string, obraName: string): ObraEstadoFinal {
+  const today = new Date();
+  const progresoSamples = [12, 28, 46, 65, 81, 100];
+  const avanceFinal = progresoSamples[index % progresoSamples.length];
+  const etapasTotales = 8;
+  const etapasCompletadas = Math.min(etapasTotales, Math.round((avanceFinal / 100) * etapasTotales));
+  const fechaEstimadaCierre = addDays(today, 25 + index * 5);
+
+  const etapaPorcentaje: Array<{ max: number; label: EstadoFinalObra }> = [
+    { max: 15, label: 'No iniciada' },
+    { max: 50, label: 'En ejecución' },
+    { max: 79, label: 'Pruebas y control' },
+    { max: 99, label: 'Listo para entrega' },
+    { max: 100, label: 'Finalizada' }
+  ];
+  const etapaFinal = etapaPorcentaje.find(item => avanceFinal <= item.max)?.label || 'No iniciada';
+
+  return {
+    obraId,
+    obraName,
+    etapaFinal,
+    avanceFinal,
+    etapasCompletadas,
+    etapasTotales,
+    fechaEstimadaCierre,
+    notas: `Estado de muestra para visualizar el anillo de estadio final de ${obraName}.`,
+    actualizadoEn: new Date().toISOString(),
+    esMuestra: true
+  };
+}
+
+function getStoredObraEstados(): Record<string, ObraEstadoFinal> | null {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_OBRA_ESTADOS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object') {
+      return parsed;
+    }
+  } catch (error) {
+    console.warn('No se pudo leer estados de obra:', error);
+  }
+  return null;
+}
+
+function saveStoredObraEstados(value: Record<string, ObraEstadoFinal>) {
+  try {
+    localStorage.setItem(LOCAL_STORAGE_OBRA_ESTADOS_KEY, JSON.stringify(value));
+  } catch (error) {
+    console.warn('No se pudo guardar estados de obra:', error);
+  }
+}
+
+function buildObraEstadoStateMapFromObras(obras: { id: string; name: string }[]): Record<string, ObraEstadoFinal> {
+  return obras.reduce((acc: Record<string, ObraEstadoFinal>, obra, idx) => {
+    acc[obra.id] = getDefaultEstadoFinal(idx, obra.id, obra.name);
+    return acc;
+  }, {});
+}
 
 /**
  * Standard phases for electrical installations in construction worksites
@@ -356,5 +425,86 @@ export const coordinadoresService = {
       endDate: maxEnd ? (maxEnd as Date).toISOString().split('T')[0] : null,
       daysRemaining
     };
+  },
+
+  /**
+   * Load progress states for obra list.
+   * On first visit, synthetic sample data is injected to show donut charts in UI.
+   */
+  getObrasEstado(obras: { id: string; name: string }[]): Record<string, ObraEstadoFinal> {
+    const stored = getStoredObraEstados();
+    if (stored === null) {
+      const seeded = buildObraEstadoStateMapFromObras(obras);
+      saveStoredObraEstados(seeded);
+      return seeded;
+    }
+
+    return stored;
+  },
+
+  /**
+   * Save or update a manual obra status.
+   * Always overrides sample states and marks record as user-managed.
+   */
+  saveObraEstado(estado: ObraEstadoFinal): boolean {
+    try {
+      const safeAvance = Number.isFinite(estado.avanceFinal) ? Math.round(estado.avanceFinal) : 0;
+      const safeTotal = Number.isFinite(estado.etapasTotales) ? Math.max(1, Math.round(estado.etapasTotales)) : 1;
+      const safeCompletadas = Number.isFinite(estado.etapasCompletadas) ? Math.round(estado.etapasCompletadas) : 0;
+      const stored = getStoredObraEstados() || {};
+      const normalizado: ObraEstadoFinal = {
+        ...estado,
+        avanceFinal: clampNumber(safeAvance, 0, 100),
+        etapasTotales: safeTotal,
+        etapasCompletadas: clampNumber(safeCompletadas, 0, safeTotal),
+        fechaEstimadaCierre: estado.fechaEstimadaCierre || null,
+        notas: estado.notas?.trim() || null,
+        actualizadoEn: new Date().toISOString(),
+        esMuestra: false
+      };
+
+      stored[normalizado.obraId] = normalizado;
+      saveStoredObraEstados(stored);
+      return true;
+    } catch (error) {
+      console.error('Error al guardar estado de obra:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Remove one obra state (sample or manual).
+   */
+  deleteObraEstado(obraId: string): boolean {
+    try {
+      const stored = getStoredObraEstados() || {};
+      if (!stored[obraId]) return true;
+      delete stored[obraId];
+      saveStoredObraEstados(stored);
+      return true;
+    } catch (error) {
+      console.error('Error al eliminar estado de obra:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Remove only synthetic sample states (keeps user-managed statuses).
+   */
+  deleteAllSampleObraEstados(): boolean {
+    try {
+      const stored = getStoredObraEstados() || {};
+      const filtered = Object.entries(stored).reduce<Record<string, ObraEstadoFinal>>((acc, [obraId, estado]) => {
+        if (!estado.esMuestra) {
+          acc[obraId] = estado;
+        }
+        return acc;
+      }, {});
+      saveStoredObraEstados(filtered);
+      return true;
+    } catch (error) {
+      console.error('Error al eliminar estados de muestra:', error);
+      return false;
+    }
   }
 };

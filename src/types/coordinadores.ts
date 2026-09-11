@@ -32,6 +32,21 @@ export interface CoordinadorProfile {
   created_at?: string;
 }
 
+export type EstadoFinalObra = 'No iniciada' | 'En ejecución' | 'Pruebas y control' | 'Listo para entrega' | 'Finalizada';
+
+export interface ObraEstadoFinal {
+  obraId: string;
+  obraName: string;
+  etapaFinal: EstadoFinalObra;
+  avanceFinal: number; // 0 to 100
+  etapasCompletadas: number;
+  etapasTotales: number;
+  fechaEstimadaCierre: string | null;
+  notas: string | null;
+  actualizadoEn: string;
+  esMuestra: boolean;
+}
+
 export interface ObraWithProgress {
   id: string;
   name: string;
