@@ -8,38 +8,38 @@ import { Toaster } from '@/components/ui/toaster';
 import AppLayout from './layouts/AppLayout';
 
 // Pages
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import Reportes from './pages/Reportes';
-import Obras from './pages/Obras';
-import Usuarios from './pages/Usuarios';
-import Herramientas from './pages/Herramientas';
-import NuevaHerramienta from './pages/NuevaHerramienta';
-import HerramientaDetail from './pages/HerramientaDetail';
-import QRScanner from './pages/QRScanner';
-import BusquedaVisual from './pages/BusquedaVisual';
-import BusquedaPersonal from './pages/BusquedaPersonal';
-import Solicitudes from './pages/Solicitudes';
-import NuevaSolicitud from './pages/NuevaSolicitud';
-import SolicitudDetail from './pages/SolicitudDetail';
-import Logistica from './pages/Logistica';
-import Compras from './pages/Compras';
-import CompraDetail from './pages/CompraDetail';
-import MisObras from './pages/MisObras';
-import Personal from './pages/Personal';
-import NuevoTrasladoPersonal from './pages/NuevoTrasladoPersonal';
-import TrasladoPersonalDetail from './pages/TrasladoPersonalDetail';
-import Ordenes from './pages/Ordenes';
-import NuevaOrden from './pages/NuevaOrden';
-import OrdenDetail from './pages/OrdenDetail';
-import NuevoPersonalAsistido from './pages/NuevoPersonalAsistido';
-import Notificaciones from './pages/Notificaciones';
-import SeguimientoTraslado from './pages/SeguimientoTraslado';
-import Contactos from './pages/Contactos';
-import Formularios from './pages/Formularios';
-import Trabajadores from './pages/Trabajadores';
-import CargarHorasPublico from './pages/CargarHorasPublico';
-import LiquidacionSueldos from './pages/LiquidacionSueldos';
+const Login = lazy(() => import('./pages/Login'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Reportes = lazy(() => import('./pages/Reportes'));
+const Obras = lazy(() => import('./pages/Obras'));
+const Usuarios = lazy(() => import('./pages/Usuarios'));
+const Herramientas = lazy(() => import('./pages/Herramientas'));
+const NuevaHerramienta = lazy(() => import('./pages/NuevaHerramienta'));
+const HerramientaDetail = lazy(() => import('./pages/HerramientaDetail'));
+const QRScanner = lazy(() => import('./pages/QRScanner'));
+const BusquedaVisual = lazy(() => import('./pages/BusquedaVisual'));
+const BusquedaPersonal = lazy(() => import('./pages/BusquedaPersonal'));
+const Solicitudes = lazy(() => import('./pages/Solicitudes'));
+const NuevaSolicitud = lazy(() => import('./pages/NuevaSolicitud'));
+const SolicitudDetail = lazy(() => import('./pages/SolicitudDetail'));
+const Logistica = lazy(() => import('./pages/Logistica'));
+const Compras = lazy(() => import('./pages/Compras'));
+const CompraDetail = lazy(() => import('./pages/CompraDetail'));
+const MisObras = lazy(() => import('./pages/MisObras'));
+const Personal = lazy(() => import('./pages/Personal'));
+const NuevoTrasladoPersonal = lazy(() => import('./pages/NuevoTrasladoPersonal'));
+const TrasladoPersonalDetail = lazy(() => import('./pages/TrasladoPersonalDetail'));
+const Ordenes = lazy(() => import('./pages/Ordenes'));
+const NuevaOrden = lazy(() => import('./pages/NuevaOrden'));
+const OrdenDetail = lazy(() => import('./pages/OrdenDetail'));
+const NuevoPersonalAsistido = lazy(() => import('./pages/NuevoPersonalAsistido'));
+const Notificaciones = lazy(() => import('./pages/Notificaciones'));
+const SeguimientoTraslado = lazy(() => import('./pages/SeguimientoTraslado'));
+const Contactos = lazy(() => import('./pages/Contactos'));
+const Formularios = lazy(() => import('./pages/Formularios'));
+const Trabajadores = lazy(() => import('./pages/Trabajadores'));
+const CargarHorasPublico = lazy(() => import('./pages/CargarHorasPublico'));
+const LiquidacionSueldos = lazy(() => import('./pages/LiquidacionSueldos'));
 const CentroOperaciones = lazy(() => import('./pages/CentroOperaciones'));
 const Coordinadores = lazy(() => import('./pages/Coordinadores'));
 const PostulacionPublica = lazy(() => import('./pages/PostulacionPublica'));
@@ -67,6 +67,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <Suspense fallback={<LogoLoader fullScreen text="Cargando sección..." size="md" />}>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/cargar-horas" element={<CargarHorasPublico />} />
@@ -155,6 +156,7 @@ export default function App() {
 
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
+      </Suspense>
       <Toaster />
     </BrowserRouter>
   );

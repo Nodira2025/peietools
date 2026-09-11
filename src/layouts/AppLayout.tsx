@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { Navigate, Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { supabase } from '../lib/supabase';
@@ -482,7 +482,7 @@ export default function AppLayout() {
         {/* Contenedor fluido de páginas */}
         <div className={containerClass}>
           <NotificationPermissionBanner />
-          <Outlet />
+          <Suspense fallback={<LogoLoader text="Cargando sección..." size="md" />}><Outlet /></Suspense>
         </div>
 
       </main>

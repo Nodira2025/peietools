@@ -22,16 +22,11 @@ export function useCategories() {
 
   const fetchCategories = async () => {
     try {
-      // 1. Obtener desde la tabla categorias_herramientas
-      const { data: dbCatData } = await supabase
-        .from('categorias_herramientas')
-        .select('name')
-        .order('name');
-
-      // 2. Obtener categorías actualmente en uso en herramientas
-      const { data: toolCatData } = await supabase
-        .from('herramientas')
-        .select('category');
+      // Ambas fuentes son independientes; no esperar una para pedir la otra.
+      const [{ data: dbCatData }, { data: toolCatData }] = await Promise.all([
+        supabase.from('categorias_herramientas').select('name').order('name'),
+        supabase.from('herramientas').select('category'),
+      ]);
 
       const set = new Set<string>();
 

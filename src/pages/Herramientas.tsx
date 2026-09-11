@@ -33,6 +33,7 @@ import { useAuthStore } from '../store/auth';
 import { useCategories } from '../lib/useCategories';
 
 import FilterBar from '../components/FilterBar';
+import ToolPhoto from '../components/ToolPhoto';
 import * as XLSX from 'xlsx';
 import ModalGestionCategorias from '../components/ModalGestionCategorias';
 import ModalImportarCategoriasExcel from '../components/ModalImportarCategoriasExcel';
@@ -94,7 +95,7 @@ export default function Herramientas() {
       // 2. Revalidar con Supabase en segundo plano
       const { data, error } = await supabase
         .from('herramientas')
-        .select('id, code, name, brand, model, status, category, current_obra_id, photo_url, obras(name, encargado_name)')
+        .select('id, code, name, brand, model, status, category, current_obra_id, obras(name, encargado_name)')
         .order('name');
       if (error) throw error;
 
@@ -752,19 +753,7 @@ export default function Herramientas() {
                     <div>
                       {/* Imagen de cabecera */}
                       <div className="relative h-36 w-full bg-slate-50 border-b border-slate-100 overflow-hidden">
-                        {h.photo_url ? (
-                          <img 
-                            src={h.photo_url} 
-                            alt={h.name} 
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
-                            onError={e => { e.currentTarget.parentElement!.style.display = 'none'; }} 
-                          />
-                        ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center text-slate-300 bg-slate-50/50">
-                            {getCategoryIcon(h.category)}
-                            <span className="text-[10px] mt-1 text-slate-400">Sin fotografía</span>
-                          </div>
-                        )}
+                        <ToolPhoto id={h.id} name={h.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" fallback={getCategoryIcon(h.category)} />
                         {/* Estado flotante sobre la foto en móvil */}
                         <span className={`absolute top-2.5 right-2.5 text-[9px] font-bold px-2 py-0.5 rounded-full border shadow-sm ${styles.badge}`}>
                           {h.status}
@@ -819,11 +808,7 @@ export default function Herramientas() {
                   >
                     <div className="flex items-center gap-4 min-w-0">
                       <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 overflow-hidden">
-                        {h.photo_url ? (
-                          <img src={h.photo_url} alt={h.name} className="w-full h-full object-cover" />
-                        ) : (
-                          getCategoryIcon(h.category)
-                        )}
+                        <ToolPhoto id={h.id} name={h.name} className="w-full h-full object-cover" fallback={getCategoryIcon(h.category)} />
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
