@@ -1,53 +1,22 @@
-import { useState, useEffect, useRef, useMemo, type Dispatch, type SetStateAction } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { HardHat, Search, Clock, Camera, Plus, Trash2, Check, FileImage, FileSpreadsheet, X } from 'lucide-react';
+import { HardHat, Search, Clock, Camera, Plus, Trash2, Edit2, Check, Download, FileImage, FileSpreadsheet, X, Maximize2 } from 'lucide-react';
 
 import { useAuthStore } from '../store/auth';
 import { compressImage } from '../lib/imageUtils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
 
 
-interface EmployeePrivateData {
-  dni: string;
-  cuil: string;
-  fecha_nacimiento: string;
-  nacionalidad: string;
-  email: string;
-  telefono_alternativo: string;
-  domicilio: string;
-  localidad: string;
-  provincia: string;
-  legajo: string;
-  fecha_ingreso: string;
-  tipo_contrato: string;
-  contacto_emergencia_nombre: string;
-  contacto_emergencia_parentesco: string;
-  contacto_emergencia_telefono: string;
-  talle_ropa: string;
-  talle_calzado: string;
-  observaciones: string;
-}
-
-interface EmployeeFormState extends EmployeePrivateData {
-  full_name: string;
-  specialty: string;
-  whatsapp: string;
-  status: 'Trabajando' | 'Libre';
-  photo_url: string | null;
-  obra_id: string | null;
-}
-
-interface Empleado extends EmployeePrivateData {
+interface Empleado {
   id: string;
   full_name: string;
   obra_id: string | null;
@@ -56,281 +25,6 @@ interface Empleado extends EmployeePrivateData {
   photo_url: string | null;
   whatsapp: string | null;
   obras: { name: string; encargado_name: string | null } | null;
-}
-
-const createEmptyPrivateData = (): EmployeePrivateData => ({
-  dni: '',
-  cuil: '',
-  fecha_nacimiento: '',
-  nacionalidad: '',
-  email: '',
-  telefono_alternativo: '',
-  domicilio: '',
-  localidad: '',
-  provincia: '',
-  legajo: '',
-  fecha_ingreso: '',
-  tipo_contrato: '',
-  contacto_emergencia_nombre: '',
-  contacto_emergencia_parentesco: '',
-  contacto_emergencia_telefono: '',
-  talle_ropa: '',
-  talle_calzado: '',
-  observaciones: ''
-});
-
-const createEmptyEmployeeForm = (specialty = ''): EmployeeFormState => ({
-  full_name: '',
-  specialty,
-  whatsapp: '',
-  status: 'Libre',
-  photo_url: null,
-  obra_id: null,
-  ...createEmptyPrivateData()
-});
-
-type PrivateDataRecord = Partial<Record<keyof EmployeePrivateData, string | null>>;
-
-const mapPrivateData = (data?: PrivateDataRecord | null): EmployeePrivateData => ({
-  dni: data?.dni || '',
-  cuil: data?.cuil || '',
-  fecha_nacimiento: data?.fecha_nacimiento || '',
-  nacionalidad: data?.nacionalidad || '',
-  email: data?.email || '',
-  telefono_alternativo: data?.telefono_alternativo || '',
-  domicilio: data?.domicilio || '',
-  localidad: data?.localidad || '',
-  provincia: data?.provincia || '',
-  legajo: data?.legajo || '',
-  fecha_ingreso: data?.fecha_ingreso || '',
-  tipo_contrato: data?.tipo_contrato || '',
-  contacto_emergencia_nombre: data?.contacto_emergencia_nombre || '',
-  contacto_emergencia_parentesco: data?.contacto_emergencia_parentesco || '',
-  contacto_emergencia_telefono: data?.contacto_emergencia_telefono || '',
-  talle_ropa: data?.talle_ropa || '',
-  talle_calzado: data?.talle_calzado || '',
-  observaciones: data?.observaciones || ''
-});
-
-const nullableText = (value: string) => value.trim() || null;
-
-const buildPrivateDataPayload = (form: EmployeeFormState) => {
-  const dniDigits = form.dni.replace(/\D/g, '');
-  const cuilDigits = form.cuil.replace(/\D/g, '');
-  const formattedCuil = cuilDigits.length === 11
-    ? `${cuilDigits.slice(0, 2)}-${cuilDigits.slice(2, 10)}-${cuilDigits.slice(10)}`
-    : form.cuil.trim();
-
-  return {
-    dni: dniDigits || null,
-    cuil: formattedCuil || null,
-    fecha_nacimiento: form.fecha_nacimiento || null,
-    nacionalidad: nullableText(form.nacionalidad),
-    email: nullableText(form.email)?.toLowerCase() || null,
-    telefono_alternativo: nullableText(form.telefono_alternativo),
-    domicilio: nullableText(form.domicilio),
-    localidad: nullableText(form.localidad),
-    provincia: nullableText(form.provincia),
-    legajo: nullableText(form.legajo),
-    fecha_ingreso: form.fecha_ingreso || null,
-    tipo_contrato: nullableText(form.tipo_contrato),
-    contacto_emergencia_nombre: nullableText(form.contacto_emergencia_nombre),
-    contacto_emergencia_parentesco: nullableText(form.contacto_emergencia_parentesco),
-    contacto_emergencia_telefono: nullableText(form.contacto_emergencia_telefono),
-    talle_ropa: nullableText(form.talle_ropa),
-    talle_calzado: nullableText(form.talle_calzado),
-    observaciones: nullableText(form.observaciones)
-  };
-};
-
-const validateEmployeeForm = (form: EmployeeFormState) => {
-  const dniLength = form.dni.replace(/\D/g, '').length;
-  if (form.dni.trim() && (dniLength < 7 || dniLength > 8)) {
-    return 'El DNI debe tener 7 u 8 números.';
-  }
-
-  const cuilLength = form.cuil.replace(/\D/g, '').length;
-  if (form.cuil.trim() && cuilLength !== 11) {
-    return 'El CUIL debe tener 11 números.';
-  }
-
-  if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
-    return 'Ingresá un correo electrónico válido.';
-  }
-
-  return null;
-};
-
-interface EmployeeDataFieldsProps {
-  form: EmployeeFormState;
-  setForm: Dispatch<SetStateAction<EmployeeFormState>>;
-  obras: { id: string; name: string; encargado_name?: string | null }[];
-  prefix: 'profile' | 'add';
-  canEdit: boolean;
-}
-
-function EmployeeDataFields({ form, setForm, obras, prefix, canEdit }: EmployeeDataFieldsProps) {
-  const updateField = <K extends keyof EmployeeFormState>(field: K, value: EmployeeFormState[K]) => {
-    setForm(prev => ({ ...prev, [field]: value }));
-  };
-  const inputClass = 'rounded-xl border-slate-200 focus-visible:ring-blue-600 font-semibold text-slate-800 disabled:bg-slate-50 disabled:text-slate-600';
-  const labelClass = 'text-[10px] font-bold text-slate-500 uppercase tracking-wider';
-
-  return (
-    <div className="space-y-5">
-      <section className="space-y-3">
-        <div>
-          <h3 className="text-sm font-extrabold text-[#031530]">Identificación</h3>
-          <p className="text-[11px] text-slate-400 font-medium">Datos personales y documentación del trabajador.</p>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="space-y-1 sm:col-span-2">
-            <Label htmlFor={`${prefix}-name`} className={labelClass}>Nombre completo *</Label>
-            <Input id={`${prefix}-name`} value={form.full_name} disabled={!canEdit} onChange={e => updateField('full_name', e.target.value)} className={inputClass} placeholder="Ej: Pérez, Juan Carlos" />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor={`${prefix}-dni`} className={labelClass}>DNI</Label>
-            <Input id={`${prefix}-dni`} value={form.dni} disabled={!canEdit} inputMode="numeric" onChange={e => updateField('dni', e.target.value)} className={inputClass} placeholder="Ej: 30123456" />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor={`${prefix}-cuil`} className={labelClass}>CUIL</Label>
-            <Input id={`${prefix}-cuil`} value={form.cuil} disabled={!canEdit} inputMode="numeric" onChange={e => updateField('cuil', e.target.value)} className={inputClass} placeholder="Ej: 20-30123456-7" />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor={`${prefix}-birth-date`} className={labelClass}>Fecha de nacimiento</Label>
-            <Input id={`${prefix}-birth-date`} type="date" max={new Date().toISOString().split('T')[0]} value={form.fecha_nacimiento} disabled={!canEdit} onChange={e => updateField('fecha_nacimiento', e.target.value)} className={inputClass} />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor={`${prefix}-nationality`} className={labelClass}>Nacionalidad</Label>
-            <Input id={`${prefix}-nationality`} value={form.nacionalidad} disabled={!canEdit} onChange={e => updateField('nacionalidad', e.target.value)} className={inputClass} placeholder="Ej: Argentina" />
-          </div>
-        </div>
-      </section>
-
-      <section className="space-y-3 border-t border-slate-100 pt-5">
-        <div>
-          <h3 className="text-sm font-extrabold text-[#031530]">Contacto y domicilio</h3>
-          <p className="text-[11px] text-slate-400 font-medium">Medios de contacto y residencia actual.</p>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label htmlFor={`${prefix}-whatsapp`} className={labelClass}>WhatsApp / teléfono</Label>
-            <Input id={`${prefix}-whatsapp`} value={form.whatsapp} disabled={!canEdit} inputMode="tel" onChange={e => updateField('whatsapp', e.target.value)} className={inputClass} placeholder="Ej: +54 9 381..." />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor={`${prefix}-secondary-phone`} className={labelClass}>Teléfono alternativo</Label>
-            <Input id={`${prefix}-secondary-phone`} value={form.telefono_alternativo} disabled={!canEdit} inputMode="tel" onChange={e => updateField('telefono_alternativo', e.target.value)} className={inputClass} placeholder="Ej: 381 4000000" />
-          </div>
-          <div className="space-y-1 sm:col-span-2">
-            <Label htmlFor={`${prefix}-email`} className={labelClass}>Correo electrónico</Label>
-            <Input id={`${prefix}-email`} type="email" value={form.email} disabled={!canEdit} onChange={e => updateField('email', e.target.value)} className={inputClass} placeholder="nombre@correo.com" />
-          </div>
-          <div className="space-y-1 sm:col-span-2">
-            <Label htmlFor={`${prefix}-address`} className={labelClass}>Domicilio</Label>
-            <Input id={`${prefix}-address`} value={form.domicilio} disabled={!canEdit} onChange={e => updateField('domicilio', e.target.value)} className={inputClass} placeholder="Calle, número, piso o barrio" />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor={`${prefix}-city`} className={labelClass}>Localidad</Label>
-            <Input id={`${prefix}-city`} value={form.localidad} disabled={!canEdit} onChange={e => updateField('localidad', e.target.value)} className={inputClass} placeholder="Ej: San Miguel de Tucumán" />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor={`${prefix}-province`} className={labelClass}>Provincia</Label>
-            <Input id={`${prefix}-province`} value={form.provincia} disabled={!canEdit} onChange={e => updateField('provincia', e.target.value)} className={inputClass} placeholder="Ej: Tucumán" />
-          </div>
-        </div>
-      </section>
-
-      <section className="space-y-3 border-t border-slate-100 pt-5">
-        <div>
-          <h3 className="text-sm font-extrabold text-[#031530]">Datos laborales</h3>
-          <p className="text-[11px] text-slate-400 font-medium">Información de ingreso, puesto y asignación.</p>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label htmlFor={`${prefix}-employee-number`} className={labelClass}>N.º de legajo</Label>
-            <Input id={`${prefix}-employee-number`} value={form.legajo} disabled={!canEdit} onChange={e => updateField('legajo', e.target.value)} className={inputClass} placeholder="Ej: PEIE-036" />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor={`${prefix}-start-date`} className={labelClass}>Fecha de ingreso</Label>
-            <Input id={`${prefix}-start-date`} type="date" value={form.fecha_ingreso} disabled={!canEdit} onChange={e => updateField('fecha_ingreso', e.target.value)} className={inputClass} />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor={`${prefix}-specialty`} className={labelClass}>Especialidad / puesto</Label>
-            <Input id={`${prefix}-specialty`} value={form.specialty} disabled={!canEdit} onChange={e => updateField('specialty', e.target.value)} className={inputClass} placeholder="Ej: Electricista, Ayudante, Oficial" />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor={`${prefix}-contract`} className={labelClass}>Tipo de contratación</Label>
-            <Input id={`${prefix}-contract`} value={form.tipo_contrato} disabled={!canEdit} onChange={e => updateField('tipo_contrato', e.target.value)} className={inputClass} placeholder="Ej: Permanente, eventual" />
-          </div>
-          <div className="space-y-1 sm:col-span-2">
-            <Label className={labelClass}>Obra asignada</Label>
-            <Select
-              disabled={!canEdit}
-              value={form.obra_id || '_none_'}
-              onValueChange={(value: string) => {
-                const obraId = value === '_none_' ? null : value;
-                setForm(prev => ({ ...prev, obra_id: obraId, status: obraId ? 'Trabajando' : 'Libre' }));
-              }}
-            >
-              <SelectTrigger className="rounded-xl border-slate-200 focus:ring-blue-600 font-semibold text-slate-800 bg-white disabled:bg-slate-50">
-                <SelectValue placeholder="Sin asignar (Libre)" />
-              </SelectTrigger>
-              <SelectContent className="rounded-xl border-slate-100 bg-white shadow-md">
-                <SelectItem value="_none_" className="font-semibold text-slate-700">Sin asignar (Libre)</SelectItem>
-                {obras.map(obra => (
-                  <SelectItem key={obra.id} value={obra.id} className="font-semibold text-slate-700">
-                    {obra.name} {obra.encargado_name ? `(${obra.encargado_name})` : ''}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </section>
-
-      <section className="space-y-3 border-t border-slate-100 pt-5">
-        <div>
-          <h3 className="text-sm font-extrabold text-[#031530]">Contacto de emergencia</h3>
-          <p className="text-[11px] text-slate-400 font-medium">Persona a contactar ante una urgencia.</p>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="space-y-1 sm:col-span-2">
-            <Label htmlFor={`${prefix}-emergency-name`} className={labelClass}>Nombre y apellido</Label>
-            <Input id={`${prefix}-emergency-name`} value={form.contacto_emergencia_nombre} disabled={!canEdit} onChange={e => updateField('contacto_emergencia_nombre', e.target.value)} className={inputClass} placeholder="Nombre completo" />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor={`${prefix}-emergency-relation`} className={labelClass}>Vínculo</Label>
-            <Input id={`${prefix}-emergency-relation`} value={form.contacto_emergencia_parentesco} disabled={!canEdit} onChange={e => updateField('contacto_emergencia_parentesco', e.target.value)} className={inputClass} placeholder="Ej: Madre, pareja" />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor={`${prefix}-emergency-phone`} className={labelClass}>Teléfono</Label>
-            <Input id={`${prefix}-emergency-phone`} value={form.contacto_emergencia_telefono} disabled={!canEdit} inputMode="tel" onChange={e => updateField('contacto_emergencia_telefono', e.target.value)} className={inputClass} placeholder="Ej: +54 9 381..." />
-          </div>
-        </div>
-      </section>
-
-      <section className="space-y-3 border-t border-slate-100 pt-5">
-        <div>
-          <h3 className="text-sm font-extrabold text-[#031530]">Indumentaria y observaciones</h3>
-          <p className="text-[11px] text-slate-400 font-medium">Talles para EPP y notas internas de trabajo.</p>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label htmlFor={`${prefix}-clothing-size`} className={labelClass}>Talle de ropa</Label>
-            <Input id={`${prefix}-clothing-size`} value={form.talle_ropa} disabled={!canEdit} onChange={e => updateField('talle_ropa', e.target.value)} className={inputClass} placeholder="Ej: L / 44" />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor={`${prefix}-shoe-size`} className={labelClass}>Talle de calzado</Label>
-            <Input id={`${prefix}-shoe-size`} value={form.talle_calzado} disabled={!canEdit} inputMode="numeric" onChange={e => updateField('talle_calzado', e.target.value)} className={inputClass} placeholder="Ej: 42" />
-          </div>
-          <div className="space-y-1 sm:col-span-2">
-            <Label htmlFor={`${prefix}-notes`} className={labelClass}>Observaciones laborales</Label>
-            <Textarea id={`${prefix}-notes`} value={form.observaciones} disabled={!canEdit} onChange={e => updateField('observaciones', e.target.value)} className={`${inputClass} min-h-24 resize-y`} placeholder="Información interna relevante para la gestión del trabajador" />
-          </div>
-        </div>
-      </section>
-    </div>
-  );
 }
 
 interface TrasladoPendiente {
@@ -391,13 +85,32 @@ export default function Personal() {
   // Profile modal state
   const [selectedEmpForProfile, setSelectedEmpForProfile] = useState<Empleado | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [profileForm, setProfileForm] = useState<EmployeeFormState>(() => createEmptyEmployeeForm());
+  const [profileForm, setProfileForm] = useState<{
+    full_name: string;
+    specialty: string;
+    whatsapp: string;
+    status: 'Trabajando' | 'Libre';
+    photo_url: string | null;
+    obra_id: string | null;
+  }>({
+    full_name: '',
+    specialty: '',
+    whatsapp: '',
+    status: 'Libre',
+    photo_url: null,
+    obra_id: null
+  });
   const [profileUpdating, setProfileUpdating] = useState(false);
   const profilePhotoInputRef = useRef<HTMLInputElement>(null);
 
   // Add employee modal state
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [addForm, setAddForm] = useState<EmployeeFormState>(() => createEmptyEmployeeForm('Electricista'));
+  const [addForm, setAddForm] = useState({
+    full_name: '',
+    specialty: 'Electricista',
+    whatsapp: '',
+    obra_id: ''
+  });
   const [addSaving, setAddSaving] = useState(false);
 
   // Image & Excel export state
@@ -417,10 +130,9 @@ export default function Personal() {
       full_name: emp.full_name,
       specialty: emp.specialty || '',
       whatsapp: emp.whatsapp || '',
-      status: emp.status === 'Libre' ? 'Libre' : 'Trabajando',
+      status: emp.status === 'Disponible' || emp.status === 'Libre' ? 'Libre' : 'Trabajando',
       photo_url: emp.photo_url,
-      obra_id: emp.obra_id || null,
-      ...mapPrivateData(emp)
+      obra_id: emp.obra_id || null
     });
     setIsProfileOpen(true);
   };
@@ -437,18 +149,12 @@ export default function Personal() {
   };
 
   const handleSaveProfile = async () => {
-    if (!selectedEmpForProfile || !profileForm.full_name.trim() || !profile || !isAdmin) return;
-    const validationError = validateEmployeeForm(profileForm);
-    if (validationError) {
-      toast({ variant: 'destructive', title: 'Revisá los datos', description: validationError });
-      return;
-    }
-
+    if (!selectedEmpForProfile || !profileForm.full_name.trim() || !profile) return;
     setProfileUpdating(true);
     try {
       const computedStatus = profileForm.obra_id ? 'Trabajando' : 'Libre';
 
-      const { error: employeeError } = await supabase
+      const { error } = await supabase
         .from('empleados')
         .update({
           full_name: profileForm.full_name.trim(),
@@ -460,59 +166,42 @@ export default function Personal() {
         })
         .eq('id', selectedEmpForProfile.id);
 
-      if (employeeError) throw employeeError;
-
-      const { error: privateDataError } = await supabase
-        .from('empleados_legajos')
-        .upsert({
-          empleado_id: selectedEmpForProfile.id,
-          ...buildPrivateDataPayload(profileForm),
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'empleado_id' });
-
-      if (privateDataError) throw privateDataError;
-
-      // Log transfer if obra changed
-      if (selectedEmpForProfile.obra_id !== profileForm.obra_id && profileForm.obra_id) {
-        const { error: transferError } = await supabase
-          .from('traslados_personal')
-          .insert([{
-            empleado_id: selectedEmpForProfile.id,
-            source_obra_id: selectedEmpForProfile.obra_id || null,
-            target_obra_id: profileForm.obra_id,
-            requester_id: profile.id,
-            status: 'Confirmado',
-            confirmed_by: profile.id,
-            confirmed_at: new Date().toISOString()
-          }]);
-        if (transferError) {
-          console.error('Error logging transfer:', transferError);
+      if (error) {
+        toast({ variant: 'destructive', title: 'Error', description: error.message });
+      } else {
+        // Log transfer if obra changed
+        if (selectedEmpForProfile.obra_id !== profileForm.obra_id) {
+          if (profileForm.obra_id) {
+            const { error: transferError } = await supabase
+              .from('traslados_personal')
+              .insert([{
+                empleado_id: selectedEmpForProfile.id,
+                source_obra_id: selectedEmpForProfile.obra_id || null,
+                target_obra_id: profileForm.obra_id,
+                requester_id: profile.id,
+                status: 'Confirmado',
+                confirmed_by: profile.id,
+                confirmed_at: new Date().toISOString()
+              }]);
+            if (transferError) {
+              console.error('Error logging transfer:', transferError);
+            }
+          }
         }
-      }
 
-      toast({ title: 'Legajo actualizado', description: 'Los datos personales y laborales fueron guardados.' });
-      setIsProfileOpen(false);
-      fetchData();
+        toast({ title: 'Perfil actualizado', description: 'Los datos del empleado fueron guardados.' });
+        setIsProfileOpen(false);
+        fetchData();
+      }
     } catch (err: any) {
-      const isDuplicate = err?.code === '23505';
-      toast({
-        variant: 'destructive',
-        title: 'No se pudo guardar',
-        description: isDuplicate ? 'El DNI, CUIL o número de legajo ya está registrado en otro trabajador.' : (err?.message || 'No se pudo actualizar el legajo.')
-      });
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar el perfil.' });
     } finally {
       setProfileUpdating(false);
     }
   };
 
   const handleAddEmployee = async () => {
-    if (!addForm.full_name.trim() || !isAdmin) return;
-    const validationError = validateEmployeeForm(addForm);
-    if (validationError) {
-      toast({ variant: 'destructive', title: 'Revisá los datos', description: validationError });
-      return;
-    }
-
+    if (!addForm.full_name.trim()) return;
     setAddSaving(true);
     try {
       const payload = {
@@ -524,39 +213,18 @@ export default function Personal() {
         active: true
       };
 
-      const { data: createdEmployee, error } = await supabase
-        .from('empleados')
-        .insert([payload])
-        .select('id')
-        .single();
+      const { error } = await supabase.from('empleados').insert([payload]);
 
       if (error) {
         toast({ variant: 'destructive', title: 'Error al agregar', description: error.message });
       } else {
-        const { error: privateDataError } = await supabase
-          .from('empleados_legajos')
-          .insert({
-            empleado_id: createdEmployee.id,
-            ...buildPrivateDataPayload(addForm)
-          });
-
-        if (privateDataError) {
-          await supabase.from('empleados').delete().eq('id', createdEmployee.id);
-          throw privateDataError;
-        }
-
         toast({ title: 'Operario agregado', description: `${payload.full_name} fue registrado con éxito.` });
         setIsAddOpen(false);
-        setAddForm(createEmptyEmployeeForm('Electricista'));
+        setAddForm({ full_name: '', specialty: 'Electricista', whatsapp: '', obra_id: '' });
         fetchData();
       }
     } catch (err: any) {
-      const isDuplicate = err?.code === '23505';
-      toast({
-        variant: 'destructive',
-        title: 'No se pudo registrar',
-        description: isDuplicate ? 'El DNI, CUIL o número de legajo ya está registrado.' : (err?.message || 'No se pudo registrar al operario.')
-      });
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo registrar al operario.' });
     } finally {
       setAddSaving(false);
     }
@@ -641,51 +309,24 @@ export default function Personal() {
     setLoading(true);
     
     // Fetch Empleados
-    const fullEmployeeResponse = await supabase
+    const { data: empData, error: empError } = await supabase
       .from('empleados')
-      .select(`
-        id, full_name, obra_id, status, specialty, photo_url, whatsapp,
-        obras:obra_id(name, encargado_name),
-        datos_personales:empleados_legajos(
-          dni, cuil, fecha_nacimiento, nacionalidad, email, telefono_alternativo,
-          domicilio, localidad, provincia, legajo, fecha_ingreso, tipo_contrato,
-          contacto_emergencia_nombre, contacto_emergencia_parentesco,
-          contacto_emergencia_telefono, talle_ropa, talle_calzado, observaciones
-        )
-      `)
+      .select('id, full_name, obra_id, status, specialty, photo_url, whatsapp, obras:obra_id(name, encargado_name)')
       .order('full_name');
-    let empData = fullEmployeeResponse.data;
-    let empError = fullEmployeeResponse.error;
-
-    // Permite desplegar primero la interfaz sin dejar fuera de servicio la nómina
-    // mientras la migración de legajos todavía no fue aplicada en Supabase.
-    if (empError) {
-      console.warn('No se pudo cargar la relación de legajos; reintentando datos básicos:', empError.message);
-      const basicEmployeeResponse = await supabase
-        .from('empleados')
-        .select('id, full_name, obra_id, status, specialty, photo_url, whatsapp, obras:obra_id(name, encargado_name)')
-        .order('full_name');
-      empData = basicEmployeeResponse.data;
-      empError = basicEmployeeResponse.error;
-    }
       
     if (empError) {
       toast({ variant: 'destructive', title: 'Error', description: 'No se pudo cargar el personal' });
     } else {
-      const dataWithDefaults = (empData || []).map((e: any) => {
-        const privateData = Array.isArray(e.datos_personales) ? e.datos_personales[0] : e.datos_personales;
-        return {
-          id: e.id,
-          full_name: e.full_name,
-          obra_id: e.obra_id,
-          status: e.status ? (e.status === 'Disponible' || e.status === 'Libre' ? 'Libre' : 'Trabajando') : (e.obra_id ? 'Trabajando' : 'Libre'),
-          specialty: e.specialty || 'Electricista',
-          photo_url: e.photo_url,
-          whatsapp: e.whatsapp || null,
-          obras: Array.isArray(e.obras) ? e.obras[0] : e.obras,
-          ...mapPrivateData(privateData)
-        };
-      });
+      const dataWithDefaults = (empData || []).map((e: any) => ({
+        id: e.id,
+        full_name: e.full_name,
+        obra_id: e.obra_id,
+        status: e.status ? (e.status === 'Disponible' || e.status === 'Libre' ? 'Libre' : 'Trabajando') : (e.obra_id ? 'Trabajando' : 'Libre'),
+        specialty: e.specialty || 'Electricista',
+        photo_url: e.photo_url,
+        whatsapp: e.whatsapp || null,
+        obras: Array.isArray(e.obras) ? e.obras[0] : e.obras
+      }));
       setEmpleados(dataWithDefaults as Empleado[]);
       
       const uniqueSpecs = [...new Set(dataWithDefaults.map(e => e.specialty))].sort();
@@ -758,8 +399,7 @@ export default function Personal() {
           specialty: emp.specialty || 'Electricista',
           photo_url: emp.photo_url,
           whatsapp: emp.whatsapp || null,
-          obras: Array.isArray(emp.obras) ? emp.obras[0] : emp.obras,
-          ...mapPrivateData(Array.isArray(emp.datos_personales) ? emp.datos_personales[0] : emp.datos_personales)
+          obras: Array.isArray(emp.obras) ? emp.obras[0] : emp.obras
         };
         handleOpenProfile(empMapped as Empleado);
       }
@@ -785,16 +425,10 @@ export default function Personal() {
   // };
 
   const filteredEmpleados = empleados.filter(e => {
-    const normalizedSearch = search.toLowerCase().trim();
     const matchesSearch = !search || 
-      e.full_name.toLowerCase().includes(normalizedSearch) ||
-      (e.obras?.name || '').toLowerCase().includes(normalizedSearch) ||
-      (e.specialty || '').toLowerCase().includes(normalizedSearch) ||
-      e.dni.toLowerCase().includes(normalizedSearch) ||
-      e.cuil.toLowerCase().includes(normalizedSearch) ||
-      e.legajo.toLowerCase().includes(normalizedSearch) ||
-      e.email.toLowerCase().includes(normalizedSearch) ||
-      e.localidad.toLowerCase().includes(normalizedSearch);
+      e.full_name.toLowerCase().includes(search.toLowerCase()) ||
+      (e.obras?.name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (e.specialty || '').toLowerCase().includes(search.toLowerCase());
     
     const matchesObra = !filterObra || e.obra_id === filterObra;
     const matchesSpecialty = !filterSpecialty || e.specialty === filterSpecialty;
@@ -1032,44 +666,8 @@ export default function Personal() {
 
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Matriz Personal");
-
-    if (isAdmin) {
-      const legajoRows = filteredEmpleados
-        .slice()
-        .sort((a, b) => a.full_name.localeCompare(b.full_name))
-        .map(emp => ({
-          'Nombre completo': emp.full_name,
-          'DNI': emp.dni,
-          'CUIL': emp.cuil,
-          'Nacimiento': emp.fecha_nacimiento,
-          'Nacionalidad': emp.nacionalidad,
-          'N.º legajo': emp.legajo,
-          'Fecha de ingreso': emp.fecha_ingreso,
-          'Especialidad / puesto': emp.specialty || '',
-          'Tipo de contratación': emp.tipo_contrato,
-          'Obra asignada': emp.obras?.name || 'Sin asignar',
-          'WhatsApp / teléfono': emp.whatsapp || '',
-          'Teléfono alternativo': emp.telefono_alternativo,
-          'Correo electrónico': emp.email,
-          'Domicilio': emp.domicilio,
-          'Localidad': emp.localidad,
-          'Provincia': emp.provincia,
-          'Contacto de emergencia': emp.contacto_emergencia_nombre,
-          'Vínculo': emp.contacto_emergencia_parentesco,
-          'Teléfono de emergencia': emp.contacto_emergencia_telefono,
-          'Talle de ropa': emp.talle_ropa,
-          'Talle de calzado': emp.talle_calzado,
-          'Observaciones laborales': emp.observaciones
-        }));
-      const legajosWorksheet = XLSX.utils.json_to_sheet(legajoRows);
-      legajosWorksheet['!cols'] = Object.keys(legajoRows[0] || {}).map(key => ({
-        wch: Math.min(Math.max(key.length + 2, 16), 36)
-      }));
-      XLSX.utils.book_append_sheet(workbook, legajosWorksheet, 'Legajos');
-    }
-
     XLSX.writeFile(workbook, `Reporte_Personal_Matriz_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    toast({ title: '¡Excel generado!', description: isAdmin ? 'Incluye la matriz por obra y una hoja con los legajos.' : 'Listado de personal exportado por obras.' });
+    toast({ title: '¡Excel Generado!', description: 'Listado de personal exportado en el formato matriz unificado por obras.' });
   };
 
 
@@ -1175,7 +773,7 @@ export default function Personal() {
         <div className="relative group">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-peie-blue" />
           <Input
-            placeholder="Buscar por nombre, DNI, legajo u obra..."
+            placeholder="Buscar empleado o por obra..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="pl-9 h-11 rounded-xl border-slate-200 shadow-sm"
@@ -1471,9 +1069,6 @@ export default function Personal() {
                           <p className="text-[9px] text-slate-450 font-bold uppercase tracking-wide">
                             {emp.specialty || 'Electricista'}
                           </p>
-                          {isAdmin && emp.dni && (
-                            <p className="text-[9px] text-slate-500 font-semibold">DNI {emp.dni}</p>
-                          )}
                           
                           <div className="flex items-center gap-1.5 mt-1 min-w-0">
                             <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full border shrink-0 ${badgeStyle}`}>
@@ -1629,11 +1224,11 @@ export default function Personal() {
 
       {/* Modal de Perfil de Empleado (Ver y Editar) */}
       <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
-        <DialogContent className="rounded-3xl w-[95%] max-w-3xl max-h-[92vh] bg-white border-slate-100 shadow-xl overflow-hidden p-0 gap-0 grid grid-rows-[auto_minmax(0,1fr)_auto]">
+        <DialogContent className="rounded-3xl w-[95%] max-w-md bg-white border-slate-100 shadow-xl overflow-hidden p-0">
           <div className="bg-gradient-to-r from-[#031530] to-[#042454] text-white p-5 pb-6 relative">
             <DialogHeader className="text-left space-y-1">
               <DialogTitle className="text-xl font-extrabold tracking-tight">Ficha del Operario</DialogTitle>
-              <p className="text-slate-350 text-xs font-semibold">Legajo personal, laboral y contacto de emergencia</p>
+              <p className="text-slate-350 text-xs font-semibold">Visualización y edición de datos básicos</p>
             </DialogHeader>
 
             {/* Avatar en cabecera */}
@@ -1650,16 +1245,14 @@ export default function Personal() {
                     <HardHat className="h-10 w-10 text-slate-400" />
                   )}
                 </div>
-                {isAdmin && (
-                  <button
-                    type="button"
-                    onClick={() => profilePhotoInputRef.current?.click()}
-                    className="absolute -bottom-1 -right-1 bg-blue-600 text-white rounded-lg p-1.5 shadow-md hover:bg-blue-700 border-2 border-white transition-all duration-200"
-                    title="Cambiar Foto"
-                  >
-                    <Camera className="h-3 w-3" />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => profilePhotoInputRef.current?.click()}
+                  className="absolute -bottom-1 -right-1 bg-blue-600 text-white rounded-lg p-1.5 shadow-md hover:bg-blue-700 border-2 border-white transition-all duration-200"
+                  title="Cambiar Foto"
+                >
+                  <Camera className="h-3 w-3" />
+                </button>
 
                 <input
                   type="file"
@@ -1672,19 +1265,70 @@ export default function Personal() {
             </div>
           </div>
 
-          <div className="overflow-y-auto p-6 pt-12">
-            {!isAdmin && (
-              <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800">
-                El legajo es de solo lectura. Administración o Logística pueden modificarlo.
-              </div>
-            )}
-            <EmployeeDataFields
-              form={profileForm}
-              setForm={setProfileForm}
-              obras={obrasOpciones}
-              prefix="profile"
-              canEdit={isAdmin}
-            />
+          <div className="p-6 pt-12 space-y-4">
+            {/* Campo Nombre */}
+            <div className="space-y-1">
+              <Label htmlFor="profile-name" className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nombre Completo</Label>
+              <Input
+                id="profile-name"
+                value={profileForm.full_name}
+                onChange={e => setProfileForm(prev => ({ ...prev, full_name: e.target.value }))}
+                className="rounded-xl border-slate-200 focus-visible:ring-blue-600 font-semibold text-slate-800"
+                placeholder="Ej: Pérez, Juan Carlos"
+              />
+            </div>
+
+            {/* Campo Especialidad */}
+            <div className="space-y-1">
+              <Label htmlFor="profile-specialty" className="text-xs font-bold text-slate-500 uppercase tracking-wider">Especialidad</Label>
+              <Input
+                id="profile-specialty"
+                value={profileForm.specialty}
+                onChange={e => setProfileForm(prev => ({ ...prev, specialty: e.target.value }))}
+                className="rounded-xl border-slate-200 focus-visible:ring-blue-600 font-semibold text-slate-800"
+                placeholder="Ej: Electricista, Ayudante, Oficial"
+              />
+            </div>
+
+            {/* Campo WhatsApp / Teléfono */}
+            <div className="space-y-1">
+              <Label htmlFor="profile-whatsapp" className="text-xs font-bold text-slate-500 uppercase tracking-wider">WhatsApp / Teléfono</Label>
+              <Input
+                id="profile-whatsapp"
+                value={profileForm.whatsapp || ''}
+                onChange={e => setProfileForm(prev => ({ ...prev, whatsapp: e.target.value }))}
+                className="rounded-xl border-slate-200 focus-visible:ring-blue-600 font-semibold text-slate-800"
+                placeholder="Ej: +54 9 381..."
+              />
+            </div>
+
+            {/* Obra Asignada */}
+            <div className="space-y-1">
+              <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Obra Asignada</Label>
+              <Select
+                value={profileForm.obra_id || '_none_'}
+                onValueChange={(val: string) => {
+                  const targetId = val === '_none_' ? null : val;
+                  setProfileForm(prev => ({
+                    ...prev,
+                    obra_id: targetId,
+                    status: targetId ? 'Trabajando' : 'Libre'
+                  }));
+                }}
+              >
+                <SelectTrigger className="rounded-xl border-slate-200 focus:ring-blue-600 font-semibold text-slate-800 bg-white">
+                  <SelectValue placeholder="Sin asignar (Libre)" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-slate-100 bg-white shadow-md">
+                  <SelectItem value="_none_" className="font-semibold text-slate-700">Sin asignar (Libre)</SelectItem>
+                  {obrasOpciones.map(o => (
+                    <SelectItem key={o.id} value={o.id} className="font-semibold text-slate-700">
+                      {o.name} {o.encargado_name ? `(${o.encargado_name})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <DialogFooter className="bg-slate-50 p-4 border-t border-slate-100 gap-2 sm:gap-0 rounded-b-3xl flex flex-row items-center justify-between">
@@ -1705,23 +1349,21 @@ export default function Personal() {
                   variant="ghost" 
                   className="rounded-xl hover:bg-slate-200 text-slate-600 font-bold text-xs"
                 >
-                  {isAdmin ? 'Cancelar' : 'Cerrar'}
+                  Cancelar
                 </Button>
               </DialogClose>
-              {isAdmin && (
-                <Button
-                  onClick={handleSaveProfile}
-                  disabled={profileUpdating || !profileForm.full_name.trim()}
-                  className="bg-blue-600 text-white hover:bg-blue-700 rounded-xl font-extrabold text-xs px-5 shadow-md shadow-blue-600/10 flex items-center gap-1.5"
-                >
-                  {profileUpdating ? 'Guardando...' : (
-                    <>
-                      <Check className="h-3.5 w-3.5" />
-                      Guardar cambios
-                    </>
-                  )}
-                </Button>
-              )}
+              <Button
+                onClick={handleSaveProfile}
+                disabled={profileUpdating || !profileForm.full_name.trim()}
+                className="bg-blue-600 text-white hover:bg-blue-700 rounded-xl font-extrabold text-xs px-5 shadow-md shadow-blue-600/10 flex items-center gap-1.5"
+              >
+                {profileUpdating ? 'Guardando...' : (
+                  <>
+                    <Check className="h-3.5 w-3.5" />
+                    Guardar Cambios
+                  </>
+                )}
+              </Button>
             </div>
           </DialogFooter>
         </DialogContent>
@@ -1729,22 +1371,69 @@ export default function Personal() {
 
       {/* Modal para Agregar Operario (Solo Admin) */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-        <DialogContent className="rounded-3xl w-[95%] max-w-3xl max-h-[92vh] bg-white border-slate-100 shadow-xl overflow-hidden p-0 gap-0 grid grid-rows-[auto_minmax(0,1fr)_auto]">
+        <DialogContent className="rounded-3xl w-[95%] max-w-md bg-white border-slate-100 shadow-xl overflow-hidden p-0">
           <div className="bg-gradient-to-r from-[#031530] to-[#042454] text-white p-5 pb-6">
             <DialogHeader className="text-left space-y-1">
               <DialogTitle className="text-xl font-extrabold tracking-tight">Nuevo Operario</DialogTitle>
-              <p className="text-slate-300 text-xs font-semibold">Registrar la ficha y el legajo del trabajador</p>
+              <p className="text-slate-300 text-xs font-semibold">Registrar un nuevo electricista en la nómina</p>
             </DialogHeader>
           </div>
 
-          <div className="overflow-y-auto p-6">
-            <EmployeeDataFields
-              form={addForm}
-              setForm={setAddForm}
-              obras={obrasOpciones}
-              prefix="add"
-              canEdit
-            />
+          <div className="p-6 space-y-4">
+            {/* Campo Nombre */}
+            <div className="space-y-1">
+              <Label htmlFor="add-name" className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nombre Completo</Label>
+              <Input
+                id="add-name"
+                value={addForm.full_name}
+                onChange={e => setAddForm(prev => ({ ...prev, full_name: e.target.value }))}
+                className="rounded-xl border-slate-200 focus-visible:ring-blue-600 font-semibold text-slate-800"
+                placeholder="Ej: Pérez, Juan Carlos"
+              />
+            </div>
+
+            {/* Campo Especialidad */}
+            <div className="space-y-1">
+              <Label htmlFor="add-specialty" className="text-xs font-bold text-slate-500 uppercase tracking-wider">Especialidad</Label>
+              <Input
+                id="add-specialty"
+                value={addForm.specialty}
+                onChange={e => setAddForm(prev => ({ ...prev, specialty: e.target.value }))}
+                className="rounded-xl border-slate-200 focus-visible:ring-blue-600 font-semibold text-slate-800"
+                placeholder="Ej: Electricista, Ayudante, Oficial"
+              />
+            </div>
+
+            {/* Campo WhatsApp */}
+            <div className="space-y-1">
+              <Label htmlFor="add-whatsapp" className="text-xs font-bold text-slate-500 uppercase tracking-wider">WhatsApp / Teléfono</Label>
+              <Input
+                id="add-whatsapp"
+                value={addForm.whatsapp}
+                onChange={e => setAddForm(prev => ({ ...prev, whatsapp: e.target.value }))}
+                className="rounded-xl border-slate-200 focus-visible:ring-blue-600 font-semibold text-slate-800"
+                placeholder="Ej: +54 9 381..."
+              />
+            </div>
+
+            {/* Campo Obra Inicial */}
+            <div className="space-y-1">
+              <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Obra Inicial (Opcional)</Label>
+              <Select
+                value={addForm.obra_id || '_none_'}
+                onValueChange={(val: string) => setAddForm(prev => ({ ...prev, obra_id: val === '_none_' ? '' : val }))}
+              >
+                <SelectTrigger className="rounded-xl border-slate-200 focus:ring-blue-600 font-semibold text-slate-800 bg-white">
+                  <SelectValue placeholder="Sin asignar (Libre)" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-slate-100 bg-white shadow-md">
+                  <SelectItem value="_none_" className="font-semibold text-slate-700">Sin asignar (Libre)</SelectItem>
+                  {obrasOpciones.map(o => (
+                    <SelectItem key={o.id} value={o.id} className="font-semibold text-slate-700">{o.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <DialogFooter className="bg-slate-50 p-4 border-t border-slate-100 gap-2 sm:gap-0 rounded-b-3xl">

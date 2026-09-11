@@ -44,6 +44,7 @@ const CentroOperaciones = lazy(() => import('./pages/CentroOperaciones'));
 const Coordinadores = lazy(() => import('./pages/Coordinadores'));
 const PostulacionPublica = lazy(() => import('./pages/PostulacionPublica'));
 const Entrevistas = lazy(() => import('./pages/Entrevistas'));
+const PersonalDatos = lazy(() => import('./pages/PersonalDatos'));
 
 
 
@@ -137,6 +138,11 @@ export default function App() {
             } 
           />
           <Route path="/personal" element={<Personal />} />
+          <Route path="/personal-datos" element={
+            <Suspense fallback={<LogoLoader fullScreen text="Cargando Personal Datos..." size="md" />}>
+              <PersonalDatos />
+            </Suspense>
+          } />
           <Route path="/personal/nuevo-asistido" element={<NuevoPersonalAsistido />} />
           <Route path="/personal/busqueda-visual" element={<BusquedaPersonal />} />
           <Route path="/personal/trasladar/:id" element={<NuevoTrasladoPersonal />} />

@@ -193,6 +193,7 @@ export default function AppLayout() {
 
   const rrhhItems = [
     { name: 'Personal', path: '/personal', icon: HardHat },
+    ...(isAdmin || isLogistica ? [{ name: 'Personal Datos', path: '/personal-datos', icon: FileText }] : []),
     { name: 'Entrevistas & CVs', path: '/entrevistas', icon: UserCheck },
     { name: 'Movimiento de Personal', path: '/pedidos-personal', icon: FileText },
     { name: 'Formularios', path: '/formularios', icon: Send },
@@ -335,7 +336,7 @@ export default function AppLayout() {
               <div className="mt-1 ml-3 pl-3 border-l-2 border-slate-200/80 space-y-1 py-1">
                 {rrhhItems.map((sub) => {
                   const SubIcon = sub.icon;
-                  const isSubActive = location.pathname === sub.path || location.pathname.startsWith(sub.path);
+                  const isSubActive = location.pathname === sub.path || location.pathname.startsWith(`${sub.path}/`);
                   return (
                     <Link
                       key={sub.path}
@@ -555,6 +556,14 @@ export default function AppLayout() {
 
             {/* Listado de links */}
             <div className="grid grid-cols-2 gap-4 py-2">
+              {(isAdmin || isLogistica) && <Link
+                to="/personal-datos"
+                onClick={() => setShowMas(false)}
+                className="flex flex-col items-center justify-center p-4 bg-blue-950/40 border border-blue-800/80 rounded-2xl text-center gap-2"
+              >
+                <FileText size={24} className="text-sky-400" />
+                <span className="text-[11px] font-black uppercase tracking-tight text-sky-200">Personal Datos</span>
+              </Link>}
               <Link 
                 to="/centro-operaciones" 
                 onClick={() => setShowMas(false)}
