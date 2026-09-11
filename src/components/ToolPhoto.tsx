@@ -36,7 +36,7 @@ export default function ToolPhoto({ id, name, className, fallback }: {
     async function loadPhoto() {
       try {
         const { data, error } = await supabase.from('herramientas')
-          .select('photo_url').eq('id', id).single().abortSignal(controller.signal);
+          .select('photo_url').eq('id', id).abortSignal(controller.signal).single();
         if (!controller.signal.aborted && !error) setPhoto(data?.photo_url || null);
       } catch {
         // El listado sigue disponible aunque una foto no pueda descargarse.

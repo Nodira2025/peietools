@@ -14,7 +14,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { compressImage } from '../lib/imageUtils';
 import { analyzeToolImage } from '../lib/openrouter';
 import VoiceInputButton from '../components/VoiceInputButton';
-import { useCategories } from '../lib/useCategories';
+import { notifyCatalogChanged, useCategories } from '../lib/useCategories';
+import ToolCategoryFields from '../components/ToolCategoryFields';
+import { canonicalCategory, classifyTool, serializeClassification } from '../lib/toolTaxonomy';
 
 interface Obra {
   id: string;
@@ -25,7 +27,7 @@ export default function NuevaHerramienta() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { profile } = useAuthStore();
-  const { categories: dynamicCategories } = useCategories();
+  const { categories: dynamicCategories, catalog } = useCategories();
 
   
   const DRAFT_KEY = 'draft_nueva_herramienta';
@@ -48,7 +50,7 @@ export default function NuevaHerramienta() {
   const [model, setModel] = useState(initialDraft?.model || '');
   const [description, setDescription] = useState(initialDraft?.description || '');
   const [currentObraId, setCurrentObraId] = useState(initialDraft?.currentObraId || '');
-  const [category, setCategory] = useState(initialDraft?.category || 'Otros');
+  const [category, setCategory] = useState(initialDraft?.category || '');
   const [loading, setLoading] = useState(false);
   const [photoUrl, setPhotoUrl] = useState<string | null>(initialDraft?.photoUrl || null);
 
@@ -156,7 +158,7 @@ export default function NuevaHerramienta() {
 }
 Texto: "${aiText}"
 
-Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Prensas y Pinzas', 'Elementos de seguridad', 'Instrumentos de medición', 'Vehículos', 'Insumos y Consumibles', 'Rotuladora', 'Otros'. Si no podés identificar una propiedad, dejala en blanco ("").`;
+Categorías válidas: ${dynamicCategories.join(', ')}. No deduzcas medidas a partir de códigos, potencias ni números de modelo. Si un dato no está explícito, dejalo en blanco ("").`;
 
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
@@ -193,21 +195,21 @@ Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Prensas y Pinzas',
         if (result.nombre_sugerido) setName(result.nombre_sugerido);
         if (result.marca) setBrand(result.marca);
         if (result.modelo) setModel(result.modelo);
-        if (result.categoria) {
-          const validCats = ['Escaleras', 'Amoladoras', 'Taladros', 'Prensas y Pinzas', 'Elementos de seguridad', 'Instrumentos de medición', 'Vehículos', 'Insumos y Consumibles', 'Otros'];
-          const matched = validCats.find(c => c.toLowerCase() === result.categoria.toLowerCase());
-          if (matched) setCategory(matched);
-          else setCategory('Otros');
-        }
+        const suggested = classifyTool({
+          name: result.nombre_sugerido || name,
+          model: result.modelo || model,
+          category: dynamicCategories.includes(canonicalCategory(result.categoria || '')) ? result.categoria : '',
+        });
+        setCategory(serializeClassification(suggested));
         if (result.descripcion_breve) setDescription(result.descripcion_breve);
 
         // Generar código sugerido si está vacío (ej: TAL-123)
         if (!code) {
-          const prefix = result.categoria === 'Taladros' ? 'TAL'
-            : result.categoria === 'Amoladoras' ? 'AMO'
-            : result.categoria === 'Escaleras' ? 'ESC'
-            : result.categoria === 'Instrumentos de medición' ? 'MED'
-            : result.categoria === 'Insumos y Consumibles' ? 'INS'
+          const prefix = suggested.category === 'Taladro' ? 'TAL'
+            : suggested.category === 'Amoladora' ? 'AMO'
+            : suggested.category === 'Escalera' ? 'ESC'
+            : suggested.category === 'Medición y prueba' ? 'MED'
+            : suggested.category === 'Insumo y consumible' ? 'INS'
             : 'HER';
           setCode(`${prefix}-${Math.floor(100 + Math.random() * 900)}`);
         }
@@ -253,7 +255,7 @@ Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Prensas y Pinzas',
       model: model.trim() || null,
       description: description.trim() || null,
       status: 'Disponible',
-      category: category,
+      category: serializeClassification(classifyTool({ category, name, model })),
       current_obra_id: currentObraId,
       photo_url: photoUrl
     }]).select().single();
@@ -268,6 +270,7 @@ Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Prensas y Pinzas',
       });
     } else {
       sessionStorage.removeItem(DRAFT_KEY);
+      notifyCatalogChanged();
       toast({ title: '¡Herramienta Creada!', description: 'El producto se integró correctamente al inventario.' });
       navigate(`/herramientas/${data.id}`);
     }
@@ -421,21 +424,7 @@ Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Prensas y Pinzas',
                     </div>
                   </div>
 
-                  <div className="space-y-1">
-                    <Label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Categoría *</Label>
-                    <Select value={category} onValueChange={setCategory}>
-                      <SelectTrigger className="h-12 rounded-xl border-slate-200 font-semibold text-slate-800">
-                        <SelectValue placeholder="Categoría" />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-xl">
-                        {dynamicCategories.map(cat => (
-                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                        ))}
-                      </SelectContent>
-
-
-                    </Select>
-                  </div>
+                  <ToolCategoryFields id="new-tool" value={category} onChange={setCategory} catalog={catalog} tool={{ name, model }} />
 
                   <Button
                     onClick={() => setWizardStep('obra')}
@@ -594,7 +583,7 @@ Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Prensas y Pinzas',
                     </div>
                     <div>
                       <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Categoría</span>
-                      <p className="text-sm font-bold text-slate-700">{category}</p>
+                      <p className="text-sm font-bold text-slate-700">{serializeClassification(classifyTool({ category, name, model }))}</p>
                     </div>
                   </div>
 
@@ -815,27 +804,12 @@ Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Prensas y Pinzas',
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="category" className="text-xs font-semibold text-slate-700">Categoría *</Label>
-                <Select value={category} onValueChange={setCategory} required>
-                  <SelectTrigger className="h-11 rounded-xl text-slate-800">
-                    <SelectValue placeholder="Selecciona la categoría" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {dynamicCategories.map(cat => (
-                      <SelectItem key={cat} value={cat}>
-                        {cat}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-
-                </Select>
-              </div>
+              <div className="md:col-span-2"><ToolCategoryFields id="new-tool" value={category} onChange={setCategory} catalog={catalog} tool={{ name, model }} /></div>
 
               <div className="space-y-1.5">
                 <Label htmlFor="obra" className="text-xs font-semibold text-slate-700">Obra o Base Inicial *</Label>
                 <Select value={currentObraId} onValueChange={setCurrentObraId} required>
-                  <SelectTrigger className="h-11 rounded-xl text-slate-800">
+                  <SelectTrigger id="obra" className="h-11 rounded-xl text-slate-800">
                     <SelectValue placeholder="Selecciona dónde se ubica físicamente" />
                   </SelectTrigger>
                   <SelectContent>

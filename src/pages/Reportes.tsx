@@ -1,3 +1,4 @@
+import { classifyTool, serializeClassification } from '../lib/toolTaxonomy';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -273,7 +274,7 @@ export default function Reportes() {
 
   // Chart 1: Categorías de herramientas (Pie Chart)
   const categoryCounts = herramientas.reduce((acc: Record<string, number>, curr) => {
-    const cat = curr.category || 'Otros';
+    const cat = classifyTool(curr).category;
     acc[cat] = (acc[cat] || 0) + 1;
     return acc;
   }, {});
@@ -307,7 +308,8 @@ export default function Reportes() {
       Nombre: h.name,
       Marca: h.brand || 'Genérica',
       Modelo: h.model || 'N/A',
-      Categoria: h.category || 'Otros',
+      Categoria: classifyTool(h).category,
+      Subcategoria: classifyTool(h).subcategory,
       Estado: h.status,
       Obra: h.obras?.name || 'Base Central'
     }));
@@ -338,13 +340,14 @@ export default function Reportes() {
   };
 
   const exportToCSV = () => {
-    const headers = ['Codigo', 'Nombre', 'Marca', 'Modelo', 'Categoria', 'Estado', 'Obra'];
+    const headers = ['Codigo', 'Nombre', 'Marca', 'Modelo', 'Categoria', 'Subcategoria', 'Estado', 'Obra'];
     const rows = herramientas.map(h => [
       h.code,
       h.name,
       h.brand || 'Genérica',
       h.model || 'N/A',
-      h.category || 'Otros',
+      classifyTool(h).category,
+      classifyTool(h).subcategory,
       h.status,
       h.obras?.name || 'Base Central'
     ]);
@@ -376,11 +379,12 @@ export default function Reportes() {
     doc.setTextColor(100);
     doc.text(`Generado: ${new Date().toLocaleString()}`, 14, 26);
     
-    const tableColumn = ["Código", "Nombre", "Categoría", "Estado", "Obra"];
+    const tableColumn = ["Código", "Nombre", "Categoría", "Subcategoría", "Estado", "Obra"];
     const tableRows = herramientas.map(h => [
       h.code,
       h.name,
-      h.category || 'Otros',
+      classifyTool(h).category,
+      classifyTool(h).subcategory,
       h.status,
       h.obras?.name || 'Base Central'
     ]);
@@ -879,7 +883,7 @@ export default function Reportes() {
                             {t.name}
                           </button>
                         </td>
-                        <td className="py-3 px-4 text-slate-600 font-medium">{t.category || 'Otros'}</td>
+                        <td className="py-3 px-4 text-slate-600 font-medium">{serializeClassification(classifyTool(t))}</td>
                         <td className="py-3 px-4">
                           <span className="bg-peie-blue/10 text-peie-blue font-black px-2.5 py-1 rounded-full border border-peie-blue/20">
                             🔄 {t.count} traslados

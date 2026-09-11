@@ -1,3 +1,4 @@
+import { classifyTool, matchesToolSearch } from '../../lib/toolTaxonomy';
 import { useState, useMemo, useEffect } from 'react';
 import type { OperationalWorksite, OperationalTool, GeoCoordinates } from '../../types/operations';
 import { calculateHaversineDistance, formatDistance } from '../../services/geo/haversine';
@@ -174,14 +175,13 @@ export default function NearestToolFinder({
 
       // 2. Query filter
       if (normQuery) {
-        const text = `${tool.name} ${tool.brand || ''} ${tool.model || ''} ${tool.code} ${tool.category || ''}`.toLowerCase();
-        if (!text.includes(normQuery)) {
+        if (!matchesToolSearch(tool, normQuery)) {
           return;
         }
       }
 
       // 3. Category filter
-      if (selectedCategory !== 'all' && tool.category !== selectedCategory) {
+      if (selectedCategory !== 'all' && classifyTool(tool).category !== selectedCategory) {
         return;
       }
 
@@ -232,7 +232,7 @@ export default function NearestToolFinder({
   const categoriesList = useMemo(() => {
     const set = new Set<string>();
     allTools.forEach((t) => {
-      if (t.category) set.add(t.category);
+      set.add(classifyTool(t).category);
     });
     return Array.from(set);
   }, [allTools]);

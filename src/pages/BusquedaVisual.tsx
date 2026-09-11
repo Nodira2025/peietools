@@ -1,3 +1,4 @@
+import { canonicalCategory, classifyTool, toolSearchText } from '../lib/toolTaxonomy';
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -325,14 +326,14 @@ export default function BusquedaVisual() {
     const brandNorm = (aiData.marca || '').toLowerCase().trim();
     const modelNorm = (aiData.modelo || '').toLowerCase().trim();
     const nameNorm = (aiData.nombre_sugerido || '').toLowerCase().trim();
-    const catNorm = (aiData.categoria || '').toLowerCase().trim();
+    const catNorm = aiData.categoria ? canonicalCategory(aiData.categoria).toLowerCase() : '';
 
     const scored = allTools.map(tool => {
       let score = 0;
       const tName = tool.name.toLowerCase();
       const tBrand = (tool.brand || '').toLowerCase();
       const tModel = (tool.model || '').toLowerCase();
-      const tCat = (tool.category || '').toLowerCase();
+      const tCat = classifyTool(tool).category.toLowerCase();
 
       if (brandNorm && tBrand && (tBrand.includes(brandNorm) || brandNorm.includes(tBrand))) score += 15;
       if (modelNorm && tModel) {
@@ -373,7 +374,7 @@ export default function BusquedaVisual() {
       const terms = [interpreted.tipo_herramienta.toLowerCase(), ...interpreted.terminos.map(t => t.toLowerCase())];
       const scored = allTools.map(tool => {
         let score = 0;
-        const allText = `${tool.name} ${tool.brand || ''} ${tool.model || ''} ${tool.category || ''}`.toLowerCase();
+        const allText = toolSearchText(tool);
         for (const term of terms) {
           for (const w of term.split(/\s+/)) {
             if (w.length > 2 && allText.includes(w)) score += 5;

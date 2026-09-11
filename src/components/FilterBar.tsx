@@ -26,6 +26,7 @@ export default function FilterBar({ filters, onFilterChange }: FilterBarProps) {
           {filter.type === 'date' ? (
             <input
               type="date"
+              aria-label={filter.label}
               value={filter.value}
               onChange={e => onFilterChange(filter.key, e.target.value)}
               className={`appearance-none text-xs font-semibold px-3 py-2 rounded-full border cursor-pointer transition-colors ${
@@ -37,6 +38,7 @@ export default function FilterBar({ filters, onFilterChange }: FilterBarProps) {
           ) : (
             <>
               <select
+                aria-label={filter.label}
                 value={filter.value}
                 onChange={e => onFilterChange(filter.key, e.target.value)}
                 className={`appearance-none text-xs font-semibold pl-3 pr-7 py-2 rounded-full border cursor-pointer transition-colors ${

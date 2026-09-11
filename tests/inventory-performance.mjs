@@ -6,6 +6,7 @@ import { createServer, preview } from 'vite';
 import { chromium } from 'playwright';
 
 const server = await createServer({
+  cacheDir: 'scratch/vite-inventory-test',
   server: { host: '127.0.0.1', port: 0 },
   plugins: [{ name: 'inventory-performance', configureServer(server) {
     server.middlewares.use('/__inventory-performance', async (_req, res, next) => {
@@ -62,12 +63,15 @@ try {
   await page.goto(`${base}__inventory-performance`);
   await page.getByText('40 unidades', { exact: true }).waitFor();
   assert.equal(photos.length, 0, 'Category view must not request tool photos');
-  await page.getByText('Amoladoras', { exact: true }).click();
+  await page.getByText('Amoladora', { exact: true }).click();
+  assert.equal(photos.length, 0, 'Subcategory view must not request tool photos');
+  const firstPhoto = page.waitForRequest(request => new URL(request.url()).searchParams.get('select') === 'photo_url');
+  await page.getByRole('button', { name: /Diámetro por confirmar.*Ver herramientas/ }).click();
   await page.getByRole('heading', { name: 'Amoladora de prueba 0', exact: true }).waitFor();
-  await page.waitForRequest(request => new URL(request.url()).searchParams.get('select') === 'photo_url');
+  await firstPhoto;
   assert.ok(photos.length < 40, 'Offscreen cards must not download their photos');
   // Search works while every visible photo is still waiting for the network.
-  await page.getByPlaceholder('Buscar por nombre, código o marca...').fill('Amoladora de prueba 39');
+  await page.getByPlaceholder('Buscar por nombre, medida, código o marca...').fill('Amoladora de prueba 39');
   await page.getByRole('heading', { name: 'Amoladora de prueba 39', exact: true }).waitFor();
   releasePhotos();
   await page.getByRole('img', { name: 'Amoladora de prueba 39', exact: true }).waitFor();

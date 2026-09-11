@@ -14,7 +14,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { useCategories } from '../lib/useCategories';
+import { notifyCatalogChanged, useCategories } from '../lib/useCategories';
+import ToolCategoryFields from '../components/ToolCategoryFields';
+import { classifyTool, serializeClassification } from '../lib/toolTaxonomy';
 import { ModalNuevaReserva } from '../components/ModalNuevaReserva';
 import {
   getToolPriceInfo,
@@ -56,7 +58,7 @@ export default function HerramientaDetail() {
   const location = useLocation();
   const { toast } = useToast();
   const { profile } = useAuthStore();
-  const { categories: dynamicCategories } = useCategories();
+  const { catalog } = useCategories();
   const [herramienta, setHerramienta] = useState<Herramienta | null>(null);
 
   const [loading, setLoading] = useState(true);
@@ -295,7 +297,7 @@ export default function HerramientaDetail() {
     setEditModel(herramienta.model || '');
     setEditDescription(herramienta.description || '');
     setEditNotes(herramienta.notes || '');
-    setEditCategory(herramienta.category || 'Otros');
+    setEditCategory(serializeClassification(classifyTool(herramienta)));
     setEditObraId(herramienta.current_obra_id || '');
     setEditStatus(herramienta.status || 'Disponible');
     setIsEditing(true);
@@ -314,7 +316,7 @@ export default function HerramientaDetail() {
       model: editModel.trim() || null,
       description: editDescription.trim() || null,
       notes: editNotes.trim() || null,
-      category: editCategory,
+      category: serializeClassification(classifyTool({ category: editCategory, name: editName, model: editModel })),
       current_obra_id: editObraId || null,
       status: editStatus,
     };
@@ -346,6 +348,7 @@ export default function HerramientaDetail() {
         obras: Array.isArray(data.obras) ? data.obras[0] : data.obras,
       };
       setHerramienta(updatedTool);
+      notifyCatalogChanged();
       refreshFinancials(updatedTool);
       try {
         localStorage.removeItem('peie_cache_herramientas');
@@ -565,6 +568,7 @@ export default function HerramientaDetail() {
             />
           </div>
           <CardHeader className="pb-4 pt-6">
+            {!isEditing && <p className="text-sm font-medium text-peie-blue mb-3">{serializeClassification(classifyTool(herramienta))}</p>}
             {isEditing ? (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -591,21 +595,8 @@ export default function HerramientaDetail() {
                     )}
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="editCategory" className="text-xs font-semibold text-slate-700">Categoría *</Label>
-                    <Select value={editCategory} onValueChange={setEditCategory}>
-                      <SelectTrigger id="editCategory" className="h-11 rounded-xl text-slate-800">
-                        <SelectValue placeholder="Categoría" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from(new Set([...dynamicCategories, editCategory].filter(Boolean))).map(cat => (
-                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                        ))}
-                      </SelectContent>
-
-                    </Select>
-                  </div>
+                <div className="space-y-4">
+                  <ToolCategoryFields id="edit-tool" value={editCategory} onChange={setEditCategory} catalog={catalog} tool={{ name: editName, model: editModel }} />
                   <div className="space-y-1.5">
                     <Label htmlFor="editStatus" className="text-xs font-semibold text-slate-700">Estado *</Label>
                     <Select value={editStatus} onValueChange={setEditStatus}>

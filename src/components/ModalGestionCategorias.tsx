@@ -1,336 +1,170 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Edit2, Plus, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { 
-  Plus, 
-  Trash2, 
-  Edit2, 
-  Check, 
-  Layers, 
-  Wrench, 
-  Disc, 
-  Hammer, 
-  Shield, 
-  Ruler, 
-  Zap, 
-  Package,
-  AlertCircle
-} from 'lucide-react';
+import { notifyCatalogChanged } from '../lib/useCategories';
+import { buildToolCatalog, canonicalCategory, canonicalSubcategory, classifyTool, normalizeToolText, parseCategoryPath, serializeClassification, STANDARD_CATALOG } from '../lib/toolTaxonomy';
+import type { CategoryImportRow, ImportTool } from '../lib/toolCategoryImport';
+import { applyCategoryImport, CategoryWriteError } from '../services/tools/toolCategoryWrites';
 
-interface Categoria {
-  id: string;
-  name: string;
-  description: string | null;
-  icon_name: string | null;
-  color: string | null;
-}
-
-interface ModalGestionCategoriasProps {
+interface RegisteredCategory { id: string; name: string }
+interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCategoriesUpdated: () => void;
+  herramientas: ImportTool[];
 }
-
-const AVAILABLE_ICONS = [
-  { name: 'Wrench', label: 'Llave', Icon: Wrench },
-  { name: 'Disc', label: 'Disco', Icon: Disc },
-  { name: 'Hammer', label: 'Martillo', Icon: Hammer },
-  { name: 'Shield', label: 'Escudo', Icon: Shield },
-  { name: 'Ruler', label: 'Regla', Icon: Ruler },
-  { name: 'Zap', label: 'Energía', Icon: Zap },
-  { name: 'Package', label: 'Paquete', Icon: Package },
-  { name: 'Layers', label: 'Capas', Icon: Layers }
-];
-
-export default function ModalGestionCategorias({ open, onOpenChange, onCategoriesUpdated }: ModalGestionCategoriasProps) {
+export default function ModalGestionCategorias({ open, onOpenChange, onCategoriesUpdated, herramientas }: Props) {
   const { toast } = useToast();
-  const [categorias, setCategorias] = useState<Categoria[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // Form states
-  const [isCreating, setIsCreating] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newDesc, setNewDesc] = useState('');
-  const [newIcon, setNewIcon] = useState('Wrench');
+  const [registered, setRegistered] = useState<RegisteredCategory[]>([]);
+  const [selected, setSelected] = useState('Escalera');
+  const [main, setMain] = useState('Escalera');
+  const [sub, setSub] = useState('');
+  const [editing, setEditing] = useState<RegisteredCategory | null>(null);
+  const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const catalog = useMemo(() => buildToolCatalog(herramientas, registered.map(row => row.name)), [herramientas, registered]);
 
-  // Edit states
-  const [editingCatId, setEditingCatId] = useState<string | null>(null);
-  const [editName, setEditName] = useState('');
-  const [editDesc, setEditDesc] = useState('');
-
-  const fetchCategorias = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('categorias_herramientas')
-        .select('*')
-        .order('name');
-      
-      if (error) {
-        // Fallback: Si la tabla no existe aún, extraer dinámicamente de las herramientas
-        const { data: herramientasData } = await supabase.from('herramientas').select('category');
-        const uniqueCats = Array.from(new Set((herramientasData || []).map((h: any) => h.category || 'Otros')));
-        setCategorias(uniqueCats.map((c, i) => ({
-          id: String(i),
-          name: c,
-          description: 'Categoría del inventario',
-          icon_name: 'Wrench',
-          color: '#3b82f6'
-        })));
-      } else {
-        setCategorias(data || []);
+      const rows: RegisteredCategory[] = [];
+      for (let offset = 0; ; offset += 500) {
+        const result = await supabase.from('categorias_herramientas').select('id, name').order('name').range(offset, offset+499);
+        if (result.error) throw result.error;
+        rows.push(...(result.data || []));
+        if ((result.data?.length || 0) < 500) break;
       }
-    } catch (err: any) {
-      console.error('Error al cargar categorías:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+      setRegistered(rows);
+      setLoadError('');
+    } catch { setLoadError('No se pudo cargar el catálogo editable. Reintentá antes de guardar cambios.'); }
+    finally { setLoading(false); }
+  }, []);
 
   useEffect(() => {
-    if (open) {
-      fetchCategorias();
-    }
-  }, [open]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronize the editable catalog with the remote registry when opened.
+    if (open) void load();
+  }, [open, load]);
 
-  const handleCreateCategory = async () => {
-    if (!newName.trim()) {
-      toast({ variant: 'destructive', title: 'Campo requerido', description: 'Ingresá el nombre de la nueva categoría.' });
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const { error } = await supabase
-        .from('categorias_herramientas')
-        .insert([{
-          name: newName.trim(),
-          description: newDesc.trim() || null,
-          icon_name: newIcon,
-          color: '#3b82f6'
-        }]);
-
-      if (error) throw error;
-
-      toast({ title: '¡Categoría Creada!', description: `La categoría "${newName.trim()}" ya está disponible.` });
-      setNewName('');
-      setNewDesc('');
-      setIsCreating(false);
-      await fetchCategorias();
-      onCategoriesUpdated();
-    } catch (err: any) {
-      toast({ variant: 'destructive', title: 'Error', description: err.message || 'No se pudo crear la categoría.' });
-    } finally {
-      setSaving(false);
-    }
+  const relatedTools = (row: RegisteredCategory) => {
+    const path = parseCategoryPath(row.name);
+    const before = classifyTool({ category: row.name });
+    return herramientas.filter(tool => {
+      const current = classifyTool(tool);
+      return current.category === before.category && (!path || current.subcategory === before.subcategory);
+    });
+  };
+  const isStandard = (name: string) => {
+    const path = parseCategoryPath(name);
+    if (!path) return Boolean(STANDARD_CATALOG[canonicalCategory(name)]);
+    return Boolean(STANDARD_CATALOG[path.category]?.includes(path.subcategory));
   };
 
-  const handleStartEdit = (cat: Categoria) => {
-    setEditingCatId(cat.id);
-    setEditName(cat.name);
-    setEditDesc(cat.description || '');
-  };
-
-  const handleSaveEdit = async (cat: Categoria) => {
-    if (!editName.trim()) return;
+  const save = async () => {
+    if (saving || loading || loadError) return;
+    const category = canonicalCategory(main);
+    const subcategory = sub.trim() ? canonicalSubcategory(category, sub) : '';
+    if (!main.trim() || main.includes('›') || sub.includes('›')) {
+      toast({ variant: 'destructive', title: 'Revisá el nombre', description: 'Ingresá los nombres de categoría y subcategoría en sus campos separados.' }); return;
+    }
+    const newName = subcategory ? serializeClassification({category, subcategory}) : category;
+    if (editing && Boolean(parseCategoryPath(editing.name)) !== Boolean(subcategory)) {
+      toast({ variant: 'destructive', title: 'Revisá la subcategoría', description: 'Conservá el nivel del elemento que estás editando.' }); return;
+    }
+    if (registered.some(row => row.id !== editing?.id && normalizeToolText(row.name) === normalizeToolText(newName)) ||
+      (!editing && (subcategory ? catalog.find(c=>c.name===category)?.subcategories.includes(subcategory) : catalog.some(c=>c.name===category)))) {
+      toast({ variant: 'destructive', title: 'Ya existe', description: 'Esa categoría o subcategoría ya está disponible.' }); return;
+    }
     setSaving(true);
+    let changedTools = 0;
     try {
-      const oldName = cat.name;
-      const updatedName = editName.trim();
-
-      // 1. Actualizar en la tabla de categorías
-      const { error: catErr } = await supabase
-        .from('categorias_herramientas')
-        .update({ name: updatedName, description: editDesc.trim() || null })
-        .eq('id', cat.id);
-
-      if (catErr) throw catErr;
-
-      // 2. Renombrar en cascada todas las herramientas con esa categoría
-      if (oldName !== updatedName) {
-        await supabase
-          .from('herramientas')
-          .update({ category: updatedName })
-          .eq('category', oldName);
+      if (editing) {
+        const before = classifyTool({ category: editing.name });
+        const path = parseCategoryPath(editing.name);
+        const changes: CategoryImportRow[] = relatedTools(editing).map((tool,index) => {
+          const current = classifyTool(tool);
+          const target = serializeClassification({ category, subcategory: path ? subcategory : current.subcategory });
+          return { row:index+1, code:tool.code, name:tool.name, toolId:tool.id, originalCategory:tool.category ?? null,
+            currentCategory:serializeClassification(current), newCategory:target, changed:target!==serializeClassification(current) };
+        });
+        const children = path ? [] : registered.filter(row => row.id!==editing.id && parseCategoryPath(row.name)?.category===before.category);
+        const updates = [{row:editing,name:newName}, ...children.map(row => ({row,name:serializeClassification({category,subcategory:parseCategoryPath(row.name)!.subcategory})}))];
+        if (updates.some(update=>registered.some(row=>!updates.some(u=>u.row.id===row.id)&&normalizeToolText(row.name)===normalizeToolText(update.name)))) throw new Error('El nombre coincide con otra entrada del catálogo.');
+        changedTools = await applyCategoryImport(changes);
+        for (const update of updates) {
+          const result = await supabase.from('categorias_herramientas').update({name:update.name}).eq('id',update.row.id).eq('name',update.row.name).select('id').single();
+          if (result.error) throw result.error;
+        }
+      } else {
+        const result = await supabase.from('categorias_herramientas').insert({name:newName,description:null}).select('id').single();
+        if (result.error) throw result.error;
       }
-
-      toast({ title: 'Categoría Actualizada', description: `Se renombró de "${oldName}" a "${updatedName}".` });
-      setEditingCatId(null);
-      await fetchCategorias();
-      onCategoriesUpdated();
-    } catch (err: any) {
-      toast({ variant: 'destructive', title: 'Error', description: err.message });
+      setSelected(category);
+      setCreating(false);
+      setEditing(null);
+      setSub('');
+      toast({ title: 'Catálogo actualizado', description: newName });
+    } catch (error) {
+      const completed = error instanceof CategoryWriteError ? error.completed : changedTools;
+      const message = error instanceof Error ? error.message : (error as {message?:string})?.message || 'No se pudo confirmar el cambio.';
+      toast({ variant: 'destructive', title: 'No se completó el cambio', description: (completed ? completed+' herramientas actualizadas. ' : '') + message });
     } finally {
+      notifyCatalogChanged();
+      await load();
+      onCategoriesUpdated();
       setSaving(false);
     }
   };
 
-  const handleDeleteCategory = async (cat: Categoria) => {
-    if (!confirm(`¿Eliminar la categoría "${cat.name}"? Las herramientas pasarán a categoría "Otros".`)) return;
-
-    try {
-      // 1. Reasignar herramientas a "Otros"
-      await supabase
-        .from('herramientas')
-        .update({ category: 'Otros' })
-        .eq('category', cat.name);
-
-      // 2. Eliminar la categoría
-      await supabase.from('categorias_herramientas').delete().eq('id', cat.id);
-
-      toast({ title: 'Categoría Eliminada', description: `La categoría "${cat.name}" fue eliminada.` });
-      await fetchCategorias();
-      onCategoriesUpdated();
-    } catch (err: any) {
-      toast({ variant: 'destructive', title: 'Error', description: err.message });
+  const remove = async (row: RegisteredCategory) => {
+    if (saving) return;
+    const classification = classifyTool({category:row.name});
+    const hasChildren = !parseCategoryPath(row.name) && registered.some(r=>parseCategoryPath(r.name)?.category===classification.category);
+    if (relatedTools(row).length || hasChildren) {
+      toast({ variant:'destructive',title:'Categoría en uso',description:'Reasigná sus herramientas y subcategorías antes de eliminarla.' }); return;
     }
+    if (!window.confirm('¿Eliminar "' + row.name + '" del catálogo?')) return;
+    setSaving(true);
+    try {
+      const result = await supabase.from('categorias_herramientas').delete().eq('id',row.id).eq('name',row.name).select('id').single();
+      if (result.error) throw result.error;
+      notifyCatalogChanged();
+      await load();
+      onCategoriesUpdated();
+      toast({title:'Entrada eliminada'});
+    } catch { toast({variant:'destructive',title:'No se pudo eliminar',description:'No se confirmó la eliminación. Actualizá el catálogo y reintentá.'}); }
+    finally { setSaving(false); }
   };
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto rounded-3xl p-6">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
-            <Layers className="h-5 w-5 text-peie-blue" />
-            Gestión de Categorías
-          </DialogTitle>
-          <p className="text-xs text-slate-500 font-medium">
-            Agrupación y clasificación de herramientas para el catálogo y reportes.
-          </p>
-        </DialogHeader>
-
-        <div className="space-y-4 py-2">
-          {/* Botón Nueva Categoría */}
-          {!isCreating && (
-            <Button
-              onClick={() => setIsCreating(true)}
-              className="w-full bg-peie-blue hover:bg-peie-blue/90 text-white font-bold h-11 rounded-2xl flex items-center justify-center gap-2 shadow-sm text-xs"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Crear Nueva Categoría</span>
-            </Button>
-          )}
-
-          {/* Formulario Crear Categoría */}
-          {isCreating && (
-            <div className="p-4 bg-blue-50/80 border border-blue-200 rounded-2xl space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold text-blue-900 uppercase">Nueva Categoría</h4>
-                <button onClick={() => setIsCreating(false)} className="text-xs text-slate-400 font-bold hover:text-slate-600">×</button>
-              </div>
-
-              <div>
-                <Label className="text-xs font-bold text-slate-700">Nombre de la Categoría *</Label>
-                <Input
-                  placeholder="Ej: Amoladoras, Roto-martillos..."
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  className="h-10 text-xs rounded-xl bg-white border-blue-200 mt-1 font-semibold"
-                />
-              </div>
-
-              <div>
-                <Label className="text-xs font-bold text-slate-700">Descripción (Opcional)</Label>
-                <Input
-                  placeholder="Ej: Herramientas de corte de metal y concreto..."
-                  value={newDesc}
-                  onChange={(e) => setNewDesc(e.target.value)}
-                  className="h-10 text-xs rounded-xl bg-white border-blue-200 mt-1"
-                />
-              </div>
-
-              <div className="flex gap-2 justify-end pt-1">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setIsCreating(false)}
-                  className="h-9 text-xs rounded-xl"
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={handleCreateCategory}
-                  disabled={saving || !newName.trim()}
-                  className="bg-peie-blue hover:bg-peie-blue/90 text-white font-bold h-9 rounded-xl text-xs"
-                >
-                  {saving ? 'Guardando...' : 'Guardar Categoría'}
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* Lista de Categorías Existentes */}
-          <div className="space-y-2 max-h-[45vh] overflow-y-auto pr-1">
-            {categorias.map((cat) => {
-              const isEditing = editingCatId === cat.id;
-
-              return (
-                <div 
-                  key={cat.id} 
-                  className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between gap-3 hover:border-slate-300 transition-all"
-                >
-                  {isEditing ? (
-                    <div className="flex-1 space-y-2">
-                      <Input
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        className="h-9 text-xs rounded-xl font-bold bg-white"
-                      />
-                      <Input
-                        value={editDesc}
-                        onChange={(e) => setEditDesc(e.target.value)}
-                        placeholder="Descripción opcional"
-                        className="h-8 text-xs rounded-xl bg-white"
-                      />
-                      <div className="flex gap-2 justify-end">
-                        <Button size="sm" variant="ghost" onClick={() => setEditingCatId(null)} className="h-7 text-xs">Cancelar</Button>
-                        <Button size="sm" onClick={() => handleSaveEdit(cat)} disabled={saving} className="bg-emerald-600 text-white h-7 text-xs font-bold">Guardar</Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shrink-0 font-bold">
-                          <Layers className="h-4 w-4" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-bold text-slate-800 text-sm truncate">{cat.name}</p>
-                          {cat.description && <p className="text-xs text-slate-400 truncate">{cat.description}</p>}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-1 shrink-0">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => handleStartEdit(cat)}
-                          className="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => handleDeleteCategory(cat)}
-                          className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
+  const startEdit = (row: RegisteredCategory) => {
+    const path = parseCategoryPath(row.name);
+    setEditing(row); setCreating(true); setMain(path?.category || canonicalCategory(row.name)); setSub(path?.subcategory || '');
+  };
+  const editableRows = registered.filter(row => classifyTool({category:row.name}).category === selected && !isStandard(row.name));
+  return <Dialog open={open} onOpenChange={value=>{if(!saving)onOpenChange(value);}}>
+    <DialogContent className="sm:max-w-2xl max-h-[88vh] overflow-y-auto rounded-2xl">
+      <DialogHeader><DialogTitle>Gestionar categorías y subcategorías</DialogTitle></DialogHeader>
+      <p className="text-sm text-slate-600">El catálogo estándar unifica los nombres. Podés agregar categorías y variantes para otras herramientas.</p>
+      {loadError && <p role="alert" className="text-sm text-red-700">{loadError}<Button variant="ghost" size="sm" onClick={()=>void load()}>Reintentar</Button></p>}
+      <div className="flex flex-wrap gap-3 items-end">
+        <div className="flex-1 min-w-40 space-y-1"><Label htmlFor="catalog-parent">Categoría principal</Label><select id="catalog-parent" className="w-full rounded-lg border p-2 bg-white text-sm" value={selected} onChange={e=>setSelected(e.target.value)}>{catalog.map(c=><option key={c.name}>{c.name}</option>)}</select></div>
+        <Button disabled={loading||saving||!!loadError} onClick={()=>{setCreating(true);setEditing(null);setMain(selected);setSub('');}}><Plus className="h-4 w-4 mr-1" />Agregar</Button>
+      </div>
+      {creating && <div className="rounded-xl border bg-slate-50 p-4 space-y-3">
+        <div><Label htmlFor="catalog-name">Categoría principal *</Label><Input id="catalog-name" list="catalog-names" value={main} onChange={e=>setMain(e.target.value)} placeholder="Ej.: Escalera" /><datalist id="catalog-names">{catalog.map(c=><option key={c.name} value={c.name} />)}</datalist></div>
+        <div><Label htmlFor="catalog-sub">Subcategoría</Label><Input id="catalog-sub" value={sub} onChange={e=>setSub(e.target.value)} placeholder="Ej.: 14 peldaños" /><p className="text-xs text-slate-500 mt-1">Dejá este campo vacío para crear solamente la categoría principal.</p></div>
+        <div className="flex justify-end gap-2"><Button variant="ghost" disabled={saving} onClick={()=>setCreating(false)}>Cancelar</Button><Button disabled={saving||!main.trim()} onClick={()=>void save()}>{saving?'Guardando…':'Guardar'}</Button></div>
+      </div>}
+      <div className="space-y-2">
+        {catalog.find(c=>c.name===selected)?.subcategories.map(subcategory=><div key={subcategory} className="flex justify-between gap-3 rounded-lg border p-3 text-sm"><span>{subcategory}</span><span className="text-slate-500 shrink-0">{herramientas.filter(t=>{const c=classifyTool(t);return c.category===selected&&c.subcategory===subcategory;}).length} unidades</span></div>)}
+      </div>
+      {!!editableRows.length && <div className="space-y-2"><p className="font-semibold text-sm">Entradas personalizadas</p>{editableRows.map(row=><div key={row.id} className="flex items-center gap-2 rounded-lg border p-3"><span className="text-sm flex-1 break-words">{row.name}</span><Button variant="ghost" size="icon" aria-label={'Editar '+row.name} disabled={saving} onClick={()=>startEdit(row)}><Edit2 className="h-4 w-4" /></Button><Button variant="ghost" size="icon" aria-label={'Eliminar '+row.name} disabled={saving} onClick={()=>void remove(row)}><Trash2 className="h-4 w-4" /></Button></div>)}</div>}
+    </DialogContent>
+  </Dialog>;
 }

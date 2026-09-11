@@ -34,6 +34,7 @@ import { WhatsAppPreviewModal } from '../components/WhatsAppPreviewModal';
 import { speak, stopSpeaking, setVoiceEnabled, isSpeechSupported } from '../lib/voiceGuide';
 import VoiceInputButton from '../components/VoiceInputButton';
 import { useCategories } from '../lib/useCategories';
+import { classifyTool, matchesToolSearch, serializeClassification } from '../lib/toolTaxonomy';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -49,6 +50,7 @@ interface Herramienta {
   name: string;
   category?: string | null;
   brand?: string | null;
+  model?: string | null;
   current_obra_id: string | null;
   status: string;
   obras?: { name: string } | null;
@@ -154,7 +156,7 @@ export default function NuevaSolicitud() {
       setDataReady(false);
 
       // Cargar caché local en 0ms
-      const cached = localStorage.getItem('peie_cache_herramientas');
+      const cached = localStorage.getItem('peie_cache_herramientas_solicitables');
       if (cached) {
         try {
           const parsed = JSON.parse(cached);
@@ -170,7 +172,7 @@ export default function NuevaSolicitud() {
       const [toolsResult, activeRequestsResult] = await Promise.all([
         supabase
           .from('herramientas')
-          .select('id, name, code, category, brand, current_obra_id, status, obras(name)')
+          .select('id, name, code, category, brand, model, current_obra_id, status, obras(name)')
 
           .in('status', REQUESTABLE_TOOL_STATUSES)
           .order('name'),
@@ -194,7 +196,7 @@ export default function NuevaSolicitud() {
 
         setHerramientas(requestableTools);
         try {
-          localStorage.setItem('peie_cache_herramientas', JSON.stringify(requestableTools));
+          localStorage.setItem('peie_cache_herramientas_solicitables', JSON.stringify(requestableTools));
         } catch (storageError) {
           console.warn('QuotaExceededError ignorado en NuevaSolicitud', storageError);
         }
@@ -375,7 +377,7 @@ export default function NuevaSolicitud() {
 
   // ─── Actions & Submissions ───────────────────────────────────────────────
 
-  const { categories: dynamicCategories } = useCategories();
+  const { catalog } = useCategories(herramientas);
 
   const normalizeString = (str: string): string => {
     return str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -384,35 +386,19 @@ export default function NuevaSolicitud() {
   const currentToolQuery = (requestedToolName || toolSearch || '').trim();
   const queryNorm = normalizeString(currentToolQuery);
 
-  const matchedCategories = queryNorm.length >= 1 ? dynamicCategories.filter(cat => {
-    return normalizeString(cat).includes(queryNorm);
-  }).map(cat => {
-    const catNorm = normalizeString(cat);
-    const totalInCat = herramientas.filter(h => normalizeString(h.category || '').includes(catNorm)).length;
-    const availableInCat = herramientas.filter(h => normalizeString(h.category || '').includes(catNorm) && h.status === 'Disponible').length;
-    return {
-      name: cat,
-      total: totalInCat,
-      available: availableInCat
-    };
-  }) : [];
-
-  const matchedTools = queryNorm.length >= 1 ? herramientas.filter(t => {
-    const nameNorm = normalizeString(t.name);
-    const codeNorm = normalizeString(t.code);
-    const catNorm = normalizeString(t.category || '');
-    const brandNorm = normalizeString(t.brand || '');
-    return nameNorm.includes(queryNorm) || codeNorm.includes(queryNorm) || catNorm.includes(queryNorm) || brandNorm.includes(queryNorm);
+  const matchedCategories = queryNorm.length >= 1 ? catalog.flatMap(category => [
+    { name: category.name, category: category.name, subcategory: '' },
+    ...category.subcategories.map(subcategory => ({ name: category.name + ' › ' + subcategory, category: category.name, subcategory })),
+  ]).filter(item => matchesToolSearch({ name: item.name, category: item.subcategory ? item.name : item.category }, currentToolQuery)).map(item => {
+    const matching = herramientas.filter(tool => {
+      const classification = classifyTool(tool);
+      return classification.category === item.category && (!item.subcategory || classification.subcategory === item.subcategory);
+    });
+    return { name: item.name, total: matching.length, available: matching.filter(tool => tool.status === 'Disponible').length };
   }).slice(0, 10) : [];
 
-  const filteredHerramientas = herramientas.filter(t => {
-    const searchNorm = normalizeString(toolSearch);
-    if (!searchNorm) return true;
-    const nameNorm = normalizeString(t.name);
-    const codeNorm = normalizeString(t.code);
-    return nameNorm.includes(searchNorm) || codeNorm.includes(searchNorm);
-  });
-
+  const matchedTools = queryNorm.length >= 1 ? herramientas.filter(tool => matchesToolSearch(tool, currentToolQuery)).slice(0, 10) : [];
+  const filteredHerramientas = herramientas.filter(tool => matchesToolSearch(tool, toolSearch));
 
   const filteredLogistica = personalLogistica.filter(p => {
     const searchNorm = normalizeString(logisticaSearch);
@@ -715,7 +701,7 @@ export default function NuevaSolicitud() {
                             >
                               <div>
                                 <p className="text-sm font-bold text-slate-800 group-hover:text-peie-blue">{t.name} <span className="text-xs text-slate-400 font-medium">[{t.code}]</span></p>
-                                <p className="text-xs text-slate-500">{t.category || 'Sin categoría'} • Obra: {t.obras?.name || 'Base'}</p>
+                                <p className="text-xs text-slate-500">{serializeClassification(classifyTool(t))} • Obra: {t.obras?.name || 'Base'}</p>
                               </div>
                               <span className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border ${
                                 t.status === 'Disponible' 
@@ -976,7 +962,7 @@ export default function NuevaSolicitud() {
                                   >
                                     <div>
                                       <p className="text-sm font-bold text-slate-800 group-hover:text-peie-blue">{t.name} <span className="text-xs text-slate-400 font-medium">[{t.code}]</span></p>
-                                      <p className="text-xs text-slate-500">{t.category || 'Sin categoría'} • Obra: {t.obras?.name || 'Base'}</p>
+                                      <p className="text-xs text-slate-500">{serializeClassification(classifyTool(t))} • Obra: {t.obras?.name || 'Base'}</p>
                                     </div>
                                     <span className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border ${
                                       t.status === 'Disponible' 

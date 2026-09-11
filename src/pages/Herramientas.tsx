@@ -1,43 +1,17 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Wrench, Plus, QrCode, Search, Layers, Disc, Hammer, Shield, Ruler, ChevronLeft, ChevronRight, Building2, LayoutGrid, List, Download, Truck, Camera, Package, FileSpreadsheet, Tag, type LucideIcon } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { useAuthStore } from '../store/auth';
+import { useToast } from '@/hooks/use-toast';
+import { useCategories } from '../lib/useCategories';
+import { canonicalCategory, classifyTool, compareCategories, compareSubcategories, matchesToolSearch, parseCategoryPath, type ToolClassification } from '../lib/toolTaxonomy';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useToast } from '@/hooks/use-toast';
-import { 
-  Wrench, 
-  Plus, 
-  QrCode, 
-  Search, 
-  Layers, 
-  Disc, 
-  Hammer, 
-  Shield, 
-  Ruler, 
-  Car, 
-  ChevronLeft, 
-  Building2,
-  LayoutGrid,
-  List,
-  Download,
-  Truck,
-  Camera,
-  Zap,
-  Package,
-  FileSpreadsheet,
-  Tag
-} from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuthStore } from '../store/auth';
-import { useCategories } from '../lib/useCategories';
-
 import FilterBar from '../components/FilterBar';
 import ToolPhoto from '../components/ToolPhoto';
-import * as XLSX from 'xlsx';
 import ModalGestionCategorias from '../components/ModalGestionCategorias';
 import ModalImportarCategoriasExcel from '../components/ModalImportarCategoriasExcel';
-
 
 interface Herramienta {
   id: string;
@@ -48,841 +22,272 @@ interface Herramienta {
   status: string;
   category: string | null;
   current_obra_id: string | null;
-  photo_url?: string | null;
   obras?: { name: string; encargado_name: string | null } | null;
+}
+type ClassifiedTool = Herramienta & { classification: ToolClassification };
+const icons: Record<string, LucideIcon> = {
+  Escalera: Layers, Andamio: Layers, Amoladora: Disc, Taladro: Hammer,
+  Rotomartillo: Hammer, Arnés: Shield, Resorte: Ruler, Rotuladora: Tag,
+  'Cajón de herramientas': Package, Vaselina: Package,
+};
+const quantity = (count: number) => count + (count === 1 ? ' unidad' : ' unidades');
+const availabilityLabel = (count: number) => count + (count === 1 ? ' disponible' : ' disponibles');
+const statusStyle = (status: string) => ({
+  Disponible: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+  'En uso': 'bg-orange-50 text-orange-800 border-orange-200',
+  Reservada: 'bg-amber-50 text-amber-800 border-amber-200',
+  'En traslado': 'bg-blue-50 text-blue-800 border-blue-200',
+  'En mantenimiento': 'bg-purple-50 text-purple-800 border-purple-200',
+}[status] || 'bg-rose-50 text-rose-800 border-rose-200');
+
+function cachedInventory(): Herramienta[] {
+  try {
+    const rows: unknown = JSON.parse(localStorage.getItem('peie_cache_herramientas') || '[]');
+    return Array.isArray(rows) && rows.every(row => row && typeof row.id === 'string' && typeof row.name === 'string' && typeof row.code === 'string') ? rows : [];
+  } catch { return []; }
 }
 
 export default function Herramientas() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [herramientas, setHerramientas] = useState<Herramienta[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(location.state?.category ?? null);
-  const [searchTerm, setSearchTerm] = useState(location.state?.searchTerm ?? '');
-  const [filterObra, setFilterObra] = useState(location.state?.filterObra ?? '');
-  const [filterStatus, setFilterStatus] = useState(location.state?.filterStatus ?? '');
-  const [filterEncargado, setFilterEncargado] = useState(location.state?.filterEncargado ?? '');
-  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'grouped'>(location.state?.viewMode ?? 'grid');
-
-  // Modales de Gestión de Categorías
+  const { profile } = useAuthStore();
+  const { toast } = useToast();
+  const [herramientas, setHerramientas] = useState<Herramienta[]>(cachedInventory);
+  const [loading, setLoading] = useState(herramientas.length === 0);
+  const [loadError, setLoadError] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(() => location.state?.category ? canonicalCategory(parseCategoryPath(location.state.category)?.category || location.state.category) : null);
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(location.state?.subcategory ?? null);
+  const [searchTerm, setSearchTerm] = useState<string>(location.state?.searchTerm ?? '');
+  const [filterObra, setFilterObra] = useState<string>(location.state?.filterObra ?? '');
+  const [filterStatus, setFilterStatus] = useState<string>(location.state?.filterStatus ?? '');
+  const [filterEncargado, setFilterEncargado] = useState<string>(location.state?.filterEncargado ?? '');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(location.state?.viewMode === 'list' ? 'list' : 'grid');
   const [isGestionCategoriasOpen, setIsGestionCategoriasOpen] = useState(false);
   const [isImportarExcelOpen, setIsImportarExcelOpen] = useState(false);
-
-
-  const { toast } = useToast();
-  const { profile } = useAuthStore();
+  const requestSequence = useRef(0);
   const isAdmin = profile?.role === 'admin' || profile?.role === 'logistica';
-  const canManageTools = profile?.role === 'admin' || profile?.role === 'logistica' || profile?.role === 'encargado' || profile?.role === 'solicitante' || profile?.role === 'coordinador';
+  const canManageTools = ['admin', 'logistica', 'encargado', 'solicitante', 'coordinador'].includes(profile?.role || '');
+  const { registeredNames } = useCategories(herramientas);
 
-  const fetchHerramientas = async () => {
+  const fetchHerramientas = useCallback(async () => {
+    const sequence = ++requestSequence.current;
     try {
-      // 1. Cargar datos del almacenamiento local en 0ms (Stale-While-Revalidate)
-      const cached = localStorage.getItem('peie_cache_herramientas');
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setHerramientas(parsed);
-            setLoading(false); // Carga instantánea si hay caché
-          }
-        } catch (e) {
-          console.error('Error al leer caché de herramientas', e);
-        }
-      } else {
-        setLoading(true);
+      const rows: Herramienta[] = [];
+      for (let offset = 0; ; offset += 500) {
+        const { data, error } = await supabase.from('herramientas')
+          .select('id, code, name, brand, model, status, category, current_obra_id, obras(name, encargado_name)')
+          .order('id').range(offset, offset + 499);
+        if (error) throw error;
+        rows.push(...(data || []).map(row => ({
+          ...row, obras: Array.isArray(row.obras) ? row.obras[0] || null : row.obras,
+        })));
+        if ((data?.length || 0) < 500) break;
       }
-
-      // 2. Revalidar con Supabase en segundo plano
-      const { data, error } = await supabase
-        .from('herramientas')
-        .select('id, code, name, brand, model, status, category, current_obra_id, obras(name, encargado_name)')
-        .order('name');
-      if (error) throw error;
-
-      const normalizedData = (data || []).map((h: any) => ({
-        ...h,
-        obras: Array.isArray(h.obras) ? h.obras[0] : h.obras
-      }));
-
-      setHerramientas(normalizedData);
-
-      // Guardar en caché de forma segura y comprimida (evitar guardar photo_url si es pesada)
-      try {
-        const lightweightCache = normalizedData.map((h: any) => ({
-          id: h.id,
-          code: h.code,
-          name: h.name,
-          brand: h.brand,
-          model: h.model,
-          status: h.status,
-          category: h.category,
-          current_obra_id: h.current_obra_id,
-          photo_url: h.photo_url && h.photo_url.length < 500 ? h.photo_url : null,
-          obras: h.obras
-        }));
-        localStorage.setItem('peie_cache_herramientas', JSON.stringify(lightweightCache));
-      } catch (storageError) {
-        console.warn('QuotaExceededError ignorado: no se pudo guardar en localStorage', storageError);
-      }
-    } catch (error: any) {
-      if (herramientas.length === 0) {
-        toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar las herramientas' });
-      }
-      console.error(error);
+      if (sequence !== requestSequence.current) return;
+      setHerramientas(rows);
+      setLoadError('');
+      try { localStorage.setItem('peie_cache_herramientas', JSON.stringify(rows)); } catch { /* Optional cache; no photos stored. */ }
+    } catch {
+      if (sequence === requestSequence.current) setLoadError('No se pudo actualizar el inventario. Los datos guardados pueden estar desactualizados.');
     } finally {
-      setLoading(false);
+      if (sequence === requestSequence.current) setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchHerramientas();
   }, []);
 
-  const { categories: dynamicCategoryNames } = useCategories();
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Revalidate the cached inventory against the remote source.
+    void fetchHerramientas();
+    const refresh = () => { void fetchHerramientas(); };
+    window.addEventListener('peie:catalog-changed', refresh);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- This is a request counter, not a DOM ref; invalidate its latest value on unmount.
+    return () => { requestSequence.current++; window.removeEventListener('peie:catalog-changed', refresh); };
+  }, [fetchHerramientas]);
 
-  const categoryMetaMap: Record<string, { icon: any; color: string; desc: string }> = {
-    'Rotuladora': { icon: Tag, color: 'from-orange-400 to-amber-600', desc: 'Rotuladoras e impresoras de etiquetas para identificar cables y equipos' },
-    'Escaleras': { icon: Layers, color: 'from-amber-400 to-orange-500', desc: 'Escaleras telescópicas, tijeras, andamios' },
-    'Amoladoras': { icon: Disc, color: 'from-sky-400 to-blue-600', desc: 'Amoladoras angulares, de banco, discos' },
-    'Taladros': { icon: Hammer, color: 'from-rose-400 to-red-600', desc: 'Rotopercutores, atornilladores, brocas' },
-    'Taladros / Rotomartillos': { icon: Hammer, color: 'from-rose-400 to-red-600', desc: 'Rotopercutores, atornilladores, brocas' },
-    'Prensas y Pinzas': { icon: Zap, color: 'from-indigo-500 to-purple-600', desc: 'Pinzas de indentar, alicates, prensas terminales y ponchadoras' },
-    'Elementos de seguridad': { icon: Shield, color: 'from-emerald-400 to-teal-600', desc: 'Cascos, arneses, antiparras, guantes' },
-    'Seguridad y Protección': { icon: Shield, color: 'from-emerald-400 to-teal-600', desc: 'Cascos, arneses, antiparras, guantes' },
-    'Instrumentos de medición': { icon: Ruler, color: 'from-purple-400 to-indigo-600', desc: 'Multímetros, pinzas, niveles, cintas' },
-    'Medición y Prueba': { icon: Ruler, color: 'from-purple-400 to-indigo-600', desc: 'Multímetros, pinzas, niveles, cintas' },
-    'Vehículos': { icon: Car, color: 'from-teal-400 to-cyan-600', desc: 'Camionetas, utilitarios, furgones' },
-    'Insumos y Consumibles': { icon: Package, color: 'from-amber-500 to-yellow-600', desc: 'Vaselina, lubricantes, cintas y productos consumibles' },
-    'Otros': { icon: Wrench, color: 'from-slate-400 to-slate-600', desc: 'Herramientas menores y accesorios varios' },
-  };
+  const navigationState = useMemo(() => ({
+    from: '/herramientas', category: selectedCategory, subcategory: selectedSubcategory,
+    searchTerm, filterObra, filterStatus, filterEncargado, viewMode,
+  }), [selectedCategory, selectedSubcategory, searchTerm, filterObra, filterStatus, filterEncargado, viewMode]);
 
-  const categoryColors = [
-    'from-sky-400 to-blue-600',
-    'from-amber-400 to-orange-500',
-    'from-rose-400 to-red-600',
-    'from-indigo-500 to-purple-600',
-    'from-emerald-400 to-teal-600',
-    'from-purple-400 to-indigo-600',
-    'from-teal-400 to-cyan-600',
-    'from-amber-500 to-yellow-600',
-    'from-slate-400 to-slate-600',
-  ];
+  // Save the current level before opening a tool so both app-back and browser-back
+  // restore the category, subcategory and filters (also after a reload).
+  useEffect(() => {
+    if (JSON.stringify(location.state) !== JSON.stringify(navigationState)) {
+      navigate(location.pathname + location.search, { replace: true, state: navigationState });
+    }
+  }, [navigationState, navigate, location.pathname, location.search, location.state]);
 
-  const categoriesList = useMemo(() => {
-    const allCatNames = Array.from(new Set([
-      ...dynamicCategoryNames,
-      ...herramientas.map(h => h.category).filter((c): c is string => !!c)
-    ])).sort((a, b) => a.localeCompare(b));
+  const classified = useMemo<ClassifiedTool[]>(() => herramientas.map(tool => ({
+    ...tool, classification: classifyTool(tool),
+  })), [herramientas]);
+  const scoped = useMemo(() => classified.filter(tool =>
+    (!filterObra || tool.obras?.name === filterObra) &&
+    (!filterStatus || tool.status === filterStatus) &&
+    (!filterEncargado || tool.obras?.encargado_name === filterEncargado)
+  ), [classified, filterObra, filterStatus, filterEncargado]);
+  const filtered = useMemo(() => scoped.filter(tool =>
+    (!selectedCategory || tool.classification.category === selectedCategory) &&
+    (!selectedSubcategory || tool.classification.subcategory === selectedSubcategory) &&
+    matchesToolSearch(tool, searchTerm)
+  ).sort((a,b) => a.name.localeCompare(b.name, 'es', { numeric: true }) || a.code.localeCompare(b.code, 'es', { numeric: true })), [scoped, selectedCategory, selectedSubcategory, searchTerm]);
 
-    return allCatNames.map((name, idx) => {
-      const meta = categoryMetaMap[name] || {
-        icon: Wrench,
-        color: categoryColors[idx % categoryColors.length],
-        desc: `Herramientas y equipos de ${name}`
-      };
-      return {
-        name,
-        icon: meta.icon,
-        color: meta.color,
-        desc: meta.desc
-      };
+  const categories = useMemo(() => {
+    const names = new Set(classified.map(tool => tool.classification.category));
+    names.add('Escalera');
+    names.add('Rotuladora');
+    registeredNames.forEach(name => {
+      const explicit = parseCategoryPath(name);
+      if (explicit) names.add(explicit.category);
+      else if (name === canonicalCategory(name)) names.add(name);
     });
-  }, [dynamicCategoryNames, herramientas]);
+    return [...names].sort(compareCategories).map(name => ({
+      name,
+      rows: scoped.filter(tool => tool.classification.category === name),
+      subcategories: [...new Set(classified.filter(tool => tool.classification.category === name).map(tool => tool.classification.subcategory))].sort(compareSubcategories),
+    }));
+  }, [classified, scoped, registeredNames]);
 
-
-  const getCategoryIcon = (category: string | null) => {
-    switch(category) {
-      case 'Escaleras': return <Layers className="h-5 w-5 text-amber-500" />;
-      case 'Amoladoras': return <Disc className="h-5 w-5 text-sky-500" />;
-      case 'Taladros': return <Hammer className="h-5 w-5 text-rose-500" />;
-      case 'Prensas y Pinzas': return <Zap className="h-5 w-5 text-indigo-500" />;
-      case 'Elementos de seguridad': return <Shield className="h-5 w-5 text-emerald-500" />;
-      case 'Instrumentos de medición': return <Ruler className="h-5 w-5 text-purple-500" />;
-      case 'Vehículos': return <Car className="h-5 w-5 text-teal-500" />;
-      case 'Insumos y Consumibles': return <Package className="h-5 w-5 text-amber-500" />;
-      default: return <Wrench className="h-5 w-5 text-slate-500" />;
-    }
-  };
-
-  const getStatusStyle = (status: string) => {
-    switch(status) {
-      case 'Disponible': return {
-        badge: 'bg-green-100 text-green-800 border-green-200',
-        border: 'border-l-green-500 border-l-4 md:border-green-100 md:hover:border-green-500',
-        dot: 'bg-green-500'
-      };
-      case 'Reservada': return {
-        badge: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-        border: 'border-l-yellow-500 border-l-4 md:border-yellow-100 md:hover:border-yellow-500',
-        dot: 'bg-yellow-500'
-      };
-      case 'En traslado': return {
-        badge: 'bg-blue-100 text-blue-800 border-blue-200',
-        border: 'border-l-blue-500 border-l-4 md:border-blue-100 md:hover:border-blue-500',
-        dot: 'bg-blue-500'
-      };
-      case 'En uso': return {
-        badge: 'bg-orange-100 text-orange-800 border-orange-200',
-        border: 'border-l-orange-500 border-l-4 md:border-orange-100 md:hover:border-orange-500',
-        dot: 'bg-orange-500'
-      };
-      case 'En mantenimiento': return {
-        badge: 'bg-purple-100 text-purple-800 border-purple-200',
-        border: 'border-l-purple-500 border-l-4 md:border-purple-100 md:hover:border-purple-500',
-        dot: 'bg-purple-500'
-      };
-      default: return {
-        badge: 'bg-red-100 text-red-800 border-red-200',
-        border: 'border-l-red-500 border-l-4 md:border-red-100 md:hover:border-red-500',
-        dot: 'bg-red-600'
-      };
-    }
-  };
-
-  const getEffectiveCategory = (h: Herramienta): string => {
-    // Si la herramienta tiene una categoría asignada en base de datos, SE RESPETA 100%
-    if (h.category && h.category.trim()) {
-      return h.category.trim();
-    }
-    // Fallback únicamente si el campo category en la DB viene nulo o vacío
-    const normName = (h.name || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    if (normName.includes('vaselina') || normName.includes('lubricante')) return 'Insumos y Consumibles';
-    if (normName.includes('pinza') || normName.includes('prensa') || normName.includes('crimpead')) return 'Prensas y Pinzas';
-    return 'Otros';
-  };
-
-  // Filtrado optimizado memoizado
-  const filtered = useMemo(() => {
-    const searchLower = searchTerm.trim().toLowerCase();
-    return herramientas.filter(h => {
-      const catName = getEffectiveCategory(h);
-      const matchCategory = !selectedCategory || catName === selectedCategory;
-      const matchSearch = !searchLower || 
-        h.name.toLowerCase().includes(searchLower) || 
-        h.code.toLowerCase().includes(searchLower) || 
-        (h.brand || '').toLowerCase().includes(searchLower);
-      const matchObra = !filterObra || h.obras?.name === filterObra;
-      const matchStatus = !filterStatus || h.status === filterStatus;
-      const matchEncargado = !filterEncargado || h.obras?.encargado_name === filterEncargado;
-      return matchCategory && matchSearch && matchObra && matchStatus && matchEncargado;
+  const subcategories = useMemo(() => {
+    const names = new Set(classified.filter(tool => tool.classification.category === selectedCategory).map(tool => tool.classification.subcategory));
+    registeredNames.forEach(name => {
+      const explicit = parseCategoryPath(name);
+      if (explicit?.category === selectedCategory) names.add(explicit.subcategory);
     });
-  }, [herramientas, selectedCategory, searchTerm, filterObra, filterStatus, filterEncargado]);
-
-  const obrasUnicas = useMemo(() => [...new Set(herramientas.map(h => h.obras?.name).filter((name): name is string => !!name))].sort(), [herramientas]);
-  const statusUnicos = useMemo(() => [...new Set(herramientas.map(h => h.status))].sort(), [herramientas]);
-  const encargadosUnicos = useMemo(() => [...new Set(herramientas.map(h => h.obras?.encargado_name).filter((name): name is string => !!name))].sort(), [herramientas]);
-
-
-  const exportToExcel = () => {
-    if (filtered.length === 0) {
-      toast({ variant: 'destructive', title: 'Sin datos', description: 'No hay herramientas filtradas para exportar.' });
-      return;
-    }
-
-    const data = filtered.map(h => ({
-      'Código': h.code,
-      'Nombre': h.name,
-      'Marca': h.brand || 'Genérica',
-      'Modelo': h.model || 'N/A',
-      'Categoría': h.category || 'Otros',
-      'Estado': h.status,
-      'Obra Actual': h.obras?.name || 'Base Central',
-      'Coordinador': h.obras?.encargado_name || 'Sin asignar'
+    if (selectedCategory === 'Escalera') names.add('2 peldaños');
+    return [...names].sort(compareSubcategories).map(name => ({
+      name, rows: scoped.filter(tool => tool.classification.category === selectedCategory && tool.classification.subcategory === name),
     }));
+  }, [classified, scoped, selectedCategory, registeredNames]);
 
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Herramientas");
-    XLSX.writeFile(workbook, `Inventario_Herramientas_${selectedCategory || 'General'}_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    toast({ title: 'Éxito', description: 'Inventario exportado a Excel correctamente.' });
+  const obras = useMemo(() => [...new Set(herramientas.flatMap(t => t.obras?.name ? [t.obras.name] : []))].sort(), [herramientas]);
+  const encargados = useMemo(() => [...new Set(herramientas.flatMap(t => t.obras?.encargado_name ? [t.obras.encargado_name] : []))].sort(), [herramientas]);
+  const statuses = useMemo(() => [...new Set(herramientas.map(t => t.status))].sort(), [herramientas]);
+  const showUnits = Boolean(selectedSubcategory || searchTerm.trim());
+  const stage = showUnits ? 3 : selectedCategory ? 2 : 1;
+  const goHome = () => { setSelectedCategory(null); setSelectedSubcategory(null); setSearchTerm(''); };
+  const goCategory = () => { setSelectedSubcategory(null); setSearchTerm(''); };
+  const clearFilters = () => { setSearchTerm(''); setFilterObra(''); setFilterStatus(''); setFilterEncargado(''); };
+  const openTool = (id: string) => navigate('/herramientas/' + id, { state: navigationState });
+  const exportToExcel = async (all = false) => {
+    const rows = all ? classified : filtered;
+    if (!rows.length) { toast({ title: 'Sin datos', description: 'No hay herramientas para exportar.' }); return; }
+    try {
+      const XLSX = await import('xlsx');
+      const sheet = XLSX.utils.json_to_sheet(rows.map(tool => ({
+        'Código': tool.code, 'Nombre': tool.name, 'Marca': tool.brand || '', 'Modelo': tool.model || '',
+        'Categoría principal': tool.classification.category, 'Subcategoría': tool.classification.subcategory,
+        'Estado': tool.status, 'Obra actual': tool.obras?.name || 'Sin ubicación asignada',
+        'Coordinador': tool.obras?.encargado_name || '',
+      })));
+      sheet['!cols'] = [12, 36, 18, 24, 25, 28, 20, 26, 26].map(wch => ({ wch }));
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, sheet, 'Herramientas');
+      XLSX.writeFile(workbook, 'Inventario_Herramientas_' + new Date().toISOString().slice(0,10) + '.xlsx');
+      toast({ title: 'Inventario exportado', description: quantity(rows.length) + ' con categoría y subcategoría.' });
+    } catch { toast({ variant: 'destructive', title: 'Error', description: 'No se pudo exportar el inventario.' }); }
   };
 
-  const exportAllToExcel = () => {
-    if (herramientas.length === 0) {
-      toast({ variant: 'destructive', title: 'Sin datos', description: 'No hay herramientas para exportar.' });
-      return;
-    }
-
-    const data = herramientas.map(h => ({
-      'Código': h.code,
-      'Nombre': h.name,
-      'Marca': h.brand || 'Genérica',
-      'Modelo': h.model || 'N/A',
-      'Categoría': h.category || 'Otros',
-      'Estado': h.status,
-      'Obra Actual': h.obras?.name || 'Base Central',
-      'Coordinador': h.obras?.encargado_name || 'Sin asignar'
-    }));
-
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Inventario Completo");
-    XLSX.writeFile(workbook, `Inventario_Herramientas_Completo_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    toast({ title: 'Éxito', description: 'Inventario completo exportado a Excel correctamente.' });
-  };
-
-  // Normalizador inteligente para agrupar herramientas por familias estandarizadas (ej: Pinza de identar + Pinza de indentar -> Pinza de Indentar)
-  const getStandardFamilyName = (name: string, category: string | null): string => {
-    const clean = name.trim();
-    const normalized = clean.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-
-    // 1. Pinzas de Indentar / Crimpeadoras / Terminales
-    if (normalized.includes('identar') || normalized.includes('indentar') || normalized.includes('crimpead') || normalized.includes('prensa terminal')) {
-      return 'Pinza de Indentar';
-    }
-
-    // 2. Tijeras de Aviación / Hojalatero
-    if (normalized.includes('tijera') && (normalized.includes('aviacion') || normalized.includes('hojalat'))) {
-      return 'Tijera de Aviación';
-    }
-
-    // 3. Tijeras Pelacables
-    if (normalized.includes('tijera') && normalized.includes('pelacable')) {
-      return 'Tijera Pelacables';
-    }
-
-    // 4. Escaleras
-    if (category === 'Escaleras' || normalized.includes('escalera')) {
-      if (normalized.includes('extensib')) return 'Escalera Extensible';
-      const matchPeldaños = normalized.match(/\b(\d{1,2})\s*(p|peld|peldaño|peldaños)?\b/);
-      if (matchPeldaños && matchPeldaños[1]) {
-        return `Escalera de ${matchPeldaños[1]} Peldaños`;
-      }
-      return 'Escalera de Obra';
-    }
-
-    // 5. Amoladoras
-    if (category === 'Amoladoras' || normalized.includes('amoladora')) {
-      if (normalized.includes('7') || normalized.includes('180') || normalized.includes('grande')) {
-        return 'Amoladora Angular 7" (180mm)';
-      }
-      if (normalized.includes('9') || normalized.includes('230')) {
-        return 'Amoladora Angular 9" (230mm)';
-      }
-      return 'Amoladora Angular 4 1/2" (115mm)';
-    }
-
-    // 6. Taladros / Rotomartillos
-    if (category === 'Taladros' || normalized.includes('taladro') || normalized.includes('roto')) {
-      if (normalized.includes('roto') || normalized.includes('sds')) {
-        return 'Rotomartillo SDS Plus';
-      }
-      return 'Taladro Percutor 13mm';
-    }
-
-    // 7. Andamios y Estructuras
-    if (normalized.includes('andamio') || normalized.includes('cuerpo')) {
-      if (normalized.includes('tablon')) return 'Tablón para Andamio';
-      if (normalized.includes('rueda') || normalized.includes('garrucha')) return 'Rueda para Andamio';
-      return 'Cuerpo de Andamio Tubular';
-    }
-
-    // 8. Pistolas de Calor y Térmicas
-    if (normalized.includes('pistola') && (normalized.includes('calor') || normalized.includes('termica'))) {
-      return 'Pistola de Calor';
-    }
-
-    // 9. Alargues / Extensiones Eléctricas
-    if (normalized.includes('alargue') || normalized.includes('extension') || normalized.includes('prolongador')) {
-      return 'Alargue / Extensión Eléctrica';
-    }
-
-    // 10. Soldadoras y Corte
-    if (normalized.includes('soldadora') || normalized.includes('inverter') || normalized.includes('mma')) {
-      return 'Soldadora Inverter';
-    }
-
-    // 11. Garrafas y Sopletes
-    if (normalized.includes('garrafa') || normalized.includes('soplete')) {
-      return 'Garrafa / Soplete de Obra';
-    }
-
-    // 12. Compresores e Hidrolavadoras
-    if (normalized.includes('compresor')) return 'Compresor de Aire';
-    if (normalized.includes('hidrolavadora')) return 'Hidrolavadora Industrial';
-
-    // 13. Capitalización estándar para nombres genéricos
-    return clean
-      .toLowerCase()
-      .replace(/(?:^|\s)\S/g, (a) => a.toUpperCase());
-  };
-
-
-  return (
-    <div className="space-y-6 pb-safe">
-      
-      {/* Cabecera Principal */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            {(selectedCategory || searchTerm.trim() !== '') && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => { setSelectedCategory(null); setSearchTerm(''); }}
-                className="p-1 h-8 w-8 rounded-full hover:bg-slate-100 text-peie-blue mr-1"
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </Button>
-            )}
-            <h1 className="text-2xl font-bold tracking-tight text-peie-blue">
-              {selectedCategory 
-                ? `${selectedCategory}` 
-                : (searchTerm.trim() !== '' ? 'Resultados de Búsqueda' : 'Categorías de Herramientas')}
-            </h1>
-          </div>
-          <p className="text-sm text-muted-foreground mt-1">
-            {selectedCategory 
-              ? `${filtered.length} herramientas en esta categoría` 
-              : (searchTerm.trim() !== '' 
-                  ? `Encontramos ${filtered.length} herramientas coincidentes` 
-                  : 'Selecciona una categoría o buscá para ver y gestionar sus herramientas')}
-          </p>
+  return <div className="space-y-5 pb-safe">
+    <div className="flex flex-col xl:flex-row justify-between gap-4">
+      <div>
+        <nav aria-label="Ruta de herramientas" className="flex flex-wrap items-center gap-2 text-sm mb-3">
+          <button type="button" onClick={goHome} className="text-peie-blue hover:underline py-1">Herramientas</button>
+          {selectedCategory && <><ChevronRight className="h-4 w-4 text-slate-400" /><button type="button" onClick={goCategory} className="text-peie-blue hover:underline py-1">{selectedCategory}</button></>}
+          {selectedSubcategory && <><ChevronRight className="h-4 w-4 text-slate-400" /><span aria-current="page" className="text-slate-600">{selectedSubcategory}</span></>}
+        </nav>
+        <div className="flex items-center gap-2">
+          {(selectedCategory || searchTerm) && <Button variant="ghost" size="icon" aria-label="Volver al nivel anterior" onClick={() => searchTerm ? setSearchTerm('') : selectedSubcategory ? goCategory() : goHome()}><ChevronLeft className="h-5 w-5" /></Button>}
+          <h1 className="text-2xl font-bold tracking-tight text-peie-blue">{searchTerm.trim() ? 'Resultados de búsqueda' : selectedSubcategory || selectedCategory || 'Herramientas'}</h1>
         </div>
-        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-          {!selectedCategory && searchTerm.trim() === '' && (
-            <Button 
-              variant="outline" 
-              onClick={exportAllToExcel}
-              className="flex-1 sm:flex-none h-11 rounded-xl border-slate-200 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 font-medium"
-            >
-              <Download className="mr-2 h-4 w-4" /> Exportar Excel
-            </Button>
-          )}
+        <p className="text-sm text-slate-500 mt-1">{showUnits ? quantity(filtered.length) : selectedCategory ? 'Elegí una subcategoría para ver sus herramientas.' : 'Elegí una categoría principal.'}</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="outline" aria-label="Buscar con cámara" onClick={() => navigate('/herramientas/busqueda-visual')}><Camera className="h-4 w-4 mr-2" /><span className="hidden sm:inline">Buscar con foto</span><span className="sm:hidden">Foto</span></Button>
+        <Button variant="outline" aria-label="Escanear QR" onClick={() => navigate('/herramientas/scanner')}><QrCode className="h-4 w-4 mr-2" />QR</Button>
+        {canManageTools && <Button className="bg-peie-blue" aria-label="Nueva herramienta" onClick={() => navigate('/herramientas/nueva')}><Plus className="h-4 w-4 mr-2" /><span className="hidden sm:inline">Nueva herramienta</span><span className="sm:hidden">Nueva</span></Button>}
+      </div>
+    </div>
 
-          <Button variant="outline" className="flex-1 sm:flex-none h-11 rounded-xl" onClick={() => navigate('/herramientas/busqueda-visual')}>
-            <Camera className="mr-2 h-4 w-4" /> Buscar con Foto
-          </Button>
-          {isAdmin && (
-            <>
-              <Button 
-                variant="outline" 
-                onClick={() => setIsImportarExcelOpen(true)}
-                className="flex-1 sm:flex-none h-11 rounded-xl border-emerald-200 text-emerald-700 hover:bg-emerald-50 font-bold"
-              >
-                <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-600" />
-                Categorías Excel
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => setIsGestionCategoriasOpen(true)}
-                className="flex-1 sm:flex-none h-11 rounded-xl border-blue-200 text-blue-700 hover:bg-blue-50 font-bold"
-              >
-                <Layers className="mr-2 h-4 w-4 text-blue-600" />
-                Gestionar Categorías
-              </Button>
-            </>
-          )}
-          {canManageTools && (
-            <Button className="bg-peie-blue hover:bg-peie-blue/90 flex-1 sm:flex-none h-11 rounded-xl font-bold" onClick={() => navigate('/herramientas/nueva')}>
-              <Plus className="mr-2 h-4 w-4" /> Nueva Herramienta
-            </Button>
-          )}
+    <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm flex-wrap" aria-label="Pasos de selección">
+      {['Categoría', 'Subcategoría', 'Herramientas'].map((label, i) => <span key={label} aria-current={stage === i+1 ? 'step' : undefined} className={'flex items-center gap-2 ' + (stage === i+1 ? 'font-semibold text-peie-blue' : 'text-slate-500')}>
+        <span className={'w-6 h-6 grid place-items-center rounded-full ' + (stage === i+1 ? 'bg-peie-blue text-white' : 'bg-slate-100')}>{i+1}</span>{label}
+        {i<2 && <ChevronRight className="h-3 w-3 text-slate-400 ml-1" />}
+      </span>)}
+    </div>
+
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2">
+        <div className="relative flex-1 min-w-[200px]"><Search className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" /><Input aria-label="Buscar herramientas" placeholder="Buscar por nombre, medida, código o marca..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="h-11 pl-10 rounded-xl" /></div>
+        <Button variant="outline" className="h-11" onClick={clearFilters}>Limpiar</Button>
+        <Button variant="outline" className="h-11" aria-label="Exportar Excel" onClick={() => void exportToExcel()}><Download className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">Excel</span></Button>
+      </div>
+      <FilterBar filters={[
+        { key: 'status', label: 'Estado', value: filterStatus, options: statuses.map(s => ({ value:s, label:s })) },
+        { key: 'obra', label: 'Obra actual', value: filterObra, options: obras.map(s => ({ value:s, label:s })) },
+        { key: 'encargado', label: 'Coordinador', value: filterEncargado, options: encargados.map(s => ({ value:s, label:s })) },
+      ]} onFilterChange={(key, value) => { if(key==='status') setFilterStatus(value); if(key==='obra') setFilterObra(value); if(key==='encargado') setFilterEncargado(value); }} />
+    </div>
+
+    {isAdmin && <details data-catalog-admin className="text-sm">
+      <summary className="cursor-pointer text-peie-blue font-medium py-2">Administrar catálogo</summary>
+      <div className="flex gap-2 flex-wrap mt-2">
+      <Button size="sm" variant="outline" onClick={() => setIsGestionCategoriasOpen(true)}><Layers className="h-4 w-4 mr-2" />Gestionar categorías</Button>
+      <Button size="sm" variant="outline" onClick={() => setIsImportarExcelOpen(true)}><FileSpreadsheet className="h-4 w-4 mr-2" />Importar categorías Excel</Button>
+      <Button size="sm" variant="ghost" onClick={() => void exportToExcel(true)}>Exportar inventario completo</Button>
+      </div>
+    </details>}
+
+    {loadError && <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{loadError}<Button size="sm" variant="ghost" onClick={() => void fetchHerramientas()}>Reintentar</Button></div>}
+    {loading ? <p className="py-12 text-center text-slate-500">Cargando inventario…</p> : !showUnits ? <>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {(selectedCategory ? subcategories : categories).map(group => {
+          const Icon = icons[selectedCategory || group.name] || Wrench;
+          const available = group.rows.filter(tool => tool.status === 'Disponible').length;
+          const categorySummary = 'subcategories' in group ? (group.subcategories as string[]).slice(0,3).join(' · ') : '';
+          return <button key={group.name} type="button" onClick={() => selectedCategory ? setSelectedSubcategory(group.name) : (setSelectedCategory(group.name), setSelectedSubcategory(null))} className="rounded-2xl border border-slate-200 bg-white p-5 text-left flex flex-col gap-4 hover:border-blue-400 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-peie-blue">
+            <span className="flex items-center justify-between gap-2"><span className="p-3 rounded-xl bg-blue-50 text-peie-blue"><Icon className="h-6 w-6" /></span><span className="text-xs rounded-full bg-slate-100 px-3 py-1 text-slate-600">{quantity(group.rows.length)}</span></span>
+            <span className="font-bold text-base text-slate-800">{group.name}</span>
+            {categorySummary && <span className="text-xs text-slate-500">{categorySummary}</span>}
+            <span className={'text-xs ' + (/confirmar|Por clasificar/.test(group.name) ? 'text-amber-700' : 'text-slate-500')}>{/confirmar|Por clasificar/.test(group.name) ? 'Datos pendientes de confirmar' : group.rows.length ? availabilityLabel(available) : 'Sin unidades con los filtros actuales'}</span>
+            <span className="flex justify-between items-center mt-auto text-sm font-medium text-peie-blue">{selectedCategory ? 'Ver herramientas' : 'Ver subcategorías'}<ChevronRight className="h-4 w-4" /></span>
+          </button>;
+        })}
+      </div>
+      {selectedCategory && !subcategories.length && <p className="text-center p-10 text-slate-500">Todavía no hay herramientas ni subcategorías registradas en esta categoría.</p>}
+    </> : <>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-slate-500" aria-live="polite">{quantity(filtered.length)} · {availabilityLabel(filtered.filter(t=>t.status==='Disponible').length)}</p>
+        <div className="flex gap-1">
+          <Button variant={viewMode==='grid'?'default':'outline'} size="sm" aria-label="Vista de tarjetas" aria-pressed={viewMode==='grid'} onClick={()=>setViewMode('grid')}><LayoutGrid className="h-4 w-4" /></Button>
+          <Button variant={viewMode==='list'?'default':'outline'} size="sm" aria-label="Vista de lista" aria-pressed={viewMode==='list'} onClick={()=>setViewMode('list')}><List className="h-4 w-4" /></Button>
         </div>
       </div>
-
-
-      {/* Buscador Global (Solo visible en la vista de categorías) */}
-      {!selectedCategory && !loading && searchTerm.trim() === '' && (
-        <div className="relative w-full max-w-md bg-white rounded-xl shadow-sm border border-slate-200/60 p-0.5 flex items-center">
-          <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input 
-              placeholder="Buscar herramienta en todo el inventario..." 
-              value={searchTerm} 
-              onChange={e => setSearchTerm(e.target.value)} 
-              className="pl-10 h-11 border-0 focus-visible:ring-0 shadow-none text-slate-800 rounded-xl" 
-            />
-          </div>
-        </div>
-      )}
-
-      {loading ? (
-        <div className="text-center py-16 text-muted-foreground">
-          <div className="w-8 h-8 border-4 border-peie-blue/20 border-t-peie-blue rounded-full animate-spin mx-auto mb-3" />
-          Cargando inventario...
-        </div>
-      ) : (!selectedCategory && searchTerm.trim() === '') ? (
-        /* VISTA DE CATEGORÍAS */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {categoriesList.map((cat) => {
-            const Icon = cat.icon;
-            const count = herramientas.filter(h => getEffectiveCategory(h) === cat.name).length;
-            return (
-              <Card 
-                key={cat.name} 
-                className="group relative cursor-pointer overflow-hidden hover:shadow-xl transition-all duration-300 rounded-2xl border-slate-100 hover:border-peie-blue/10 flex flex-col justify-between"
-                onClick={() => setSelectedCategory(cat.name)}
-              >
-                <div className={`h-1.5 bg-gradient-to-r ${cat.color} w-full`} />
-                <CardHeader className="pb-3 pt-5">
-                  <div className="flex justify-between items-start">
-                    <div className={`p-3 rounded-2xl bg-gradient-to-br ${cat.color} text-white shadow-md shadow-slate-100 group-hover:scale-110 transition-transform duration-300`}>
-                      <Icon className="h-6 w-6" />
-                    </div>
-                    <span className="text-xs font-bold bg-slate-100 text-slate-600 px-3 py-1 rounded-full border border-slate-200/50">
-                      {count} {count === 1 ? 'unidad' : 'unidades'}
-                    </span>
-                  </div>
-                  <CardTitle className="text-base font-bold text-slate-800 mt-4 group-hover:text-peie-blue transition-colors">
-                    {cat.name}
-                  </CardTitle>
-                  <CardDescription className="text-xs mt-1.5 line-clamp-2">
-                    {cat.desc}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pb-5 pt-0">
-                  <span className="inline-flex items-center text-xs font-bold text-peie-blue group-hover:underline">
-                    Ver herramientas <ChevronLeft className="h-3 w-3 rotate-180 ml-1" />
-                  </span>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      ) : (
-        /* VISTA DE HERRAMIENTAS DENTRO DE UNA CATEGORÍA */
-        <div className="space-y-4">
-          {/* Barra de Búsqueda y Botón Agrupar Destacado en Celulares */}
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-col sm:flex-row gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input 
-                  placeholder="Buscar por nombre, código o marca..." 
-                  value={searchTerm} 
-                  onChange={e => setSearchTerm(e.target.value)} 
-                  className="pl-10 h-11 rounded-xl border-slate-200" 
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Button 
-                  variant="outline"
-                  className="h-11 rounded-xl border-slate-200 text-slate-600 font-medium flex-1 sm:flex-initial text-xs"
-                  onClick={() => { setSearchTerm(''); setFilterObra(''); setFilterStatus(''); setFilterEncargado(''); }}
-                >
-                  Limpiar
-                </Button>
-                <Button 
-                  variant="outline"
-                  onClick={exportToExcel}
-                  className="h-11 rounded-xl border-slate-200 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 font-medium flex items-center gap-1.5 flex-1 sm:flex-initial text-xs"
-                >
-                  <Download className="h-4 w-4" /> Excel
-                </Button>
-              </div>
+      <div className={viewMode==='grid'?'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4':'flex flex-col gap-3'}>
+        {filtered.map(tool => {
+          const Icon = icons[tool.classification.category] || Wrench;
+          return <article key={tool.id} className={'rounded-2xl border border-slate-200 bg-white overflow-hidden ' + (viewMode==='list'?'sm:flex sm:items-center':'flex flex-col')}>
+            {viewMode==='grid' && <button type="button" aria-label={'Abrir ' + tool.name + ' ' + tool.code} onClick={()=>openTool(tool.id)} className="h-36 w-full bg-slate-50 overflow-hidden"><ToolPhoto id={tool.id} name={tool.name} className="w-full h-full object-cover" fallback={<Icon className="h-8 w-8 text-slate-400" />} /></button>}
+            <div className="p-4 flex-1 min-w-0 space-y-2">
+              <div className="flex flex-wrap gap-2 items-center justify-between"><span className="font-mono text-xs text-slate-500 break-all">{tool.code}</span><span className={'text-xs px-2 py-1 border rounded-full ' + statusStyle(tool.status)}>{tool.status}</span></div>
+              <button type="button" onClick={()=>openTool(tool.id)} className="text-left hover:text-peie-blue"><h2 className="text-base font-semibold">{tool.name}</h2></button>
+              <p className="text-xs font-medium text-peie-blue">{tool.classification.category} › {tool.classification.subcategory}</p>
+              <p className="text-xs text-slate-500">{tool.brand || 'Marca sin registrar'}{tool.model ? ' · ' + tool.model : ''}</p>
+              <p className="text-xs text-slate-500 flex gap-1 items-center"><Building2 className="h-3.5 w-3.5 shrink-0" />{tool.obras?.name || 'Sin ubicación asignada'}</p>
             </div>
-
-            {/* SECTOR DE MODO DE VISTA (BOTÓN AGRUPAR DESTACADO EN CELULARES) */}
-            <div className="flex items-center justify-between bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200/80 shadow-inner">
-              <button
-                type="button"
-                onClick={() => setViewMode('grouped')}
-                className={`flex-1 py-2.5 px-3 rounded-xl font-extrabold text-xs transition-all flex items-center justify-center gap-2 ${
-                  viewMode === 'grouped'
-                    ? 'bg-peie-blue text-white shadow-md scale-[1.01]'
-                    : 'bg-white text-peie-blue border border-slate-200/60 hover:bg-slate-50'
-                }`}
-              >
-                <Layers className="h-4.5 w-4.5" />
-                <span className="text-xs sm:text-sm font-black">📦 Vista Agrupada por Familias</span>
-                {viewMode === 'grouped' && (
-                  <span className="bg-white/20 text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider ml-1">
-                    Activo
-                  </span>
-                )}
-              </button>
-
-              <div className="flex items-center gap-1 pl-2">
-                <button
-                  type="button"
-                  onClick={() => setViewMode('grid')}
-                  className={`p-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
-                    viewMode === 'grid' ? 'bg-white text-peie-blue shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                  title="Vista Tarjetas Individuales"
-                >
-                  <LayoutGrid className="h-4 w-4" />
-                  <span className="hidden md:inline">Grilla</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setViewMode('list')}
-                  className={`p-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
-                    viewMode === 'list' ? 'bg-white text-peie-blue shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                  title="Vista Lista Tabla"
-                >
-                  <List className="h-4 w-4" />
-                  <span className="hidden md:inline">Lista</span>
-                </button>
-              </div>
+            <div className="p-3 border-t border-slate-100 flex gap-2 justify-between sm:shrink-0">
+              <Button size="sm" variant="ghost" onClick={()=>openTool(tool.id)}>Ver ficha</Button>
+              <Button size="sm" className="bg-peie-blue" onClick={()=>navigate('/solicitudes/nueva',{state:{herramientaId:tool.id}})}><Truck className="h-3.5 w-3.5 mr-1" />Pedir</Button>
             </div>
-          </div>
-
-
-          {/* Chips de Estado Rápidos */}
-          <div className="flex flex-wrap gap-1.5 py-1 items-center">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mr-1.5">Estado:</span>
-            {[
-              { label: 'Todas', value: '' },
-              { label: 'Disponible', value: 'Disponible', color: 'bg-green-50 text-green-700 border-green-200/50 hover:bg-green-100' },
-              { label: 'En uso', value: 'En uso', color: 'bg-orange-50 text-orange-700 border-orange-200/50 hover:bg-orange-100' },
-              { label: 'En traslado', value: 'En traslado', color: 'bg-blue-50 text-blue-700 border-blue-200/50 hover:bg-blue-100' },
-              { label: 'Reservada', value: 'Reservada', color: 'bg-yellow-50 text-yellow-700 border-yellow-200/50 hover:bg-yellow-100' },
-              { label: 'Mantenimiento', value: 'En mantenimiento', color: 'bg-red-50 text-red-700 border-red-200/50 hover:bg-red-100' }
-            ].map(chip => {
-              const isActive = filterStatus === chip.value;
-              return (
-                <button
-                  key={chip.label}
-                  onClick={() => setFilterStatus(chip.value)}
-                  className={`text-xs px-3 py-1.5 rounded-full border transition-all duration-150 font-medium ${
-                    isActive
-                      ? 'bg-peie-blue text-white border-peie-blue shadow-sm font-bold scale-105'
-                      : chip.color || 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                  }`}
-                >
-                  {chip.label}
-                </button>
-              );
-            })}
-          </div>
-
-          <FilterBar
-            filters={[
-              { key: 'status', label: 'Estado', value: filterStatus, options: statusUnicos.map(s => ({ value: s, label: s })) },
-              { key: 'obra', label: 'Obra actual', value: filterObra, options: obrasUnicas.map(o => ({ value: o, label: o })) },
-              { key: 'encargado', label: 'Coordinador', value: filterEncargado, options: encargadosUnicos.map(e => ({ value: e, label: e })) },
-            ]}
-            onFilterChange={(key, val) => {
-              if (key === 'status') setFilterStatus(val);
-              if (key === 'obra') setFilterObra(val);
-              if (key === 'encargado') setFilterEncargado(val);
-            }}
-          />
-
-          {/* Listado condicional según viewMode */}
-          {viewMode === 'grouped' ? (
-            <div className="space-y-4">
-              {/* Agrupación inteligente por nombre/modelo estandarizado */}
-              {Object.entries(
-                filtered.reduce((acc: Record<string, Herramienta[]>, h) => {
-                  const key = getStandardFamilyName(h.name, h.category);
-                  if (!acc[key]) acc[key] = [];
-                  acc[key].push(h);
-                  return acc;
-                }, {})
-              ).map(([modelName, groupItems]) => {
-                const availables = groupItems.filter(i => i.status === 'Disponible');
-                const inUse = groupItems.filter(i => i.status === 'En uso');
-                const inTransit = groupItems.filter(i => i.status === 'En traslado');
-                const mainCategory = groupItems[0]?.category;
-
-                return (
-                  <Card key={modelName} className="rounded-2xl border border-slate-200 p-4 space-y-3 bg-white shadow-sm hover:shadow-md transition-all">
-                    <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 pb-2 border-b border-slate-100">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 shrink-0">
-                          {getCategoryIcon(mainCategory)}
-                        </div>
-                        <div>
-                          <h3 className="text-base font-bold text-slate-800 leading-snug">{modelName}</h3>
-                          <p className="text-xs text-slate-400 font-semibold">
-                            Total: {groupItems.length} unidad{groupItems.length > 1 ? 'es' : ''} en la empresa
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs bg-green-50 text-green-700 px-2.5 py-1 rounded-full font-bold border border-green-200/60">
-                          🟢 {availables.length} Disponibles
-                        </span>
-                        {inUse.length > 0 && (
-                          <span className="text-xs bg-orange-50 text-orange-700 px-2.5 py-1 rounded-full font-bold border border-orange-200/60">
-                            🔴 {inUse.length} En uso
-                          </span>
-                        )}
-                        {inTransit.length > 0 && (
-                          <span className="text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full font-bold border border-blue-200/60">
-                            🚚 {inTransit.length} En viaje
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Desglose de unidades físicas */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 pt-1">
-                      {groupItems.map((unit) => {
-                        const styles = getStatusStyle(unit.status);
-                        return (
-                          <div
-                            key={unit.id}
-                            onClick={() => navigate('/herramientas/' + unit.id)}
-                            className={`p-3 rounded-xl border ${styles.border} bg-slate-50/60 hover:bg-white transition-all cursor-pointer flex items-center justify-between gap-2`}
-                          >
-                            <div className="min-w-0">
-                              <span className="text-[10px] font-mono bg-white text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 font-bold">
-                                {unit.code}
-                              </span>
-                              <p className="text-xs font-bold text-slate-700 truncate mt-1">
-                                {unit.obras?.name || 'Base Central'}
-                              </p>
-                            </div>
-                            <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${styles.badge}`}>
-                              {unit.status}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
-          ) : viewMode === 'grid' ? (
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6">
-              {filtered.map((h) => {
-                const styles = getStatusStyle(h.status);
-                return (
-                  <Card 
-                    key={h.id} 
-                    className={`group relative overflow-hidden transition-all duration-200 cursor-pointer flex flex-col justify-between hover:shadow-lg rounded-2xl border ${styles.border}`} 
-                    onClick={() => navigate('/herramientas/' + h.id, { state: { from: '/herramientas', category: selectedCategory, searchTerm, filterObra, filterStatus, filterEncargado, viewMode } })}
-                  >
-                    <div>
-                      {/* Imagen de cabecera */}
-                      <div className="relative h-36 w-full bg-slate-50 border-b border-slate-100 overflow-hidden">
-                        <ToolPhoto id={h.id} name={h.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" fallback={getCategoryIcon(h.category)} />
-                        {/* Estado flotante sobre la foto en móvil */}
-                        <span className={`absolute top-2.5 right-2.5 text-[9px] font-bold px-2 py-0.5 rounded-full border shadow-sm ${styles.badge}`}>
-                          {h.status}
-                        </span>
-                      </div>
-
-                      <div className="p-4 space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-[9px] font-mono bg-slate-100 text-slate-500 px-2 py-0.5 rounded border border-slate-200/50">
-                            {h.code}
-                          </span>
-                          <span className="text-[10px] text-slate-400 font-semibold">{h.brand || 'Genérica'}</span>
-                        </div>
-
-                        {/* Título más grande para Premium */}
-                        <h3 className="text-sm font-bold text-slate-800 line-clamp-2 leading-snug group-hover:text-peie-blue transition-colors">
-                          {h.name}
-                        </h3>
-                      </div>
-                    </div>
-
-                    {/* Footer de la tarjeta con indicadores visuales mínimos */}
-                    <div className="p-3 pt-2.5 border-t border-slate-50 mt-auto bg-slate-50/20 flex items-center justify-between gap-1.5">
-                      <div className="flex items-center gap-1 text-[11px] text-slate-500 font-semibold min-w-0">
-                        <Building2 className="h-3 w-3 text-slate-400 shrink-0" />
-                        <span className="truncate">{h.obras?.name || 'Base Central'}</span>
-                      </div>
-                      <Button
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate('/solicitudes/nueva', { state: { herramientaId: h.id } });
-                        }}
-                        className="bg-peie-blue hover:bg-peie-blue/90 text-white font-bold h-7 rounded-lg text-[10px] px-2.5 flex items-center gap-0.5 shrink-0 shadow-sm"
-                      >
-                        <Truck className="h-3 w-3" /> Pedir
-                      </Button>
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {filtered.map((h) => {
-                const styles = getStatusStyle(h.status);
-                return (
-                  <Card 
-                    key={h.id}
-                    onClick={() => navigate('/herramientas/' + h.id, { state: { from: '/herramientas', category: selectedCategory, searchTerm, filterObra, filterStatus, filterEncargado, viewMode } })}
-                    className={`group relative overflow-hidden transition-all duration-200 cursor-pointer p-4 border rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 hover:shadow-md ${styles.border}`}
-                  >
-                    <div className="flex items-center gap-4 min-w-0">
-                      <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 overflow-hidden">
-                        <ToolPhoto id={h.id} name={h.name} className="w-full h-full object-cover" fallback={getCategoryIcon(h.category)} />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-mono bg-slate-100 text-slate-500 px-2 py-0.5 rounded border border-slate-200/50">
-                            {h.code}
-                          </span>
-                          <span className="text-xs text-slate-400 font-semibold">{h.brand || 'Genérica'} {h.model ? `· ${h.model}` : ''}</span>
-                        </div>
-                        <h3 className="text-sm font-bold text-slate-800 mt-1 leading-snug group-hover:text-peie-blue transition-colors">
-                          {h.name}
-                        </h3>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap md:flex-nowrap items-center gap-4 md:gap-6 self-stretch md:self-auto justify-between md:justify-end">
-                      <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-                        <Building2 className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                        <span className="truncate">{h.obras?.name || 'Base Central'}</span>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border shadow-sm ${styles.badge}`}>
-                          {h.status}
-                        </span>
-                        <Button
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate('/solicitudes/nueva', { state: { herramientaId: h.id } });
-                          }}
-                          className="bg-peie-blue hover:bg-peie-blue/90 text-white font-bold h-8 rounded-lg text-xs px-3 flex items-center gap-1 shadow-sm"
-                        >
-                          <Truck className="h-3 w-3" /> Pedir
-                        </Button>
-                      </div>
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-
-
-
-            {filtered.length === 0 && (
-              <div className="col-span-full text-center py-16 bg-white rounded-2xl border border-dashed border-slate-200">
-                <Wrench className="mx-auto h-12 w-12 text-slate-300 mb-3" />
-                <h3 className="text-base font-bold text-slate-700">No encontramos herramientas</h3>
-                <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
-                  Prueba cambiando los filtros o realizando otra búsqueda dentro de la categoría {selectedCategory}.
-                </p>
-                <Button variant="outline" className="mt-4 rounded-xl" onClick={() => { setSearchTerm(''); setFilterObra(''); setFilterStatus(''); setFilterEncargado(''); }}>
-                  Restablecer
-                </Button>
-              </div>
-            )}
-          </div>
-        )}
-
-      {/* Modales de Gestión e Importación por Excel para Federico Grande y Administradores */}
-      <ModalGestionCategorias
-        open={isGestionCategoriasOpen}
-        onOpenChange={setIsGestionCategoriasOpen}
-        onCategoriesUpdated={fetchHerramientas}
-      />
-
-      <ModalImportarCategoriasExcel
-        open={isImportarExcelOpen}
-        onOpenChange={setIsImportarExcelOpen}
-        herramientas={herramientas}
-        onSuccess={fetchHerramientas}
-      />
-    </div>
-  );
+          </article>;
+        })}
+      </div>
+      {!filtered.length && <div className="text-center py-12 px-4 border border-dashed rounded-2xl bg-white">
+        <Wrench className="h-9 w-9 mx-auto mb-3 text-slate-300" />
+        <h2 className="font-semibold text-slate-700">No encontramos herramientas</h2>
+        <p className="text-sm text-slate-500 mt-2">{selectedSubcategory==='2 peldaños' ? 'No hay unidades registradas de 2 peldaños que coincidan con los filtros.' : 'Probá otra búsqueda o cambiá los filtros.'}</p>
+        <Button variant="outline" className="mt-4" onClick={clearFilters}>Restablecer filtros</Button>
+      </div>}
+    </>}
+    {isAdmin && isGestionCategoriasOpen && <ModalGestionCategorias open={isGestionCategoriasOpen} onOpenChange={setIsGestionCategoriasOpen} onCategoriesUpdated={fetchHerramientas} herramientas={herramientas} />}
+    {isAdmin && isImportarExcelOpen && <ModalImportarCategoriasExcel open={isImportarExcelOpen} onOpenChange={setIsImportarExcelOpen} herramientas={herramientas} onSuccess={fetchHerramientas} />}
+  </div>;
 }
-
-
-

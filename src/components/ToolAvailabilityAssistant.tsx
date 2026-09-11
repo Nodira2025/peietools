@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Building2, CalendarClock, CheckCircle2, MapPin, Phone, RefreshCw, Sparkles, Wrench } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { matchesToolSearch, toolSearchText } from '../lib/toolTaxonomy';
 import { Button } from '@/components/ui/button';
 
 
@@ -25,6 +26,9 @@ interface ToolRow {
   id: string;
   name: string;
   code: string;
+  category?: string | null;
+  brand?: string | null;
+  model?: string | null;
   status: string;
   current_obra_id: string | null;
   last_latitude?: number | null;
@@ -101,7 +105,7 @@ export function ToolAvailabilityAssistant({
     const [toolsResult, requestsResult, reservationsResult, profilesResult] = await Promise.all([
       supabase
         .from('herramientas')
-        .select('id, name, code, status, current_obra_id, last_latitude, last_longitude, obras!herramientas_current_obra_id_fkey(name, latitude, longitude, encargado_name)')
+        .select('id, name, code, category, brand, model, status, current_obra_id, last_latitude, last_longitude, obras!herramientas_current_obra_id_fkey(name, latitude, longitude, encargado_name)')
         .order('name'),
       supabase
         .from('solicitudes')
@@ -132,7 +136,7 @@ export function ToolAvailabilityAssistant({
     }
 
     const query = normalize(requestedToolName);
-    const queryTokens = query.split(/\s+/).filter(token => token.length >= 3);
+
     const activeToolIds = new Set((requestsResult.data || []).map(row => row.herramienta_id));
     const reservations = reservationsResult.data || [];
     const profiles = profilesResult.data || [];
@@ -140,10 +144,8 @@ export function ToolAvailabilityAssistant({
 
     const rows = ((toolsResult.data || []) as unknown as ToolRow[])
       .map(tool => {
-        const normalizedTool = normalize(`${tool.name} ${tool.code}`);
-        const matchScore = normalizedTool.includes(query)
-          ? 100
-          : queryTokens.reduce((score, token) => score + (normalizedTool.includes(token) ? 10 : 0), 0);
+        const normalizedTool = toolSearchText(tool);
+        const matchScore = query && matchesToolSearch(tool, requestedToolName) ? (normalizedTool.includes(query) ? 100 : 90) : 0;
         return { tool, matchScore };
       })
       .filter(({ matchScore }) => matchScore > 0)

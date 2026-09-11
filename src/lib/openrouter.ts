@@ -1,3 +1,5 @@
+import { STANDARD_CATALOG } from './toolTaxonomy';
+
 export interface AnalyzedTool {
   nombre_sugerido: string;
   marca: string;
@@ -42,7 +44,7 @@ export async function analyzeToolImage(base64Image: string): Promise<AnalyzedToo
   "descripcion_breve": "Descripción técnica muy corta de sus características principales"
 }
 
-Categorías válidas: 'Escaleras', 'Amoladoras', 'Taladros', 'Prensas y Pinzas', 'Elementos de seguridad', 'Instrumentos de medición', 'Vehículos', 'Insumos y Consumibles', 'Rotuladora', 'Otros'. Si no podés identificar una propiedad, dejala en blanco ("").`;
+Categorías válidas: ${Object.keys(STANDARD_CATALOG).join(', ')}. No deduzcas medidas a partir de códigos, potencias ni números de modelo. Si un dato no está explícito o no es legible, dejalo en blanco ("").`;
 
   console.log('[OpenRouter] Enviando petición a la API con el modelo google/gemini-2.5-flash...');
   

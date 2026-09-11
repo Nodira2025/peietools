@@ -5,6 +5,7 @@ import { createServer } from 'vite';
 import { chromium } from 'playwright';
 
 const server = await createServer({
+  cacheDir: 'scratch/vite-tool-edit-test',
   server: { host: '127.0.0.1', port: 0 },
   plugins: [{ name: 'tool-edit-fixture', configureServer(server) {
     server.middlewares.use('/__tool-edit', async (_req, res, next) => {
@@ -57,9 +58,11 @@ try {
     await page.goto(`${base}__tool-edit`);
     await page.getByRole('button', { name: 'Editar', exact: true }).click();
     await page.getByLabel('Marca', { exact: true }).fill('Bosch');
-    await page.getByLabel('Categoría', { exact: false }).click();
+    await page.getByLabel('Categoría principal *', { exact: true }).click();
     assert.equal(await page.getByRole('option', { name: 'Rotuladora', exact: true }).count(), 1);
-    await page.getByRole('option', { name: 'Rotomartillo demoledor', exact: true }).click();
+    await page.getByRole('option', { name: 'Rotomartillo', exact: true }).click();
+    await page.getByLabel('Subcategoría *', { exact: true }).click();
+    await page.getByRole('option', { name: 'Demoledor', exact: true }).click();
     await page.getByRole('button', { name: 'Guardar', exact: true }).click();
     if (mode === 'success') {
       await page.getByRole('button', { name: 'Editar', exact: true }).waitFor();
@@ -76,7 +79,7 @@ try {
     }
     assert.equal(writes.length, 1);
     assert.equal(writes[0].brand, 'Bosch');
-    assert.equal(writes[0].category, 'Rotomartillo demoledor');
+    assert.equal(writes[0].category, 'Rotomartillo › Demoledor');
     assert.deepEqual(errors, []);
     console.log(`PASS: tool editing ${mode}, Rotuladora available`);
     await page.close();
