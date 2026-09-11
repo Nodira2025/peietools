@@ -8,11 +8,13 @@ import { registerSW } from 'virtual:pwa-register'
 // Registrar auto-actualización del Service Worker
 registerSW({ immediate: true })
 
-createRoot(document.getElementById('root')!).render(
+const rootElement = document.getElementById('root')!
+// The bootstrap error screen must not replace nodes owned by React.
+rootElement.dataset.reactOwned = 'true'
+createRoot(rootElement).render(
   <StrictMode>
     <ErrorBoundary>
       <App />
     </ErrorBoundary>
   </StrictMode>,
 )
-
