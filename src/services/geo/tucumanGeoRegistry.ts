@@ -54,7 +54,8 @@ export const KNOWN_TUCUMAN_LOCATIONS: Record<string, GeoCoordinates> = {
   'CANTARES': { latitude: -26.77850, longitude: -65.23800 },
 
   // Este / Aeropuerto / Banda del Río Salí
-  'AEROPUERTO': { latitude: -26.82184, longitude: -65.18377 },
+  // ORSNA: Aeropuerto Internacional Teniente Benjamín Matienzo (TUC).
+  'AEROPUERTO': { latitude: -26.835503, longitude: -65.102254 },
   'SHELL OASIS': { latitude: -26.85018, longitude: -65.16777 },
   'OASIS': { latitude: -26.85018, longitude: -65.16777 },
   'CIRCUNVALACION': { latitude: -26.81200, longitude: -65.17800 },

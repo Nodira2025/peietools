@@ -51,12 +51,13 @@ SET address = 'Av. Presidente Perón 480, Yerba Buena',
     longitude = -65.27050
 WHERE name ILIKE '%#300%';
 
--- 8. AEROPUERTO (Av. Santiago Gallo 4117, SMT)
+-- 8. AEROPUERTO (Teniente Benjamín Matienzo, referencia oficial ORSNA)
+-- Fuente: https://qa2-back.argentina.gob.ar/sites/default/files/2023/05/iet-tuc_2013.pdf
 UPDATE public.obras
-SET address = 'Av. Santiago Gallo 4117, San Miguel de Tucumán',
-    latitude = -26.82184,
-    longitude = -65.18377
-WHERE name ILIKE '%AEROPUERTO%';
+SET address = 'Delfín Gallo s/n, Cevil Pozo, Tucumán',
+    latitude = -26.835503,
+    longitude = -65.102254
+WHERE name ILIKE 'AEROPUERTO';
 
 -- 9. OASIS (Ex Ruta 9 Km 1288, Banda del Río Salí)
 UPDATE public.obras
