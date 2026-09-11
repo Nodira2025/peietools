@@ -2,7 +2,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { Navigate, Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { supabase } from '../lib/supabase';
-import { Home, Wrench, FileText, Truck, Users, Building, LogOut, ShoppingCart, Sparkles, HardHat, ClipboardList, BarChart3, MoreHorizontal, Bell, Key, Eye, EyeOff, DollarSign, Calendar, CalendarRange, PhoneCall, Send, Award, ChevronDown, Compass, UserCheck } from 'lucide-react';
+import { Home, Wrench, FileText, Truck, Users, Building, LogOut, ShoppingCart, Sparkles, HardHat, ClipboardList, BarChart3, MoreHorizontal, Bell, Key, Eye, EyeOff, DollarSign, Calendar, CalendarRange, PhoneCall, Send, Award, ChevronDown, Compass } from 'lucide-react';
 
 
 
@@ -194,10 +194,9 @@ export default function AppLayout() {
   const rrhhItems = [
     { name: 'Personal', path: '/personal', icon: HardHat },
     ...(isAdmin || isLogistica ? [{ name: 'Personal Datos', path: '/personal-datos', icon: FileText }] : []),
-    { name: 'Entrevistas & CVs', path: '/entrevistas', icon: UserCheck },
     { name: 'Movimiento de Personal', path: '/pedidos-personal', icon: FileText },
-    { name: 'Formularios', path: '/formularios', icon: Send },
-    { name: 'Trabajadores', path: '/trabajadores', icon: Award },
+    { name: 'Formulario para el ingreso de horas', path: '/formularios', icon: FileText },
+    { name: 'Horas Trabajadas', path: '/trabajadores', icon: Award },
     { name: 'Liquidación de Sueldos', path: '/liquidacion-sueldos', icon: DollarSign },
   ];
 
@@ -601,15 +600,6 @@ export default function AppLayout() {
               </Link>
 
               <Link 
-                to="/entrevistas" 
-                onClick={() => setShowMas(false)}
-                className="flex flex-col items-center justify-center p-4 bg-purple-950/40 border border-purple-800/80 rounded-2xl hover:bg-purple-900/60 transition-all text-center gap-2"
-              >
-                <UserCheck size={24} className="text-purple-400" />
-                <span className="text-[11px] font-black uppercase tracking-tight text-purple-200">Entrevistas & CVs</span>
-              </Link>
-
-              <Link 
                 to="/logistica" 
                 onClick={() => setShowMas(false)}
                 className="flex flex-col items-center justify-center p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:bg-slate-900 transition-all text-center gap-2"
@@ -651,7 +641,7 @@ export default function AppLayout() {
                 className="flex flex-col items-center justify-center p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:bg-slate-900 transition-all text-center gap-2"
               >
                 <Send size={24} className="text-cyan-400" />
-                <span className="text-[11px] font-black uppercase tracking-tight">Formularios</span>
+                <span className="text-[11px] font-black uppercase tracking-tight text-[10px] leading-tight">Formulario para el ingreso de horas</span>
               </Link>
 
               <Link 
@@ -660,7 +650,7 @@ export default function AppLayout() {
                 className="flex flex-col items-center justify-center p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:bg-slate-900 transition-all text-center gap-2"
               >
                 <Award size={24} className="text-amber-400" />
-                <span className="text-[11px] font-black uppercase tracking-tight">Trabajadores</span>
+                <span className="text-[11px] font-black uppercase tracking-tight">Horas Trabajadas</span>
               </Link>
 
               <Link 
