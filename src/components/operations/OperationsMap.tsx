@@ -1,3 +1,4 @@
+import { createWorksiteBubble, createWorksiteSummary } from './worksiteBubble';
 import { useEffect, useRef } from 'react';
 import { Map as MapLibreMap, Marker, Popup, NavigationControl } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -99,91 +100,19 @@ export default function OperationsMap({
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
 
+    const popups: Popup[] = [];
     worksites.forEach((worksite) => {
       const isSelected = worksite.id === selectedWorksiteId;
-      const size = Math.max(34, Math.round((worksite.bubbleRadiusPx || 46) * 0.88));
-
-      // Outer Marker Wrapper
-      const el = document.createElement('div');
-      el.className = 'peie-operation-bubble-marker cursor-pointer select-none';
-      el.style.width = `${size}px`;
-      el.style.height = `${size}px`;
-
-      // Bubble styling with dynamic magnitude
-      const hasPhoto = Boolean(worksite.photo_url);
-      const isCompact = size < 42;
-
-      const innerContent = `
-        <div class="relative w-full h-full rounded-full transition-all duration-300 transform group hover:scale-110 flex items-center justify-center ${
-          isSelected
-            ? 'ring-4 ring-amber-400 ring-offset-2 ring-offset-white shadow-2xl z-30 scale-105'
-            : 'hover:ring-2 hover:ring-blue-500 shadow-lg'
-        }" style="background: radial-gradient(circle at 30% 30%, #042454, #031530); border: 2.5px solid ${
-        worksite.isSimulatedLocation ? '#94a3b8' : '#38bdf8'
-      };">
-          ${
-            hasPhoto
-              ? `<img src="${worksite.photo_url}" class="absolute inset-0 w-full h-full object-cover rounded-full opacity-35 group-hover:opacity-45 transition-opacity" />`
-              : ''
-          }
-          <div class="relative z-10 flex flex-col items-center justify-center text-white px-1 leading-none text-center pointer-events-none">
-            ${
-              isCompact
-                ? `<span class="text-[10px] font-black tracking-tight">${worksite.workersCount}👷</span>`
-                : `
-                <span class="text-[9px] font-extrabold uppercase tracking-tight text-blue-200 truncate max-w-[90%] drop-shadow">
-                  ${worksite.name.split(' ')[0]}
-                </span>
-                <div class="flex items-center gap-1 mt-0.5 font-black text-[10px] drop-shadow-md">
-                  <span class="text-amber-300">👷${worksite.workersCount}</span>
-                  <span class="text-sky-300">🛠${worksite.toolsCount}</span>
-                </div>
-              `
-            }
-          </div>
-          ${
-            worksite.isSimulatedLocation
-              ? `<span title="Ubicación referencial en Tucumán" class="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 border border-white rounded-full"></span>`
-              : ''
-          }
-        </div>
-      `;
-
-      el.innerHTML = innerContent;
-
-      // Tooltip preview on hover
-      const popup = new Popup({
-        offset: size / 2 + 6,
-        closeButton: false,
-        closeOnClick: false,
-      }).setHTML(`
-        <div class="p-2.5 font-sans min-w-[170px] text-slate-800">
-          <div class="flex items-center gap-1.5 mb-1">
-            <span class="w-2 h-2 rounded-full ${worksite.active ? 'bg-emerald-500' : 'bg-slate-400'}"></span>
-            <p class="font-extrabold text-xs text-peie-blue leading-tight">${worksite.name}</p>
-          </div>
-          ${worksite.encargado_name ? `<p class="text-[10px] text-slate-500 font-semibold mb-1.5">Coordinador: <b class="text-slate-700">${worksite.encargado_name}</b></p>` : ''}
-          <div class="grid grid-cols-2 gap-1.5 py-1.5 px-2 bg-slate-50 rounded-lg border border-slate-100 text-[10px] font-bold">
-            <div class="flex items-center gap-1 text-slate-700">
-              <span class="text-amber-600 font-black">👷</span> ${worksite.workersCount} operarios
-            </div>
-            <div class="flex items-center gap-1 text-slate-700">
-              <span class="text-sky-600 font-black">🛠</span> ${worksite.toolsCount} equipos
-            </div>
-          </div>
-          ${(worksite.totalLaborCost || 0) > 0 ? `
-            <div class="mt-1.5 p-1.5 bg-emerald-50 rounded-lg border border-emerald-150 text-[10px] flex items-center justify-between text-emerald-900 font-bold">
-              <span>Costo M.O.:</span>
-              <span class="font-black text-emerald-700">$${(worksite.totalLaborCost || 0).toLocaleString('es-AR')}</span>
-            </div>
-          ` : ''}
-          <p class="text-[9px] text-blue-600 font-bold mt-1 text-center">Click para abrir panel operativo</p>
-        </div>
-      `);
-
+      const size = Math.max(64, Math.round(worksite.bubbleRadiusPx || 64));
+      const el = createWorksiteBubble(worksite, size, isSelected);
+      const popup = new Popup({ offset: size / 2 + 6, closeButton: false, closeOnClick: false, maxWidth: '300px', anchor: 'bottom' })
+        .setLngLat([worksite.longitude, worksite.latitude])
+        .setDOMContent(createWorksiteSummary(worksite));
       el.addEventListener('mouseenter', () => popup.addTo(map));
-      el.addEventListener('mouseleave', () => popup.remove());
-
+      el.addEventListener('mouseleave', () => { if (document.activeElement !== el) popup.remove(); });
+      el.addEventListener('focus', () => popup.addTo(map));
+      el.addEventListener('blur', () => popup.remove());
+      el.addEventListener('keydown', event => { if (event.key === 'Escape') popup.remove(); });
       el.addEventListener('click', (e) => {
         e.stopPropagation();
         popup.remove();
@@ -192,12 +121,13 @@ export default function OperationsMap({
 
       const marker = new Marker({ element: el })
         .setLngLat([worksite.longitude, worksite.latitude])
-        .setPopup(popup)
         .addTo(map);
 
       markersRef.current.push(marker);
+      popups.push(popup);
 
     });
+    return () => { popups.forEach(popup => popup.remove()); markersRef.current.forEach(marker => marker.remove()); markersRef.current = []; };
   }, [worksites, selectedWorksiteId, onSelectWorksite]);
 
   // 4. Render Origin Marker (Punto de Búsqueda / Tu Ubicación)
@@ -266,7 +196,7 @@ export default function OperationsMap({
       <button
         onClick={handleResetCenter}
         title="Centrar en Gran San Miguel de Tucumán"
-        className="absolute top-4 right-4 z-10 bg-white/95 backdrop-blur shadow-md hover:bg-slate-50 border border-slate-200 text-peie-blue text-xs font-bold px-3 py-2 rounded-xl transition-all flex items-center gap-1.5"
+        className="absolute top-16 sm:top-4 right-4 z-10 bg-white/95 backdrop-blur shadow-md hover:bg-slate-50 border border-slate-200 text-peie-blue text-xs font-bold px-3 py-2 rounded-xl transition-all flex items-center gap-1.5"
       >
         <span className="w-2 h-2 rounded-full bg-blue-600 animate-ping"></span>
         Centrar Tucumán
@@ -274,7 +204,7 @@ export default function OperationsMap({
 
       {/* Reference note overlay */}
       <div className="absolute bottom-2 left-2 z-10 bg-white/90 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-slate-200 text-[10px] text-slate-500 font-medium pointer-events-none">
-        Área Metropolitana de Tucumán • Magnitud por Carga Operativa
+        Anillo: avance de 0 a 100% · Gris: sin avance cargado · Tamaño: recursos
       </div>
     </div>
   );

@@ -1,3 +1,5 @@
+import type { Attendance } from '../services/operations/worksiteMetrics';
+import { PROGRESS_KEY, readLocalRecord, progressFor, toolValuation, laborMetrics } from '../services/operations/worksiteMetrics';
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import LogoLoader from '../components/LogoLoader';
@@ -24,36 +26,28 @@ import {
 } from '../services/operations/recommendationEngine';
 import NearestToolFinder from '../components/operations/NearestToolFinder';
 
-import { Compass, Sparkles, SlidersHorizontal, ChevronUp, ChevronDown, MapPin } from 'lucide-react';
+import { Compass, Sparkles, ChevronUp, ChevronDown, MapPin } from 'lucide-react';
 
-function normalizeText(text: string | null | undefined): string {
-  if (!text) return '';
-  return text
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[,.-]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+// Paginate accumulated attendance and inventory; totals must include more than 1,000 rows.
+async function loadAll<T = Record<string, unknown>>(table: string, columns: string) {
+  const rows: T[] = [];
+  for (let offset = 0; ; offset += 500) {
+    const result = await supabase.from(table).select(columns).order('id').range(offset, offset + 499);
+    if (result.error) throw result.error;
+    rows.push(...((result.data || []) as unknown as T[]));
+    if ((result.data?.length || 0) < 500) return { data: rows, error: null };
+  }
 }
 
-const RATE_BY_SPEC: Record<string, number> = {
-  'electricista': 5000,
-  'oficial': 4800,
-  'medio oficial': 4400,
-  'ayudante': 4000,
-  'capataz': 6000,
-  'general': 4500,
-};
-
 export default function CentroOperaciones() {
+  const [loadError, setLoadError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [worksites, setWorksites] = useState<OperationalWorksite[]>([]);
   const [allEmployees, setAllEmployees] = useState<OperationalEmployee[]>([]);
   const [allTools, setAllTools] = useState<OperationalTool[]>([]);
   const [selectedWorksiteId, setSelectedWorksiteId] = useState<string | null>(null);
   const [flyToCoords, setFlyToCoords] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [showMobileDrawer, setShowMobileDrawer] = useState(false);
+  const [, setShowMobileDrawer] = useState(false);
   const [showSuggestionsDrawer, setShowSuggestionsDrawer] = useState(false);
   const [showToolFinder, setShowToolFinder] = useState(false);
   const [mapOriginCoords, setMapOriginCoords] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -76,25 +70,17 @@ export default function CentroOperaciones() {
     async function loadOperationalData() {
       try {
         setLoading(true);
+        setLoadError(false);
 
         const [obrasRes, empsRes, toolsRes, novsRes] = await Promise.all([
-          supabase
-            .from('obras')
-            .select('id, code, name, address, encargado_name, phone, latitude, longitude, photo_url, active, status')
-            .order('name'),
-          supabase
-            .from('empleados')
-            .select('id, full_name, role, whatsapp, active, obra_id, status, specialty, photo_url')
-            .order('full_name'),
-          supabase
-            .from('herramientas')
-            .select('id, code, name, description, brand, model, photo_url, status, current_obra_id, category, last_latitude, last_longitude')
-            .order('name'),
-          supabase
-            .from('novedades_diarias')
-            .select('*'),
+          loadAll('obras', 'id, code, name, address, encargado_name, phone, latitude, longitude, photo_url, active, status'),
+          loadAll('empleados', '*'),
+          loadAll('herramientas', 'id, code, name, description, brand, model, photo_url, status, current_obra_id, category, last_latitude, last_longitude'),
+          loadAll<Attendance>('novedades_diarias', '*'),
         ]);
 
+        for (const result of [obrasRes, empsRes, toolsRes, novsRes]) if (result.error) throw result.error;
+        const progress = readLocalRecord(PROGRESS_KEY);
         const rawObras = obrasRes.data || [];
         const rawEmps: OperationalEmployee[] = (empsRes.data || []).map((e: any) => ({
           ...e,
@@ -106,18 +92,7 @@ export default function CentroOperaciones() {
         }));
         const rawNovs = novsRes.data || [];
 
-        // Tarifas personalizadas guardadas en localStorage como respaldo
-        const localTarifasSaved: Record<string, number> = {};
-        try {
-          const raw = localStorage.getItem('peie_tarifas_horas');
-          if (raw) Object.assign(localTarifasSaved, JSON.parse(raw));
-        } catch {}
-
-        const empMap = new Map<string, any>();
-        rawEmps.forEach((e) => {
-          empMap.set(e.id, e);
-          empMap.set(normalizeText(e.full_name), e);
-        });
+        const localTarifasSaved = readLocalRecord('peie_tarifas_horas');
 
         setAllEmployees(rawEmps);
         setAllTools(rawTools);
@@ -128,26 +103,7 @@ export default function CentroOperaciones() {
           const assignedTools = rawTools.filter((t) => t.current_obra_id === obra.id);
           const { coordinates, isSimulated } = resolveWorksiteCoordinates(obra);
 
-          const obraWorkerIds = new Set(assignedWorkers.map((w) => w.id));
-          const normObraName = normalizeText(obra.name);
-
-          // Novedades de asistencia para calcular horas y costo acumulado de la obra
-          const obraNovs = rawNovs.filter((n: any) => {
-            if (n.obra_id && n.obra_id === obra.id) return true;
-            if (n.empleado_id && obraWorkerIds.has(n.empleado_id)) return true;
-            if (n.obra_nombre && normalizeText(n.obra_nombre) === normObraName) return true;
-            return false;
-          });
-
-          const totalLaborHours = obraNovs.reduce((acc: number, curr: any) => acc + (Number(curr.horas_trabajadas) || 0), 0);
-          const totalLaborCost = obraNovs.reduce((acc: number, curr: any) => {
-            const hours = Number(curr.horas_trabajadas) || 0;
-            if (hours <= 0) return acc;
-            const emp = curr.empleado_id ? empMap.get(curr.empleado_id) : null;
-            const spec = (emp?.specialty || 'general').toLowerCase().trim();
-            const rate = (emp?.id && localTarifasSaved[emp.id]) || RATE_BY_SPEC[spec] || 4500;
-            return acc + (hours * rate);
-          }, 0);
+          const labor = laborMetrics(obra, rawNovs, rawEmps, localTarifasSaved);
 
           const rawMagnitude = calculateRawMagnitude(
             assignedWorkers.length,
@@ -172,8 +128,9 @@ export default function CentroOperaciones() {
             assignedWorkers,
             assignedTools,
             magnitudeIndex: rawMagnitude,
-            totalLaborHours,
-            totalLaborCost,
+            ...labor,
+            ...progressFor(obra.id, progress),
+            ...toolValuation(assignedTools),
           };
         });
 
@@ -189,6 +146,7 @@ export default function CentroOperaciones() {
 
         setWorksites(finalWorksites);
       } catch (err) {
+        setLoadError(true);
         console.error('Error loading operational data:', err);
       } finally {
         setLoading(false);
@@ -196,6 +154,13 @@ export default function CentroOperaciones() {
     }
 
     loadOperationalData();
+  }, []);
+
+  useEffect(() => {
+    const refresh = () => setWorksites(current => current.map(worksite => ({ ...worksite, ...progressFor(worksite.id, readLocalRecord(PROGRESS_KEY)), ...toolValuation(worksite.assignedTools) })));
+    window.addEventListener('focus', refresh);
+    window.addEventListener('storage', refresh);
+    return () => { window.removeEventListener('focus', refresh); window.removeEventListener('storage', refresh); };
   }, []);
 
   // 2. Coordinators list for filters
@@ -275,6 +240,7 @@ export default function CentroOperaciones() {
       totalInUseTools,
       totalAvailableTools,
       alertsCount,
+      ...toolValuation(allTools),
       suggestionsCount: 0,
       totalLaborCost,
     };
@@ -299,6 +265,8 @@ export default function CentroOperaciones() {
     }, 120);
   };
 
+  if (loadError) return <div role="alert" className="p-8">No se pudieron cargar los datos operativos. <button className="underline" onClick={() => window.location.reload()}>Reintentar</button></div>;
+
   if (loading) {
     return <LogoLoader fullScreen text="Cargando Centro de Operaciones..." size="md" />;
   }
@@ -307,7 +275,7 @@ export default function CentroOperaciones() {
     <div className="flex flex-col min-h-[calc(100vh-4rem)] overflow-y-auto font-sans space-y-4 p-2 sm:p-4 pb-20">
       {/* 1. Header & KPIs */}
       <div className="space-y-2 shrink-0">
-        <div className="flex items-center justify-between gap-2 px-1">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1">
           <div className="flex items-center gap-2">
             <div className="p-2 rounded-xl bg-peie-blue text-white shadow-sm">
               <Compass className="h-5 w-5 text-sky-400 animate-spin" style={{ animationDuration: '20s' }} />

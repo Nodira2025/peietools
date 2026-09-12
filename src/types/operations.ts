@@ -49,6 +49,11 @@ export interface OperationalWorksite {
   assignedTools: OperationalTool[];
   magnitudeIndex: number;
   bubbleRadiusPx: number;
+  progressPercent?: number | null;
+  totalToolValue?: number;
+  estimatedToolCount?: number;
+  estimatedLaborHours?: number;
+  laborRecordCount?: number;
   totalLaborHours: number;
   totalLaborCost: number;
 }
@@ -67,6 +72,8 @@ export interface OperationsKPIs {
   totalInUseTools: number;
   totalAvailableTools: number;
   alertsCount: number;
+  totalToolValue?: number;
+  estimatedToolCount?: number;
   suggestionsCount: number;
   totalLaborCost: number;
 }

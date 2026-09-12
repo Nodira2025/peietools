@@ -1,3 +1,5 @@
+import { formatARS } from '../../services/tools/toolPriceReference';
+import { progressLabel } from './worksiteBubble';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -194,7 +196,7 @@ export default function OperationsSidebar({
       </div>
 
       {/* Resumen Métricas con Costo de Mano de Obra */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-white border-b border-slate-100">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 bg-white border-b border-slate-100">
         <div className="p-3 rounded-xl bg-amber-50/80 border border-amber-150">
           <p className="text-xs font-extrabold text-amber-900">Personal Asignado</p>
           <p className="text-xl font-black text-amber-700 mt-0.5">👷 {selectedWorksite.workersCount}</p>
@@ -204,13 +206,25 @@ export default function OperationsSidebar({
           <p className="text-xl font-black text-sky-700 mt-0.5">🛠 {selectedWorksite.toolsCount}</p>
         </div>
         <div className="p-3 rounded-xl bg-emerald-50/80 border border-emerald-200">
-          <p className="text-xs font-extrabold text-emerald-900">Costo Mano de Obra</p>
+          <p className="text-xs font-extrabold text-emerald-900">Costo por horas</p>
           <p className="text-xl font-black text-emerald-700 mt-0.5">
             ${(selectedWorksite.totalLaborCost || 0).toLocaleString('es-AR')}
           </p>
           <p className="text-[10px] text-emerald-700 font-semibold mt-0.5">
-            ⏱ {selectedWorksite.totalLaborHours || 0} hs registradas
+            ⏱ {selectedWorksite.totalLaborHours || 0} hs registradas · {selectedWorksite.estimatedLaborHours || 0} h con tarifa estimada
           </p>
+        </div>
+        <div className="p-3 rounded-xl bg-blue-50 border border-blue-200">
+          <p className="text-xs font-extrabold text-blue-900">Valor de herramientas en obra</p>
+          <p className="text-xl font-black text-blue-800">{formatARS(selectedWorksite.totalToolValue ?? 0)}</p>
+          <p className="text-[10px] text-slate-600">Asignadas actualmente · {selectedWorksite.estimatedToolCount || 0} valores estimados</p>
+        </div>
+        <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+          <p className="text-xs font-extrabold text-emerald-900">Finalización de obra</p>
+          <p className="text-xl font-black text-emerald-800">{progressLabel(selectedWorksite)} <span className="text-xs">/ 100%</span></p>
+          <progress className="w-full accent-emerald-600" aria-label="Finalización de obra" max={100} value={selectedWorksite.progressPercent ?? 0} />
+          <button className="text-xs underline" onClick={() => navigate('/coordinadores')}>Actualizar avance en Coordinadores</button>
+          <p className="text-[10px] text-slate-600">Avance y precios manuales guardados en este navegador.</p>
         </div>
         <div className="p-3 rounded-xl bg-slate-50 border border-slate-150 flex items-center justify-between">
           <div>

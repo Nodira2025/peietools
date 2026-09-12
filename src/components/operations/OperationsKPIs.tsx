@@ -1,3 +1,4 @@
+import { formatARS } from '../../services/tools/toolPriceReference';
 import { Building, HardHat, Wrench, AlertTriangle, CheckCircle2, DollarSign } from 'lucide-react';
 import type { OperationsKPIs as KPIsType } from '../../types/operations';
 
@@ -11,7 +12,7 @@ export default function OperationsKPIs({ kpis }: OperationsKPIsProps) {
     : `$${(kpis.totalLaborCost || 0).toLocaleString('es-AR')}`;
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2 p-3 bg-white/95 backdrop-blur rounded-2xl border border-slate-200/80 shadow-sm font-sans">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 p-3 bg-white/95 backdrop-blur rounded-2xl border border-slate-200/80 shadow-sm font-sans">
       {/* 1. Obras Activas */}
       <div className="p-2.5 rounded-xl bg-slate-50/80 border border-slate-100 flex items-center gap-2.5 min-w-0">
         <div className="w-8 h-8 rounded-lg bg-blue-100/70 text-blue-700 flex items-center justify-center shrink-0">
@@ -73,13 +74,18 @@ export default function OperationsKPIs({ kpis }: OperationsKPIsProps) {
           <DollarSign size={16} />
         </div>
         <div className="min-w-0">
-          <p className="text-[10px] font-bold text-teal-800 uppercase tracking-wider truncate">Costo M.O.</p>
+          <p className="text-[10px] font-bold text-teal-800 uppercase tracking-wider truncate">Costo por horas (estimado)</p>
           <p className="text-base font-black text-teal-900 leading-none mt-0.5" title={`Total: $${(kpis.totalLaborCost || 0).toLocaleString('es-AR')}`}>
             {formattedCost}
           </p>
         </div>
       </div>
 
+      <div className="p-2.5 rounded-xl bg-blue-50 border border-blue-200 min-w-0">
+        <p className="text-xs font-bold text-blue-900">Valor total de herramientas</p>
+        <p className="text-base font-black text-blue-900">{formatARS(kpis.totalToolValue ?? 0)}</p>
+        <p className="text-[10px] text-slate-600">Todo el inventario · {kpis.estimatedToolCount || 0} valores estimados</p>
+      </div>
       {/* 7. Alertas / Sugerencias */}
       <div className="p-2.5 rounded-xl bg-rose-50/60 border border-rose-100/80 flex items-center gap-2.5 min-w-0">
         <div className="w-8 h-8 rounded-lg bg-rose-100/80 text-rose-700 flex items-center justify-center shrink-0">
