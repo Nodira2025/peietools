@@ -1,3 +1,4 @@
+import { SHOW_REPORTS, SHOW_PURCHASES_SHORTCUT } from '../config/navigationFeatures';
 import { useState, useEffect, Suspense } from 'react';
 import { Navigate, Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
@@ -203,7 +204,7 @@ export default function AppLayout() {
     { name: 'Inicio', path: '/dashboard', icon: Sparkles, show: true },
     { name: 'Centro de Operaciones', path: '/centro-operaciones', icon: Compass, show: true },
     { name: 'Notificaciones', path: '/notificaciones', icon: Bell, show: true, badge: pendingCount },
-    { name: 'Reportes', path: '/reportes', icon: BarChart3, show: isLogistica || isAdmin },
+    { name: 'Reportes', path: '/reportes', icon: BarChart3, show: SHOW_REPORTS && (isLogistica || isAdmin) },
     { name: 'Herramientas', path: '/herramientas', icon: Wrench, show: true },
     { name: 'Movimiento de Herramientas', path: '/pedidos-herramientas', icon: FileText, show: true },
     { name: 'Mis Obras', path: '/mis-obras', icon: Building, show: true },
@@ -211,8 +212,8 @@ export default function AppLayout() {
 
   const mainNavBottom = [
     { name: 'Contactos', path: '/contactos', icon: PhoneCall, show: true },
-    { name: 'Logística', path: '/logistica', icon: Truck, show: isLogistica || isAdmin },
-    { name: 'Registro de Compras', path: '/compras', icon: ShoppingCart, show: isLogistica || isAdmin || deviceMode !== 'mobile' },
+    { name: 'Logística', path: '/logistica', icon: Truck, show: isLogistica || isAdmin || deviceMode !== 'mobile' },
+    { name: 'Registro de Compras', path: '/compras', icon: ShoppingCart, show: SHOW_PURCHASES_SHORTCUT && (isLogistica || isAdmin || deviceMode !== 'mobile') },
     { name: 'Obras (Admin)', path: '/obras', icon: Building, show: isAdmin },
     { name: 'Usuarios', path: '/usuarios', icon: Users, show: isAdmin },
   ].filter(item => item.show);
@@ -589,6 +590,7 @@ export default function AppLayout() {
                 <span className="text-[11px] font-black uppercase tracking-tight">Mapa Logística</span>
               </Link>
 
+              {SHOW_REPORTS && (
               <Link 
                 to="/reportes" 
                 onClick={() => setShowMas(false)}
@@ -597,6 +599,7 @@ export default function AppLayout() {
                 <BarChart3 size={24} className="text-orange-400" />
                 <span className="text-[11px] font-black uppercase tracking-tight">Reportes KPI</span>
               </Link>
+              )}
 
               <Link 
                 to="/logistica?nuevoGasto=true" 

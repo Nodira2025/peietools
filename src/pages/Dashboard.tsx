@@ -1,3 +1,4 @@
+import { SHOW_REPORTS, SHOW_PURCHASES_SHORTCUT } from '../config/navigationFeatures';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
@@ -634,6 +635,7 @@ export default function Dashboard() {
                 <ChevronRight size={16} className="text-slate-400 shrink-0" />
               </div>
 
+              {SHOW_PURCHASES_SHORTCUT && (
               <div 
                 onClick={() => navigate('/compras')}
                 className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-sm hover:shadow-md flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all group"
@@ -649,6 +651,7 @@ export default function Dashboard() {
                 </div>
                 <ChevronRight size={16} className="text-slate-400 shrink-0" />
               </div>
+              )}
 
               <div 
                 onClick={() => navigate('/contactos')}
@@ -740,6 +743,7 @@ export default function Dashboard() {
                 <ChevronRight size={16} className="text-slate-400 shrink-0" />
               </div>
 
+              {SHOW_REPORTS && (
               <div 
                 onClick={() => navigate('/reportes')}
                 className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-sm hover:shadow-md flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all group"
@@ -755,6 +759,7 @@ export default function Dashboard() {
                 </div>
                 <ChevronRight size={16} className="text-slate-400 shrink-0" />
               </div>
+              )}
 
               {(isCoordinador || isAdmin) && (
                 <div 

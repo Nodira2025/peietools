@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -233,6 +234,7 @@ ${APP_URL}/compras/${compra.id}`;
 
   return (
     <div className="space-y-6">
+      <Link to="/logistica" className="inline-flex text-sm font-semibold text-peie-blue hover:underline">← Volver a Logística</Link>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-peie-blue">Solicitudes de Compra</h1>

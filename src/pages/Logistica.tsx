@@ -1,3 +1,4 @@
+import { SHOW_REPORTS } from '../config/navigationFeatures';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -114,7 +115,7 @@ export default function Logistica() {
 
       if (error) throw error;
 
-      toast({ title: '¡Compra Registrada!', description: 'Guardada en el Registro de Compras (PC).' });
+      toast({ title: '¡Compra Registrada!', description: 'Guardada en el Registro de Compras.' });
       setIsCompraOpen(false);
       setCompraRawText('');
       setCompraTitle('');
@@ -470,7 +471,16 @@ export default function Logistica() {
           <h1 className="text-2xl font-bold tracking-tight text-peie-blue">Panel de Logística</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Gestión unificada de pedidos y traslados</p>
         </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <Button
+            onClick={() => navigate('/compras')}
+            variant="outline"
+            className="bg-white border-blue-200 text-blue-800 hover:bg-blue-50 font-bold rounded-xl text-xs h-10 px-3 flex-1 sm:flex-initial flex items-center justify-center gap-1.5 shadow-sm"
+          >
+            <ShoppingBag className="h-4 w-4 shrink-0" />
+            <span>Registro de Compras</span>
+          </Button>
+          {SHOW_REPORTS && (
           <Button 
             onClick={() => navigate('/reportes')}
             variant="outline"
@@ -479,6 +489,7 @@ export default function Logistica() {
             <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0" />
             <span>Historial de Reportes</span>
           </Button>
+          )}
 
           {/* Botón para Reportar Orden de Compra (Pegar WhatsApp + IA) */}
           <Dialog open={isCompraOpen} onOpenChange={setIsCompraOpen}>
@@ -493,7 +504,7 @@ export default function Logistica() {
                   <ShoppingBag className="w-5 h-5 text-amber-600" /> Reportar Orden de Compra
                 </DialogTitle>
                 <DialogDescription className="text-xs text-slate-500">
-                  Pegá el texto crudo del mensaje de WhatsApp del empleado y la IA lo estructurará automáticamente para el Registro de Compras (PC).
+                  Pegá el texto crudo del mensaje de WhatsApp del empleado y la IA lo estructurará automáticamente para el Registro de Compras.
                 </DialogDescription>
               </DialogHeader>
 
@@ -609,7 +620,7 @@ export default function Logistica() {
                   disabled={compraSaving || (!compraTitle && !compraRawText)}
                   className="w-full h-12 bg-peie-blue hover:bg-peie-blue/90 text-white font-extrabold rounded-2xl text-sm mt-4 shadow-lg"
                 >
-                  {compraSaving ? 'Guardando...' : '💾 Guardar en Registro de Compras (PC)'}
+                  {compraSaving ? 'Guardando...' : '💾 Guardar en Registro de Compras'}
                 </Button>
               </div>
             </DialogContent>
