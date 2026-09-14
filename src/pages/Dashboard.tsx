@@ -1,4 +1,4 @@
-import { SHOW_REPORTS, SHOW_PURCHASES_SHORTCUT } from '../config/navigationFeatures';
+import { SHOW_REPORTS, SHOW_PURCHASES_SHORTCUT, SHOW_TOOL_MOVEMENTS_SHORTCUT } from '../config/navigationFeatures';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
@@ -1066,6 +1066,7 @@ export default function Dashboard() {
             </Card>
 
             {/* Card 2: Movimiento de Herramientas */}
+            {SHOW_TOOL_MOVEMENTS_SHORTCUT && (
             <Card 
               onClick={() => navigate('/pedidos-herramientas')}
               className="bg-white border-0 shadow-[0_8px_30px_rgba(0,0,0,0.02)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:ring-1 hover:ring-blue-500/10 transition-all cursor-pointer rounded-[24px] overflow-hidden flex flex-col justify-between group active:scale-98 duration-150"
@@ -1099,6 +1100,7 @@ export default function Dashboard() {
                 </div>
               </div>
             </Card>
+            )}
 
             {/* Card 3: Logística */}
             <Card 

@@ -466,12 +466,20 @@ export default function Logistica() {
   return (
     <div className="space-y-6 pb-safe">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-peie-blue">Panel de Logística</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Gestión unificada de pedidos y traslados</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto min-w-0">
+          <Button
+            onClick={() => navigate('/pedidos-herramientas')}
+            variant="outline"
+            className="bg-white border-blue-200 text-blue-800 hover:bg-blue-50 font-bold rounded-xl text-xs h-auto min-h-10 py-2 px-3 flex-1 sm:flex-initial flex items-center justify-center gap-1.5 shadow-sm"
+          >
+            <Wrench className="h-4 w-4 shrink-0" />
+            <span>Movimiento de Herramientas</span>
+          </Button>
           <Button
             onClick={() => navigate('/compras')}
             variant="outline"

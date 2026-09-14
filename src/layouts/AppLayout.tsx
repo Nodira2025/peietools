@@ -1,4 +1,4 @@
-import { SHOW_REPORTS, SHOW_PURCHASES_SHORTCUT } from '../config/navigationFeatures';
+import { SHOW_REPORTS, SHOW_PURCHASES_SHORTCUT, SHOW_TOOL_MOVEMENTS_SHORTCUT } from '../config/navigationFeatures';
 import { useState, useEffect, Suspense } from 'react';
 import { Navigate, Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
@@ -206,13 +206,13 @@ export default function AppLayout() {
     { name: 'Notificaciones', path: '/notificaciones', icon: Bell, show: true, badge: pendingCount },
     { name: 'Reportes', path: '/reportes', icon: BarChart3, show: SHOW_REPORTS && (isLogistica || isAdmin) },
     { name: 'Herramientas', path: '/herramientas', icon: Wrench, show: true },
-    { name: 'Movimiento de Herramientas', path: '/pedidos-herramientas', icon: FileText, show: true },
+    { name: 'Movimiento de Herramientas', path: '/pedidos-herramientas', icon: FileText, show: SHOW_TOOL_MOVEMENTS_SHORTCUT },
     { name: 'Mis Obras', path: '/mis-obras', icon: Building, show: true },
   ].filter(item => item.show);
 
   const mainNavBottom = [
     { name: 'Contactos', path: '/contactos', icon: PhoneCall, show: true },
-    { name: 'Logística', path: '/logistica', icon: Truck, show: isLogistica || isAdmin || deviceMode !== 'mobile' },
+    { name: 'Logística', path: '/logistica', icon: Truck, show: true },
     { name: 'Registro de Compras', path: '/compras', icon: ShoppingCart, show: SHOW_PURCHASES_SHORTCUT && (isLogistica || isAdmin || deviceMode !== 'mobile') },
     { name: 'Obras (Admin)', path: '/obras', icon: Building, show: isAdmin },
     { name: 'Usuarios', path: '/usuarios', icon: Users, show: isAdmin },
@@ -563,6 +563,7 @@ export default function AppLayout() {
 
 
 
+              {SHOW_TOOL_MOVEMENTS_SHORTCUT && (
               <Link 
                 to="/pedidos-herramientas" 
                 onClick={() => setShowMas(false)}
@@ -571,6 +572,7 @@ export default function AppLayout() {
                 <FileText size={24} className="text-blue-400" />
                 <span className="text-[11px] font-black uppercase tracking-tight">Mov. Herramientas</span>
               </Link>
+              )}
 
               <Link 
                 to="/pedidos-personal" 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -269,6 +269,7 @@ export default function Solicitudes() {
 
   return (
     <div className="space-y-5 max-w-5xl mx-auto pb-10">
+      {isHerramientasPage && <Link to="/logistica" className="inline-flex text-sm font-semibold text-peie-blue hover:underline">← Volver a Logística</Link>}
       {/* Cabecera */}
       <div className="flex flex-col gap-1.5">
         <h1 className="text-2xl font-bold tracking-tight text-slate-800">{pageTitle}</h1>

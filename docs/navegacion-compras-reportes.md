@@ -21,3 +21,11 @@ Se conservan las páginas, rutas `/compras`, `/compras/:id` y `/reportes`, regis
 5. Ejecutar `npm run build` y comprobar Inicio, navegación de escritorio, menú móvil y Logística. Confirmar que el registro abre y permite volver a Logística.
 
 Este cambio es independiente de `SHOW_EXTENDED_OPERATIONS` (Centro de operaciones) y `SHOW_PROGRESS_PHOTOS` (Mis obras). No cambiar esas constantes para reactivar Reportes o los accesos de compras.
+
+## Movimiento de Herramientas dentro de Logística
+
+Se agregó el acceso a Movimiento de Herramientas en el encabezado de Logística y un enlace de regreso en su página. Se ocultan su entrada en la navegación principal, en el menú móvil y la tarjeta principal de Inicio mediante `SHOW_TOOL_MOVEMENTS_SHORTCUT = false` en `src/config/navigationFeatures.ts`.
+
+Logística se muestra para todos los perfiles que antes tenían el acceso a movimientos. Se conservan la ruta `/pedidos-herramientas`, las redirecciones, los enlaces de seguimiento y los retornos al finalizar operaciones. No cambian los datos ni permisos de la base.
+
+Para recuperar los accesos principales, cambiar `SHOW_TOOL_MOVEMENTS_SHORTCUT` a `true`. Para deshacer toda esta reubicación, localizar el commit con `git log --oneline --grep="Mover Movimiento de Herramientas dentro de Logistica"`, revisar su diff y usar `git revert <COMMIT>` preservando los cambios posteriores. Validar con `npm run build`.
