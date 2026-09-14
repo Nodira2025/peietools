@@ -223,7 +223,6 @@ export default function OperationsSidebar({
           <p className="text-xs font-extrabold text-emerald-900">Finalización de obra</p>
           <p className="text-xl font-black text-emerald-800">{progressLabel(selectedWorksite)} <span className="text-xs">/ 100%</span></p>
           <progress className="w-full accent-emerald-600" aria-label="Finalización de obra" max={100} value={selectedWorksite.progressPercent ?? 0} />
-          <button className="text-xs underline" onClick={() => navigate('/coordinadores')}>Actualizar avance en Coordinadores</button>
           <p className="text-[10px] text-slate-600">Avance y precios manuales guardados en este navegador.</p>
         </div>
         <div className="p-3 rounded-xl bg-slate-50 border border-slate-150 flex items-center justify-between">

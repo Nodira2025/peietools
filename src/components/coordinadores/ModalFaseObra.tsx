@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
-import { Trash2, CheckCircle2, Clock } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 
 interface ModalFaseObraProps {
   isOpen: boolean;
@@ -58,9 +58,11 @@ export default function ModalFaseObra({
   const [responsableName, setResponsableName] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
+    setError('');
     if (fase) {
       setName(fase.name);
       setStartDate(fase.start_date);
@@ -96,10 +98,12 @@ export default function ModalFaseObra({
     e.preventDefault();
     if (!name.trim() || !startDate || !endDate) return;
 
+    if (endDate < startDate) { setError('La fecha final no puede ser anterior al inicio.'); return; }
+    setError('');
     setSaving(true);
     try {
       const payload: ObraFase = {
-        id: fase?.id || `${obraId}-${Date.now()}`,
+        id: fase?.id || crypto.randomUUID(),
         obra_id: obraId,
         name: name.trim(),
         start_date: startDate,
@@ -113,6 +117,8 @@ export default function ModalFaseObra({
 
       await onSave(payload);
       onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo guardar el cambio.');
     } finally {
       setSaving(false);
     }
@@ -125,6 +131,8 @@ export default function ModalFaseObra({
     try {
       await onDelete(fase.id);
       onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo guardar el cambio.');
     } finally {
       setDeleting(false);
     }
@@ -256,6 +264,7 @@ export default function ModalFaseObra({
             />
           </div>
 
+          {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
           <DialogFooter className="flex flex-row items-center justify-between pt-3 border-t border-slate-100 gap-2">
             {fase && onDelete ? (
               <Button

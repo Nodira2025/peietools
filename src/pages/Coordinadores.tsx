@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import type { ObraFase, CoordinadorProfile, ObraEstadoFinal } from '../types/coordinadores';
 import { coordinadoresService } from '../services/coordinadores/coordinadoresService';
+import ObraRecursosCostos from '../components/coordinadores/ObraRecursosCostos';
 import GanttChart from '../components/coordinadores/GanttChart';
 import ModalFaseObra from '../components/coordinadores/ModalFaseObra';
 import ModalEstadoObra from '../components/coordinadores/ModalEstadoObra';
@@ -94,20 +95,22 @@ export default function Coordinadores() {
   useEffect(() => {
     if (!selectedObraId) return;
 
+    let cancelled = false;
     async function loadFases() {
       setFasesLoading(true);
       try {
         const currentObra = obras.find(o => o.id === selectedObraId);
         const data = await coordinadoresService.getFases(selectedObraId, currentObra?.encargado_name);
-        setFases(data);
+        if (!cancelled) setFases(data);
       } catch (err: any) {
         console.error('Error loading fases:', err);
       } finally {
-        setFasesLoading(false);
+        if (!cancelled) setFasesLoading(false);
       }
     }
 
     loadFases();
+    return () => { cancelled = true; };
   }, [selectedObraId, obras]);
 
   useEffect(() => {
@@ -149,6 +152,7 @@ export default function Coordinadores() {
 
   const handleSaveFase = async (fase: ObraFase) => {
     const success = await coordinadoresService.saveFase(fase);
+    if (!success) throw new Error('No se pudo guardar la fase en la base de datos. Verificá la conexión y los permisos.');
     if (success) {
       toast({
         title: 'Fase Guardada',
@@ -163,6 +167,7 @@ export default function Coordinadores() {
 
   const handleDeleteFase = async (faseId: string) => {
     const success = await coordinadoresService.deleteFase(selectedObraId, faseId);
+    if (!success) throw new Error('No se pudo eliminar la fase. Reasigná o eliminá primero sus tareas y verificá los permisos.');
     if (success) {
       toast({
         title: 'Fase Eliminada',
@@ -536,6 +541,13 @@ export default function Coordinadores() {
               </div>
             </div>
           </div>
+
+          {selectedObraId && !fasesLoading && <ObraRecursosCostos
+            key={selectedObraId}
+            obraId={selectedObraId}
+            fases={fases}
+            coordinador={obras.find(o => o.id === selectedObraId)?.encargado_name || coordinadores.filter(c => c.obra_id === selectedObraId).map(c => c.full_name).join(', ')}
+          />}
 
           {/* Gantt Visualization */}
           {fasesLoading ? (

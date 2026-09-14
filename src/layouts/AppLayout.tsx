@@ -2,7 +2,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { Navigate, Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { supabase } from '../lib/supabase';
-import { Home, Wrench, FileText, Truck, Users, Building, LogOut, ShoppingCart, Sparkles, HardHat, ClipboardList, BarChart3, MoreHorizontal, Bell, Key, Eye, EyeOff, DollarSign, Calendar, CalendarRange, PhoneCall, Send, Award, ChevronDown, Compass } from 'lucide-react';
+import { Home, Wrench, FileText, Truck, Users, Building, LogOut, ShoppingCart, Sparkles, HardHat, ClipboardList, BarChart3, MoreHorizontal, Bell, Key, Eye, EyeOff, DollarSign, Calendar, PhoneCall, ChevronDown, Compass } from 'lucide-react';
 
 
 
@@ -193,11 +193,7 @@ export default function AppLayout() {
 
   const rrhhItems = [
     { name: 'Personal', path: '/personal', icon: HardHat },
-    ...(isAdmin || isLogistica ? [{ name: 'Personal Datos', path: '/personal-datos', icon: FileText }] : []),
     { name: 'Movimiento de Personal', path: '/pedidos-personal', icon: FileText },
-    { name: 'Formulario para el ingreso de horas', path: '/formularios', icon: FileText },
-    { name: 'Horas Trabajadas', path: '/trabajadores', icon: Award },
-    { name: 'Liquidación de Sueldos', path: '/liquidacion-sueldos', icon: DollarSign },
   ];
 
 
@@ -206,7 +202,6 @@ export default function AppLayout() {
   const mainNavTop = [
     { name: 'Inicio', path: '/dashboard', icon: Sparkles, show: true },
     { name: 'Centro de Operaciones', path: '/centro-operaciones', icon: Compass, show: true },
-    { name: 'Coordinadores', path: '/coordinadores', icon: CalendarRange, show: true },
     { name: 'Notificaciones', path: '/notificaciones', icon: Bell, show: true, badge: pendingCount },
     { name: 'Reportes', path: '/reportes', icon: BarChart3, show: isLogistica || isAdmin },
     { name: 'Herramientas', path: '/herramientas', icon: Wrench, show: true },
@@ -215,7 +210,6 @@ export default function AppLayout() {
   ].filter(item => item.show);
 
   const mainNavBottom = [
-    { name: 'Legales', path: '/legales', icon: FileText, show: true },
     { name: 'Contactos', path: '/contactos', icon: PhoneCall, show: true },
     { name: 'Logística', path: '/logistica', icon: Truck, show: isLogistica || isAdmin },
     { name: 'Registro de Compras', path: '/compras', icon: ShoppingCart, show: isLogistica || isAdmin || deviceMode !== 'mobile' },
@@ -556,14 +550,7 @@ export default function AppLayout() {
 
             {/* Listado de links */}
             <div className="grid grid-cols-2 gap-4 py-2">
-              {(isAdmin || isLogistica) && <Link
-                to="/personal-datos"
-                onClick={() => setShowMas(false)}
-                className="flex flex-col items-center justify-center p-4 bg-blue-950/40 border border-blue-800/80 rounded-2xl text-center gap-2"
-              >
-                <FileText size={24} className="text-sky-400" />
-                <span className="text-[11px] font-black uppercase tracking-tight text-sky-200">Personal Datos</span>
-              </Link>}
+
               <Link 
                 to="/centro-operaciones" 
                 onClick={() => setShowMas(false)}
@@ -573,14 +560,7 @@ export default function AppLayout() {
                 <span className="text-[11px] font-black uppercase tracking-tight text-sky-200">Centro Operaciones</span>
               </Link>
 
-              <Link 
-                to="/coordinadores" 
-                onClick={() => setShowMas(false)}
-                className="flex flex-col items-center justify-center p-4 bg-blue-950/40 border border-blue-800/80 rounded-2xl hover:bg-blue-900/60 transition-all text-center gap-2"
-              >
-                <CalendarRange size={24} className="text-blue-400" />
-                <span className="text-[11px] font-black uppercase tracking-tight text-blue-200">Coordinadores / Gantt</span>
-              </Link>
+
 
               <Link 
                 to="/pedidos-herramientas" 
@@ -636,41 +616,13 @@ export default function AppLayout() {
                 <span className="text-[11px] font-black uppercase tracking-tight">Contactos / Prov.</span>
               </Link>
 
-              <Link 
-                to="/legales"
-                onClick={() => setShowMas(false)}
-                className="flex flex-col items-center justify-center p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:bg-slate-900 transition-all text-center gap-2"
-              >
-                <FileText size={24} className="text-sky-400" />
-                <span className="text-[11px] font-black uppercase tracking-tight">Legales</span>
-              </Link>
 
-              <Link
-                to="/formularios" 
-                onClick={() => setShowMas(false)}
-                className="flex flex-col items-center justify-center p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:bg-slate-900 transition-all text-center gap-2"
-              >
-                <Send size={24} className="text-cyan-400" />
-                <span className="text-[11px] font-black uppercase tracking-tight text-[10px] leading-tight">Formulario para el ingreso de horas</span>
-              </Link>
 
-              <Link 
-                to="/trabajadores" 
-                onClick={() => setShowMas(false)}
-                className="flex flex-col items-center justify-center p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:bg-slate-900 transition-all text-center gap-2"
-              >
-                <Award size={24} className="text-amber-400" />
-                <span className="text-[11px] font-black uppercase tracking-tight">Horas Trabajadas</span>
-              </Link>
 
-              <Link 
-                to="/liquidacion-sueldos" 
-                onClick={() => setShowMas(false)}
-                className="flex flex-col items-center justify-center p-4 bg-slate-900/60 border border-slate-800 rounded-2xl hover:bg-slate-900 transition-all text-center gap-2"
-              >
-                <DollarSign size={24} className="text-emerald-400" />
-                <span className="text-[11px] font-black uppercase tracking-tight">Liquidación Sueldos</span>
-              </Link>
+
+
+
+
 
 
               {isAdmin && (

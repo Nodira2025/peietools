@@ -264,7 +264,7 @@ export const coordinadoresService = {
         .eq('obra_id', obraId)
         .order('order_index');
 
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         return data as ObraFase[];
       }
 
@@ -292,37 +292,15 @@ export const coordinadoresService = {
    */
   async saveFase(fase: ObraFase): Promise<boolean> {
     try {
-      // Try Supabase insert/upsert
-      const { error } = await supabase
-        .from('obra_fases')
-        .upsert({
-          id: fase.id.includes('-f') ? undefined : fase.id, // Avoid passing synthetic template IDs
-          obra_id: fase.obra_id,
-          name: fase.name,
-          start_date: fase.start_date,
-          end_date: fase.end_date,
-          progress: fase.progress,
-          status: fase.status,
-          responsable_name: fase.responsable_name,
-          order_index: fase.order_index,
-          notes: fase.notes
-        });
+      const id = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(fase.id) ? fase.id : crypto.randomUUID();
+      const { error } = await supabase.from('obra_fases').upsert({
+        id, obra_id: fase.obra_id, name: fase.name,
+        start_date: fase.start_date, end_date: fase.end_date,
+        progress: fase.progress, status: fase.status,
+        responsable_name: fase.responsable_name, order_index: fase.order_index, notes: fase.notes
+      });
+      if (error) throw error;
 
-      if (error) {
-        console.warn('Upsert to obra_fases failed (using local sync):', error.message);
-      }
-
-      // Sync to local storage
-      const current = await this.getFases(fase.obra_id);
-      const index = current.findIndex(f => f.id === fase.id);
-      let updated: ObraFase[];
-      if (index >= 0) {
-        updated = [...current];
-        updated[index] = fase;
-      } else {
-        updated = [...current, fase];
-      }
-      this.saveFasesLocally(fase.obra_id, updated);
       return true;
     } catch (err) {
       console.error('Error saving fase:', err);
@@ -335,7 +313,8 @@ export const coordinadoresService = {
    */
   async deleteFase(obraId: string, faseId: string): Promise<boolean> {
     try {
-      await supabase.from('obra_fases').delete().eq('id', faseId);
+      const { error } = await supabase.from('obra_fases').delete().eq('id', faseId);
+      if (error) throw error;
       const current = await this.getFases(obraId);
       const filtered = current.filter(f => f.id !== faseId);
       this.saveFasesLocally(obraId, filtered);
