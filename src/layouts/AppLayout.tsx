@@ -206,6 +206,7 @@ export default function AppLayout() {
     { name: 'Notificaciones', path: '/notificaciones', icon: Bell, show: true, badge: pendingCount },
     { name: 'Reportes', path: '/reportes', icon: BarChart3, show: SHOW_REPORTS && (isLogistica || isAdmin) },
     { name: 'Herramientas', path: '/herramientas', icon: Wrench, show: true },
+    { name: 'Pedir herramientas', path: '/solicitudes/nueva', icon: FileText, show: true },
     { name: 'Movimiento de Herramientas', path: '/pedidos-herramientas', icon: FileText, show: SHOW_TOOL_MOVEMENTS_SHORTCUT },
     { name: 'Mis Obras', path: '/mis-obras', icon: Building, show: true },
   ].filter(item => item.show);

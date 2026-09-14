@@ -29,3 +29,9 @@ Se agregó el acceso a Movimiento de Herramientas en el encabezado de Logística
 Logística se muestra para todos los perfiles que antes tenían el acceso a movimientos. Se conservan la ruta `/pedidos-herramientas`, las redirecciones, los enlaces de seguimiento y los retornos al finalizar operaciones. No cambian los datos ni permisos de la base.
 
 Para recuperar los accesos principales, cambiar `SHOW_TOOL_MOVEMENTS_SHORTCUT` a `true`. Para deshacer toda esta reubicación, localizar el commit con `git log --oneline --grep="Mover Movimiento de Herramientas dentro de Logistica"`, revisar su diff y usar `git revert <COMMIT>` preservando los cambios posteriores. Validar con `npm run build`.
+
+## Acceso directo para pedir herramientas
+
+Se agrega “Pedir herramientas” inmediatamente debajo de “Herramientas” en `mainNavTop` de `src/layouts/AppLayout.tsx`. Abre el formulario existente `/solicitudes/nueva` y está disponible para los mismos perfiles que ven Herramientas. El historial Movimiento de Herramientas permanece dentro de Logística.
+
+Para retirar únicamente este acceso, eliminar la entrada con `path: '/solicitudes/nueva'` de `mainNavTop`. No eliminar la ruta ni el formulario.
