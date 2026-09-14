@@ -1,3 +1,4 @@
+import { SHOW_EXTENDED_OPERATIONS, hasStoredCoordinates } from '../components/operations/operationsFeatures';
 import type { Attendance } from '../services/operations/worksiteMetrics';
 import { PROGRESS_KEY, readLocalRecord, progressFor, toolValuation, laborMetrics } from '../services/operations/worksiteMetrics';
 import { useState, useEffect, useMemo } from 'react';
@@ -76,11 +77,11 @@ export default function CentroOperaciones() {
           loadAll('obras', 'id, code, name, address, encargado_name, phone, latitude, longitude, photo_url, active, status'),
           loadAll('empleados', '*'),
           loadAll('herramientas', 'id, code, name, description, brand, model, photo_url, status, current_obra_id, category, last_latitude, last_longitude'),
-          loadAll<Attendance>('novedades_diarias', '*'),
+          SHOW_EXTENDED_OPERATIONS ? loadAll<Attendance>('novedades_diarias', '*') : Promise.resolve({ data: [] as Attendance[], error: null }),
         ]);
 
         for (const result of [obrasRes, empsRes, toolsRes, novsRes]) if (result.error) throw result.error;
-        const progress = readLocalRecord(PROGRESS_KEY);
+        const progress = SHOW_EXTENDED_OPERATIONS ? readLocalRecord(PROGRESS_KEY) : {};
         const rawObras = obrasRes.data || [];
         const rawEmps: OperationalEmployee[] = (empsRes.data || []).map((e: any) => ({
           ...e,
@@ -92,7 +93,7 @@ export default function CentroOperaciones() {
         }));
         const rawNovs = novsRes.data || [];
 
-        const localTarifasSaved = readLocalRecord('peie_tarifas_horas');
+        const localTarifasSaved = SHOW_EXTENDED_OPERATIONS ? readLocalRecord('peie_tarifas_horas') : {};
 
         setAllEmployees(rawEmps);
         setAllTools(rawTools);
@@ -121,7 +122,7 @@ export default function CentroOperaciones() {
             active: obra.active ?? true,
             latitude: coordinates.latitude,
             longitude: coordinates.longitude,
-            isSimulatedLocation: isSimulated,
+            isSimulatedLocation: !hasStoredCoordinates(obra) || isSimulated,
             photo_url: obra.photo_url || null,
             workersCount: assignedWorkers.length,
             toolsCount: assignedTools.length,
@@ -130,7 +131,7 @@ export default function CentroOperaciones() {
             magnitudeIndex: rawMagnitude,
             ...labor,
             ...progressFor(obra.id, progress),
-            ...toolValuation(assignedTools),
+            ...(SHOW_EXTENDED_OPERATIONS ? toolValuation(assignedTools) : {}),
           };
         });
 
@@ -157,6 +158,7 @@ export default function CentroOperaciones() {
   }, []);
 
   useEffect(() => {
+    if (!SHOW_EXTENDED_OPERATIONS) return;
     const refresh = () => setWorksites(current => current.map(worksite => ({ ...worksite, ...progressFor(worksite.id, readLocalRecord(PROGRESS_KEY)), ...toolValuation(worksite.assignedTools) })));
     window.addEventListener('focus', refresh);
     window.addEventListener('storage', refresh);
@@ -212,18 +214,18 @@ export default function CentroOperaciones() {
 
     // Focus on the first match
     const target = filteredWorksites[0];
-    setFlyToCoords({ latitude: target.latitude, longitude: target.longitude });
+    setFlyToCoords(target.isSimulatedLocation ? null : { latitude: target.latitude, longitude: target.longitude });
     setSelectedWorksiteId(target.id);
   }, [filters.searchQuery, filteredWorksites]);
 
   // 4. Compute KPIs
   const kpis: KPIsType = useMemo(() => {
     const totalActiveWorksites = worksites.filter((w) => w.active).length;
-    const totalFieldWorkers = allEmployees.filter((e) => e.status === 'Trabajando').length;
+    const totalFieldWorkers = filteredWorksites.reduce((sum, w) => sum + w.workersCount, 0);
     const totalAvailableWorkers = allEmployees.filter(
       (e) => e.status === 'Libre' || !e.obra_id || e.status === 'Disponible'
     ).length;
-    const totalInUseTools = allTools.filter((t) => t.status === 'En uso').length;
+    const totalInUseTools = filteredWorksites.reduce((sum, w) => sum + w.toolsCount, 0);
     const totalAvailableTools = allTools.filter((t) => t.status === 'Disponible').length;
 
     // Alerts: inactive worksites with resources, or active worksites with 0 workers
@@ -240,15 +242,15 @@ export default function CentroOperaciones() {
       totalInUseTools,
       totalAvailableTools,
       alertsCount,
-      ...toolValuation(allTools),
+      ...(SHOW_EXTENDED_OPERATIONS ? toolValuation(allTools) : {}),
       suggestionsCount: 0,
       totalLaborCost,
     };
-  }, [worksites, allEmployees, allTools]);
+  }, [worksites, allEmployees, allTools, filteredWorksites]);
 
   // 5. Generate Deterministic Suggestions
   const suggestions: OperationalSuggestion[] = useMemo(() => {
-    return generateOperationalSuggestions(worksites, allEmployees, allTools);
+    return SHOW_EXTENDED_OPERATIONS ? generateOperationalSuggestions(worksites, allEmployees, allTools) : [];
   }, [worksites, allEmployees, allTools]);
 
   const selectedWorksite = useMemo(() => {
@@ -257,7 +259,7 @@ export default function CentroOperaciones() {
 
   const handleSelectWorksite = (worksite: OperationalWorksite) => {
     setSelectedWorksiteId(worksite.id);
-    setFlyToCoords({ latitude: worksite.latitude, longitude: worksite.longitude });
+    setFlyToCoords(worksite.isSimulatedLocation ? null : { latitude: worksite.latitude, longitude: worksite.longitude });
     setShowMobileDrawer(true);
     // Auto scroll suave al panel debajo del mapa para ver los detalles
     setTimeout(() => {
@@ -285,12 +287,12 @@ export default function CentroOperaciones() {
                 Centro de Operaciones
               </h1>
               <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
-                Radar geoespacial y logística de obras en Gran San Miguel de Tucumán
+                Personal y herramientas asignados por obra
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          {SHOW_EXTENDED_OPERATIONS && <div className="flex items-center gap-2">
             <button
               onClick={() => setShowToolFinder(!showToolFinder)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-black shadow-sm transition-all ${
@@ -311,7 +313,7 @@ export default function CentroOperaciones() {
               <span>Sugerencias ({suggestions.length})</span>
               {showSuggestionsDrawer ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
-          </div>
+          </div>}
         </div>
 
         {/* Top KPIs Banner */}
@@ -327,7 +329,7 @@ export default function CentroOperaciones() {
       </div>
 
       {/* Sugerencias Operativas Desplegables (Banner Superior) */}
-      {showSuggestionsDrawer && (
+      {SHOW_EXTENDED_OPERATIONS && showSuggestionsDrawer && (
         <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-2xl max-h-56 overflow-y-auto animate-in fade-in duration-200 shrink-0">
           <RecommendationCards
             suggestions={suggestions}
@@ -345,23 +347,23 @@ export default function CentroOperaciones() {
           onSelectWorksite={handleSelectWorksite}
           flyToCoords={flyToCoords}
           originCoords={mapOriginCoords}
-          onMapClick={(coords) => {
+          onMapClick={SHOW_EXTENDED_OPERATIONS ? (coords) => {
             setMapClickCoords(coords);
             setMapOriginCoords(coords);
-          }}
+          } : undefined}
         />
 
         {/* Floating Toggle Button directly on top-left of the Map */}
-        <button
+        {SHOW_EXTENDED_OPERATIONS && <button
           onClick={() => setShowToolFinder(!showToolFinder)}
           className="absolute top-4 left-4 z-10 bg-white/95 backdrop-blur-md shadow-md hover:bg-slate-50 border border-slate-200 text-peie-blue text-xs font-black px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 hover:scale-[1.02]"
         >
           <span className="w-2 h-2 rounded-full bg-blue-600 animate-ping"></span>
           <span>{showToolFinder ? 'Ocultar Buscador' : '📍 Buscar Herramienta Más Cercana'}</span>
-        </button>
+        </button>}
 
         {/* Floating Nearest Tool Finder Panel */}
-        {showToolFinder && (
+        {SHOW_EXTENDED_OPERATIONS && showToolFinder && (
           <div className="absolute top-16 left-4 z-20 max-w-md w-[calc(100%-2rem)] sm:w-[420px] shadow-2xl animate-in fade-in slide-in-from-top-3 duration-200">
             <NearestToolFinder
               worksites={worksites}
@@ -392,7 +394,7 @@ export default function CentroOperaciones() {
         <OperationsSidebar
           selectedWorksite={selectedWorksite}
           onClose={() => setSelectedWorksiteId(null)}
-          allWorksites={worksites}
+          allWorksites={filteredWorksites}
           onSelectWorksite={handleSelectWorksite}
         />
       </div>

@@ -1,3 +1,4 @@
+import { SHOW_EXTENDED_OPERATIONS } from './operationsFeatures';
 import type { OperationalWorksite } from '../../types/operations';
 import { formatARS } from '../../services/tools/toolPriceReference';
 
@@ -5,6 +6,25 @@ export function progressLabel(worksite: OperationalWorksite) {
   return worksite.progressPercent == null ? 'Sin datos' : `${worksite.progressPercent}%`;
 }
 export function createWorksiteBubble(worksite: OperationalWorksite, size: number, selected: boolean) {
+  if (!SHOW_EXTENDED_OPERATIONS) {
+    const marker = document.createElement('button');
+    marker.type = 'button';
+    marker.className = 'peie-operation-bubble-marker';
+    marker.setAttribute('aria-label', worksite.name + '. Personal: ' + worksite.workersCount + '. Herramientas: ' + worksite.toolsCount + '. Ver obra');
+    marker.style.cssText = 'display:flex;flex-direction:column;align-items:center;border:0;background:transparent;padding:0;cursor:pointer;max-width:148px';
+    const label = document.createElement('span');
+    label.textContent = worksite.name;
+    label.style.cssText = 'max-width:148px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-radius:6px;padding:3px 7px;background:white;color:#042454;font:bold 11px system-ui;box-shadow:0 1px 4px #0003';
+    const counts = document.createElement('span');
+    counts.textContent = '👷 ' + worksite.workersCount + '  ·  🛠 ' + worksite.toolsCount;
+    counts.style.cssText = 'border:2px solid white;border-radius:16px;padding:5px 9px;background:' + (selected ? '#b45309' : '#042454') + ';color:white;font:bold 12px system-ui;box-shadow:0 2px 6px #0004';
+    const stem = document.createElement('span');
+    stem.style.cssText = 'height:12px;width:2px;background:#042454';
+    const point = document.createElement('span');
+    point.style.cssText = 'height:8px;width:8px;border:2px solid white;border-radius:50%;background:#042454;box-shadow:0 0 2px #000';
+    marker.append(label, counts, stem, point);
+    return marker;
+  }
   const element = document.createElement('button');
   element.type = 'button';
   element.className = 'peie-operation-bubble-marker';
@@ -39,6 +59,14 @@ export function createWorksiteBubble(worksite: OperationalWorksite, size: number
 }
 
 export function createWorksiteSummary(worksite: OperationalWorksite) {
+  if (!SHOW_EXTENDED_OPERATIONS) {
+    const summary = document.createElement('div');
+    summary.style.cssText = 'padding:10px;font:12px system-ui;color:#042454;max-width:240px';
+    for (const text of [worksite.name, worksite.address || 'Sin dirección', 'Personal asignado: ' + worksite.workersCount, 'Herramientas en obra: ' + worksite.toolsCount]) {
+      const row = document.createElement('p'); row.textContent = text; row.style.margin = '4px 0'; summary.append(row);
+    }
+    return summary;
+  }
   const element = document.createElement('div');
   element.className = 'p-3 text-xs text-slate-800';
   element.style.cssText = 'min-width:220px;max-width:270px;font-family:system-ui';

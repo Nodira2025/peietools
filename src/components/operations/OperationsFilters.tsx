@@ -1,3 +1,4 @@
+import { SHOW_EXTENDED_OPERATIONS } from './operationsFeatures';
 import { Search, Building, HardHat, Wrench, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import type { OperationsFilterState } from '../../types/operations';
@@ -47,6 +48,7 @@ export default function OperationsFilters({
 
       {/* 2. Capas Activas (Chips) */}
       <div className="flex items-center gap-1.5 flex-wrap shrink-0">
+        {SHOW_EXTENDED_OPERATIONS && <>
         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1 hidden sm:inline">
           Capas:
         </span>
@@ -90,6 +92,7 @@ export default function OperationsFilters({
           <span>Herramientas</span>
         </button>
 
+        </>}
         {/* Filtro por Coordinador */}
         <select
           value={filters.selectedEncargado}

@@ -1,3 +1,4 @@
+import { SHOW_EXTENDED_OPERATIONS } from './operationsFeatures';
 import { formatARS } from '../../services/tools/toolPriceReference';
 import { progressLabel } from './worksiteBubble';
 import { useState } from 'react';
@@ -9,7 +10,6 @@ import {
   X,
   ExternalLink,
   MapPin,
-  Sparkles,
   Phone,
   ArrowRightLeft,
   ChevronRight,
@@ -39,7 +39,7 @@ export default function OperationsSidebar({
   // Top 5 worksites by magnitude for the default overview
   const topWorksites = [...allWorksites]
     .sort((a, b) => b.magnitudeIndex - a.magnitudeIndex)
-    .slice(0, 6);
+    .slice(0, SHOW_EXTENDED_OPERATIONS ? 6 : allWorksites.length);
 
   if (!selectedWorksite) {
     return (
@@ -52,7 +52,7 @@ export default function OperationsSidebar({
               <h3 className="font-black text-sm sm:text-base tracking-tight">Radar Operativo</h3>
             </div>
             <p className="text-xs text-slate-300 max-w-2xl">
-              Hacé click en cualquier burbuja del mapa de Tucumán para inspeccionar su dotación, herramientas asignadas y cercanía logística.
+              Seleccioná una obra en el mapa o en el listado para consultar su personal y herramientas.
             </p>
           </div>
           <div className="px-3.5 py-1.5 rounded-xl bg-white/10 text-sky-200 text-xs font-bold border border-white/15 whitespace-nowrap">
@@ -64,7 +64,7 @@ export default function OperationsSidebar({
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider">
-              Obras con Mayor Despliegue Operativo
+              Personal y herramientas por obra
             </h4>
             <span className="text-[10px] font-bold text-slate-400">Ordenadas por recursos</span>
           </div>
@@ -85,7 +85,7 @@ export default function OperationsSidebar({
                       {obra.name}
                     </p>
                     <p className="text-[11px] text-slate-400 truncate">
-                      {obra.encargado_name ? `Coord: ${obra.encargado_name}` : 'Sin coordinador'}
+                      {obra.address || 'Sin dirección'}{obra.isSimulatedLocation ? ' · Ubicación pendiente' : ''}
                     </p>
                   </div>
                 </div>
@@ -97,7 +97,7 @@ export default function OperationsSidebar({
                   <span className="text-[10px] font-extrabold text-sky-700 bg-sky-50 px-2 py-1 rounded-lg border border-sky-200">
                     🛠 {obra.toolsCount}
                   </span>
-                  {obra.totalLaborCost > 0 && (
+                  {SHOW_EXTENDED_OPERATIONS && obra.totalLaborCost > 0 && (
                     <span 
                       className="text-[10px] font-extrabold text-emerald-800 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200" 
                       title={`Horas trabajadas: ${obra.totalLaborHours} hs`}
@@ -115,7 +115,8 @@ export default function OperationsSidebar({
     );
   }
 
-  const gmapsUrl = `https://www.google.com/maps/search/?api=1&query=${selectedWorksite.latitude},${selectedWorksite.longitude}`;
+  const gmapsQuery = selectedWorksite.isSimulatedLocation ? `${selectedWorksite.address || selectedWorksite.name}, Tucumán, Argentina` : `${selectedWorksite.latitude},${selectedWorksite.longitude}`;
+  const gmapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gmapsQuery)}`;
 
   return (
     <div className="flex flex-col bg-white overflow-hidden font-sans">
@@ -128,14 +129,14 @@ export default function OperationsSidebar({
             </span>
             {selectedWorksite.isSimulatedLocation ? (
               <span className="text-[9px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                Ubicación Referencial
+                Ubicación pendiente de confirmar
               </span>
             ) : (
               <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
-                <ShieldCheck size={11} /> Coordenada GPS
+                <ShieldCheck size={11} /> Coordenadas guardadas
               </span>
             )}
-            {(selectedWorksite.totalLaborCost || 0) > 0 && (
+            {SHOW_EXTENDED_OPERATIONS && (selectedWorksite.totalLaborCost || 0) > 0 && (
               <span className="text-[9px] font-black text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-full border border-emerald-300">
                 Costo M.O.: ${(selectedWorksite.totalLaborCost || 0).toLocaleString('es-AR')}
               </span>
@@ -196,7 +197,7 @@ export default function OperationsSidebar({
       </div>
 
       {/* Resumen Métricas con Costo de Mano de Obra */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 bg-white border-b border-slate-100">
+      <div className="grid grid-cols-2 gap-3 p-4 bg-white border-b border-slate-100">
         <div className="p-3 rounded-xl bg-amber-50/80 border border-amber-150">
           <p className="text-xs font-extrabold text-amber-900">Personal Asignado</p>
           <p className="text-xl font-black text-amber-700 mt-0.5">👷 {selectedWorksite.workersCount}</p>
@@ -205,6 +206,7 @@ export default function OperationsSidebar({
           <p className="text-xs font-extrabold text-sky-900">Herramientas en Obra</p>
           <p className="text-xl font-black text-sky-700 mt-0.5">🛠 {selectedWorksite.toolsCount}</p>
         </div>
+        {SHOW_EXTENDED_OPERATIONS && <>
         <div className="p-3 rounded-xl bg-emerald-50/80 border border-emerald-200">
           <p className="text-xs font-extrabold text-emerald-900">Costo por horas</p>
           <p className="text-xl font-black text-emerald-700 mt-0.5">
@@ -234,6 +236,7 @@ export default function OperationsSidebar({
             {selectedWorksite.magnitudeIndex.toFixed(1)} pts
           </span>
         </div>
+        </>}
       </div>
 
       {/* Contenido Pestañas */}

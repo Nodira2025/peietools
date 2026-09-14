@@ -1,3 +1,4 @@
+import { SHOW_EXTENDED_OPERATIONS } from './operationsFeatures';
 import { formatARS } from '../../services/tools/toolPriceReference';
 import { Building, HardHat, Wrench, AlertTriangle, CheckCircle2, DollarSign } from 'lucide-react';
 import type { OperationsKPIs as KPIsType } from '../../types/operations';
@@ -7,6 +8,17 @@ interface OperationsKPIsProps {
 }
 
 export default function OperationsKPIs({ kpis }: OperationsKPIsProps) {
+  if (!SHOW_EXTENDED_OPERATIONS) return (
+    <div className="grid grid-cols-2 gap-3 rounded-2xl border border-slate-200 bg-white p-3">
+      {[['Personal en obras', kpis.totalFieldWorkers, HardHat], ['Herramientas en obras', kpis.totalInUseTools, Wrench]].map(([label, count, Icon]) => {
+        const ResourceIcon = Icon as typeof HardHat;
+        return <div key={String(label)} className="rounded-xl bg-blue-50 p-3 text-blue-950">
+          <ResourceIcon className="mb-2 h-5 w-5" />
+          <p className="text-xs font-semibold">{String(label)}</p><p className="text-2xl font-black">{String(count)}</p>
+        </div>;
+      })}
+    </div>
+  );
   const formattedCost = (kpis.totalLaborCost || 0) >= 1000000
     ? `$${((kpis.totalLaborCost || 0) / 1000000).toFixed(1)}M`
     : `$${(kpis.totalLaborCost || 0).toLocaleString('es-AR')}`;

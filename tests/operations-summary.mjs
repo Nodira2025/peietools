@@ -13,6 +13,9 @@ const server = await createServer({ cacheDir: 'scratch/vite-operations-test', se
 let browser;
 try {
   const { laborMetrics, progressFor } = await server.ssrLoadModule('/src/services/operations/worksiteMetrics.ts');
+  const { hasStoredCoordinates } = await server.ssrLoadModule('/src/components/operations/operationsFeatures.ts');
+  assert.equal(hasStoredCoordinates({ latitude: -26.82, longitude: -65.22 }), true);
+  for (const value of [{}, { latitude: 0, longitude: 0 }, { latitude: 100, longitude: -65 }, { latitude: -26, longitude: 181 }, { latitude: Infinity, longitude: -65 }]) assert.equal(hasStoredCoordinates(value), false);
   const employee = { id: 'e1', full_name: 'Ana', obra_id: 'b', valor_hora: 1000 };
   const records = [{ obra_id: 'a', empleado_id: 'e1', horas_trabajadas: 8 }, { obra_id: 'b', empleado_id: 'e1', horas_trabajadas: 4 }, { empleado_id: 'e1', horas_trabajadas: 10 }];
   assert.equal(laborMetrics({ id: 'a', name: 'A' }, records, [employee], {}).totalLaborCost, 8000);
@@ -34,12 +37,13 @@ try {
     await page.route('**/*', async route => {
       const url = new URL(route.request().url());
       if (url.origin === new URL(base).origin) return route.continue();
-      if (url.hostname === 'tile.openstreetmap.org') return route.fulfill({ contentType: 'image/png', body: tile });
+      if (url.hostname === 'tile.openstreetmap.org') return process.env.OPERATIONS_REAL_TILES === '1' ? route.continue() : route.fulfill({ contentType: 'image/png', body: tile });
       if (!url.pathname.startsWith('/rest/v1/')) return route.abort();
       assert.equal(route.request().method(), 'GET', 'Never write real or test operational data');
       const table = url.pathname.split('/').at(-1);
+      assert.notEqual(table, 'novedades_diarias', 'Resource view must not request labor records');
       const all = {
-        obras: ['a', 'b', 'c'].map((id, i) => ({ id, name: `Obra ${id.toUpperCase()}`, active: true, latitude: -26.824 + i * .02, longitude: -65.222 + i * .02 })),
+        obras: [...['a', 'b', 'c'].map((id, i) => ({ id, name: `Obra ${id.toUpperCase()}`, address: `Calle ${i + 1}, Tucumán`, active: true, latitude: -26.824 + i * .02, longitude: -65.222 + i * .02 })), { id: 'unknown', name: 'Sin coordenadas', active: true }],
         empleados: [{ ...employee, status: 'Trabajando', specialty: 'oficial' }],
         herramientas: [{ id: 't1', name: 'Taladro', code: 'T1', current_obra_id: 'a', status: 'En uso' }],
         novedades_diarias: [...records, ...Array.from({ length: 505 }, () => ({ obra_id: 'a', empleado_id: 'e1', horas_trabajadas: 1 }))],
@@ -48,23 +52,30 @@ try {
       await route.fulfill({ contentType: 'application/json', body: JSON.stringify(all.slice(offset, offset + limit)) });
     });
     await page.goto(`${base}__operations`);
-    const bubble = page.getByRole('button', { name: 'Obra A. Avance: 65%. Ver resumen de obra', exact: true });
+    const bubble = page.getByRole('button', { name: 'Obra A. Personal: 0. Herramientas: 1. Ver obra', exact: true });
     await bubble.waitFor();
-    assert.equal(await page.locator('[data-progress-ring="100"]').getAttribute('stroke-dashoffset'), '0');
-    await page.getByRole('button', { name: 'Obra C. Avance: Sin datos. Ver resumen de obra', exact: true }).waitFor();
+    assert.equal(await page.locator('[data-progress-ring]').count(), 0);
+    assert.equal(await page.locator('.peie-operation-bubble-marker').count(), 3);
+    assert.equal(await page.getByRole('button', { name: /Sin coordenadas.*Ver obra/ }).count(), 0);
+    await page.getByText('1 obra(s) sin coordenadas válidas. Disponibles en el listado.').waitFor();
+    await page.getByText('Personal en obras', { exact: true }).waitFor();
+    assert.equal(await page.getByText(/Costo por horas|Valor total de herramientas|Finalización de obra|Sugerencias/).count(), 0);
     await bubble.hover();
     const popup = page.locator('.maplibregl-popup');
-    await popup.getByText('513 h', { exact: true }).waitFor();
-    await popup.getByText(/513.000/).waitFor();
-    await popup.getByText('65% de 100%', { exact: true }).waitFor();
-    await page.getByText('Valor total de herramientas', { exact: true }).waitFor();
+    await popup.getByText('Calle 1, Tucumán', { exact: true }).waitFor();
+    await popup.getByText('Herramientas en obra: 1', { exact: true }).waitFor();
     await mkdir('scratch/operations-qa', { recursive: true });
-    await page.screenshot({ path: `scratch/operations-qa/hover-${width}.png` });
+    await page.screenshot({ path: 'scratch/operations-qa/hover-' + width + '.png' });
     await bubble.click();
-    await page.getByText('Valor de herramientas en obra', { exact: true }).waitFor();
+    await page.getByRole('tab', { name: 'Herramientas (1)' }).click();
+    await page.getByText('Taladro', { exact: true }).waitFor();
+    assert.equal(await page.getByText(/Costo por horas|Valor de herramientas en obra|Finalización de obra|Índice de Carga/).count(), 0);
+    await page.getByRole('button', { name: 'Cerrar ficha' }).click();
+    await page.getByText('Sin coordenadas', { exact: true }).click();
+    await page.getByText('Ubicación pendiente de confirmar', { exact: true }).waitFor();
     assert.deepEqual(errors, []);
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'No horizontal overflow');
-    await page.screenshot({ path: `scratch/operations-qa/detail-${width}.png`, fullPage: true });
-    await page.close(); console.log(`PASS ${width}px: progress 65/100/unknown, hover, touch/click, totals, pagination, labor assignment`);
+    await page.screenshot({ path: 'scratch/operations-qa/detail-' + width + '.png', fullPage: true });
+    await page.close(); console.log(`PASS ${width}px: resources only, stored coordinates, hover address, touch/click, no financial requests`);
   }
 } finally { await browser?.close(); await server.close(); }
