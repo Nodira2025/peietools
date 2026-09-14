@@ -1,3 +1,4 @@
+import { buildCoordinatorDirectory, normalizeCoordinatorName } from '../services/operations/coordinatorDirectory';
 import { SHOW_EXTENDED_OPERATIONS, hasStoredCoordinates } from '../components/operations/operationsFeatures';
 import type { Attendance } from '../services/operations/worksiteMetrics';
 import { PROGRESS_KEY, readLocalRecord, progressFor, toolValuation, laborMetrics } from '../services/operations/worksiteMetrics';
@@ -166,17 +167,16 @@ export default function CentroOperaciones() {
   }, []);
 
   // 2. Coordinators list for filters
-  const encargadosList = useMemo(() => {
-    return Array.from(
-      new Set(worksites.map((w) => w.encargado_name).filter((name): name is string => Boolean(name)))
-    ).sort();
-  }, [worksites]);
+  const coordinatorDirectory = useMemo(
+    () => buildCoordinatorDirectory(worksites.map(w => w.encargado_name)),
+    [worksites]
+  );
 
   // 3. Global Search & Filter Matching
   const filteredWorksites = useMemo(() => {
     return worksites.filter((w) => {
       // Coordinator filter
-      if (filters.selectedEncargado && w.encargado_name !== filters.selectedEncargado) {
+      if (filters.selectedEncargado && coordinatorDirectory.resolve(w.encargado_name) !== filters.selectedEncargado) {
         return false;
       }
 
@@ -186,7 +186,7 @@ export default function CentroOperaciones() {
         const matchesWorksite =
           w.name.toLowerCase().includes(query) ||
           (w.address && w.address.toLowerCase().includes(query)) ||
-          (w.encargado_name && w.encargado_name.toLowerCase().includes(query));
+          (w.encargado_name && coordinatorDirectory.resolve(w.encargado_name).includes(normalizeCoordinatorName(query)));
 
         const matchesWorker = w.assignedWorkers.some(
           (emp) =>
@@ -206,7 +206,7 @@ export default function CentroOperaciones() {
 
       return true;
     });
-  }, [worksites, filters]);
+  }, [worksites, filters, coordinatorDirectory]);
 
   // Handle Search Fly-to
   useEffect(() => {
@@ -254,8 +254,8 @@ export default function CentroOperaciones() {
   }, [worksites, allEmployees, allTools]);
 
   const selectedWorksite = useMemo(() => {
-    return worksites.find((w) => w.id === selectedWorksiteId) || null;
-  }, [worksites, selectedWorksiteId]);
+    return filteredWorksites.find((w) => w.id === selectedWorksiteId) || null;
+  }, [filteredWorksites, selectedWorksiteId]);
 
   const handleSelectWorksite = (worksite: OperationalWorksite) => {
     setSelectedWorksiteId(worksite.id);
@@ -323,7 +323,7 @@ export default function CentroOperaciones() {
         <OperationsFilters
           filters={filters}
           onFilterChange={setFilters}
-          encargadosList={encargadosList}
+          encargadosList={coordinatorDirectory.options}
           searchMatchesCount={filteredWorksites.length}
         />
       </div>

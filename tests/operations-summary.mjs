@@ -16,6 +16,14 @@ try {
   const { hasStoredCoordinates } = await server.ssrLoadModule('/src/components/operations/operationsFeatures.ts');
   assert.equal(hasStoredCoordinates({ latitude: -26.82, longitude: -65.22 }), true);
   for (const value of [{}, { latitude: 0, longitude: 0 }, { latitude: 100, longitude: -65 }, { latitude: -26, longitude: 181 }, { latitude: Infinity, longitude: -65 }]) assert.equal(hasStoredCoordinates(value), false);
+  const { buildCoordinatorDirectory } = await server.ssrLoadModule('/src/services/operations/coordinatorDirectory.ts');
+  const directory = buildCoordinatorDirectory(['Carlos Grande', 'CARLOS GRANDE', 'Carlos', 'Carlos ', 'Martin Grande', 'Martín', null, '  ']);
+  assert.deepEqual(directory.options.map(o => o.value), ['carlos grande', 'martin grande']);
+  assert.equal(directory.resolve(' Carlos  '), 'carlos grande');
+  assert.equal(directory.resolve('MARTÍN'), 'martin grande');
+  const ambiguous = buildCoordinatorDirectory(['Carlos Grande', 'Carlos Perez', 'Carlos']);
+  assert.equal(ambiguous.options.length, 3);
+  assert.equal(ambiguous.resolve('Carlos'), 'carlos');
   const employee = { id: 'e1', full_name: 'Ana', obra_id: 'b', valor_hora: 1000 };
   const records = [{ obra_id: 'a', empleado_id: 'e1', horas_trabajadas: 8 }, { obra_id: 'b', empleado_id: 'e1', horas_trabajadas: 4 }, { empleado_id: 'e1', horas_trabajadas: 10 }];
   assert.equal(laborMetrics({ id: 'a', name: 'A' }, records, [employee], {}).totalLaborCost, 8000);
@@ -43,7 +51,7 @@ try {
       const table = url.pathname.split('/').at(-1);
       assert.notEqual(table, 'novedades_diarias', 'Resource view must not request labor records');
       const all = {
-        obras: [...['a', 'b', 'c'].map((id, i) => ({ id, name: `Obra ${id.toUpperCase()}`, address: `Calle ${i + 1}, Tucumán`, active: true, latitude: -26.824 + i * .02, longitude: -65.222 + i * .02 })), { id: 'unknown', name: 'Sin coordenadas', active: true }],
+        obras: [...['a', 'b', 'c'].map((id, i) => ({ id, name: `Obra ${id.toUpperCase()}`, address: `Calle ${i + 1}, Tucumán`, encargado_name: ['Carlos Grande', 'CARLOS GRANDE', 'Carlos '][i], active: true, latitude: -26.824 + i * .02, longitude: -65.222 + i * .02 })), { id: 'unknown', name: 'Sin coordenadas', encargado_name: 'Martin Grande', active: true }],
         empleados: [{ ...employee, status: 'Trabajando', specialty: 'oficial' }],
         herramientas: [{ id: 't1', name: 'Taladro', code: 'T1', current_obra_id: 'a', status: 'En uso' }],
         novedades_diarias: [...records, ...Array.from({ length: 505 }, () => ({ obra_id: 'a', empleado_id: 'e1', horas_trabajadas: 1 }))],
@@ -73,6 +81,16 @@ try {
     await page.getByRole('button', { name: 'Cerrar ficha' }).click();
     await page.getByText('Sin coordenadas', { exact: true }).click();
     await page.getByText('Ubicación pendiente de confirmar', { exact: true }).waitFor();
+    const coordinatorFilter = page.getByRole('combobox', { name: 'Filtrar por encargado de obra' });
+    assert.deepEqual(await coordinatorFilter.locator('option').allTextContents(), ['Todos los coordinadores', 'Carlos Grande', 'Martin Grande']);
+    await coordinatorFilter.selectOption('carlos grande');
+    await page.getByText('Personal y herramientas por obra', { exact: true }).waitFor();
+    assert.equal(await page.locator('.peie-operation-bubble-marker').count(), 3);
+    await coordinatorFilter.selectOption('martin grande');
+    await page.waitForFunction(() => document.querySelectorAll('.peie-operation-bubble-marker').length === 0);
+    await page.getByText('Sin coordenadas', { exact: true }).waitFor();
+    await coordinatorFilter.selectOption('');
+    await bubble.waitFor();
     assert.deepEqual(errors, []);
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'No horizontal overflow');
     await page.screenshot({ path: 'scratch/operations-qa/detail-' + width + '.png', fullPage: true });

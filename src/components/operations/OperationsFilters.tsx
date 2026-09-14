@@ -7,7 +7,7 @@ import type { OperationsFilterState } from '../../types/operations';
 interface OperationsFiltersProps {
   filters: OperationsFilterState;
   onFilterChange: (newFilters: OperationsFilterState) => void;
-  encargadosList: string[];
+  encargadosList: { value: string; label: string }[];
   searchMatchesCount: number;
 }
 
@@ -95,14 +95,15 @@ export default function OperationsFilters({
         </>}
         {/* Filtro por Coordinador */}
         <select
+          aria-label="Filtrar por encargado de obra"
           value={filters.selectedEncargado}
           onChange={(e) => onFilterChange({ ...filters, selectedEncargado: e.target.value })}
           className="h-9 px-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos los coordinadores</option>
           {encargadosList.map((enc) => (
-            <option key={enc} value={enc}>
-              {enc}
+            <option key={enc.value} value={enc.value}>
+              {enc.label}
             </option>
           ))}
         </select>

@@ -64,3 +64,13 @@ En `src/pages/MisObras.tsx`, `SHOW_PROGRESS_PHOTOS = false` oculta el registro f
 - Escritorio de 1280 px y móvil de 390 px; capturas en `scratch/operations-qa/` (no versionadas).
 
 Los tests no verifican la exactitud física de ubicaciones de producción ni se conectan a datos reales de la empresa.
+
+## Corrección del filtro de encargados (14/09/2026)
+
+Se confirmó por lectura de `obras.encargado_name` que había variantes como Carlos Grande, CARLOS GRANDE, Carlos, Carlos con espacio final, Martin Grande y Martin.
+
+`src/services/operations/coordinatorDirectory.ts` normaliza espacios, mayúsculas y tildes para generar una opción por encargado. Un nombre corto se agrupa con el completo solo cuando existe una única coincidencia por primer nombre. Si aparecen Carlos Grande y Carlos Perez, Carlos permanece separado para no mezclar personas sin evidencia suficiente. No se realizan correcciones ortográficas aproximadas ni cambios en Supabase.
+
+El selector usa una clave normalizada y aplica la misma resolución a cada obra; así incluye las obras registradas con variantes del nombre. La búsqueda también reconoce el nombre completo para obras cargadas con nombre corto. La ficha seleccionada se oculta si queda fuera del filtro.
+
+La prueba `tests/operations-summary.mjs` cubre duplicados, abreviaciones únicas, nombres ambiguos y filtrado en escritorio y móvil. Para deshacer solo esta corrección, localizar el commit con `git log --oneline --grep="Unificar encargados duplicados en Centro de operaciones"` y revertirlo tras revisar cambios posteriores; no cambiar el indicador de funciones ampliadas.
