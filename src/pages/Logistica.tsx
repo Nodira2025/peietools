@@ -1,11 +1,12 @@
-import { SHOW_REPORTS } from '../config/navigationFeatures';
+import ReportTaskDialog from '../components/ReportTaskDialog';
+import { SHOW_REPORTS, SHOW_REPORT_PURCHASE } from '../config/navigationFeatures';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Truck, Clock, Package, CheckCircle, ArrowRight, Wrench, Search, FileSpreadsheet, AlertTriangle, Sparkles, ShoppingBag } from 'lucide-react';
+import { Truck, Clock, Package, CheckCircle, ArrowRight, Wrench, Search, FileSpreadsheet, FileText, AlertTriangle, Sparkles, ShoppingBag } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import FilterBar from '../components/FilterBar';
 import { Input } from '@/components/ui/input';
@@ -59,6 +60,7 @@ export default function Logistica() {
 
 
   // Form State para registrar orden de compra (WhatsApp + IA)
+  const [isReportOpen, setIsReportOpen] = useState(false);
   const [isCompraOpen, setIsCompraOpen] = useState(false);
   const [compraRawText, setCompraRawText] = useState('');
   const [compraTitle, setCompraTitle] = useState('');
@@ -169,7 +171,7 @@ export default function Logistica() {
     if (searchParams.get('nuevoGasto') === 'true') {
       setIsGastoOpen(true);
     }
-    if (searchParams.get('nuevaCompra') === 'true') {
+    if (SHOW_REPORT_PURCHASE && searchParams.get('nuevaCompra') === 'true') {
       setIsCompraOpen(true);
     }
     if (searchParams.get('verGastos') === 'true') {
@@ -499,7 +501,15 @@ export default function Logistica() {
           </Button>
           )}
 
+          <Button
+            onClick={() => setIsReportOpen(true)}
+            className="bg-amber-600 hover:bg-amber-700 text-white font-black rounded-xl text-xs h-10 px-3 flex-1 sm:flex-initial flex items-center justify-center gap-1.5 shadow-md"
+          >
+            <FileText className="h-4 w-4 shrink-0" /> Reportar Tarea
+          </Button>
+          <ReportTaskDialog open={isReportOpen} onOpenChange={setIsReportOpen} />
           {/* Botón para Reportar Orden de Compra (Pegar WhatsApp + IA) */}
+          {SHOW_REPORT_PURCHASE && (
           <Dialog open={isCompraOpen} onOpenChange={setIsCompraOpen}>
             <DialogTrigger asChild>
               <Button className="bg-amber-600 hover:bg-amber-700 text-white font-black rounded-xl text-xs h-10 px-3 flex-1 sm:flex-initial flex items-center justify-center gap-1.5 shadow-md">
@@ -633,6 +643,7 @@ export default function Logistica() {
               </div>
             </DialogContent>
           </Dialog>
+          )}
 
           <Dialog open={isGastoOpen} onOpenChange={setIsGastoOpen}>
             <DialogTrigger asChild>

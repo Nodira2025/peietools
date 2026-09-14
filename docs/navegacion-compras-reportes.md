@@ -35,3 +35,16 @@ Para recuperar los accesos principales, cambiar `SHOW_TOOL_MOVEMENTS_SHORTCUT` a
 Se agrega “Pedir herramientas” inmediatamente debajo de “Herramientas” en `mainNavTop` de `src/layouts/AppLayout.tsx`. Abre el formulario existente `/solicitudes/nueva` y está disponible para los mismos perfiles que ven Herramientas. El historial Movimiento de Herramientas permanece dentro de Logística.
 
 Para retirar únicamente este acceso, eliminar la entrada con `path: '/solicitudes/nueva'` de `mainNavTop`. No eliminar la ruta ni el formulario.
+
+## Reportar Tarea reemplaza a Reportar Compra en Logística
+
+Cambio aplicado tras aprobar la vista previa: el encabezado de Logística mantiene Movimiento de Herramientas y Registro de Compras, y ofrece Reportar Tarea en lugar de Reportar Compra.
+
+- `SHOW_REPORT_PURCHASE = false` en `src/config/navigationFeatures.ts` oculta el diálogo completo de Reportar Compra en Logística, su acceso en Inicio y la apertura mediante `?nuevaCompra=true`. La función y los datos de compras se conservan.
+- `src/components/ReportTaskDialog.tsx` contiene el formulario de tarea existente, compartido por Inicio y Logística. Sus listas de personas se cargan al abrirlo. Se conserva la selección de destinatario, personal de obra/oficina, tarea, motivo y apertura de WhatsApp por acción del usuario.
+- El formulario comprueba que el destinatario elegido tenga WhatsApp; no interpreta un ID de usuario como teléfono. Para personal de la tabla empleados conserva el nombre en el reporte y no envía ese ID a la clave foránea de usuarios de autenticación.
+- La opción Reportes continúa oculta; no se reactiva el módulo de informes.
+
+Para volver a mostrar Reportar Compra, cambiar `SHOW_REPORT_PURCHASE` a `true`. Para revertir todo el reemplazo y la extracción del formulario compartido, localizar el commit con `git log --oneline --grep="Reemplazar Reportar Compra por Reportar Tarea en Logistica"`, revisar sus cambios y revertir ese commit preservando modificaciones posteriores.
+
+Validación: `npm run build` y `node tests/logistica-report-task.mjs`. Se comprueban escritorio de 1280 px y móvil de 390 px, el formulario desde Logística e Inicio, el bloqueo del enlace antiguo y la conservación del Registro de Compras. Las pruebas usan datos simulados y no generan reportes ni abren WhatsApp.
