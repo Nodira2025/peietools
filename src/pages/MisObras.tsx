@@ -11,6 +11,9 @@ import { compressImage } from '../lib/imageUtils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 
+// Mantener el registro disponible para reactivarlo, oculto en Mis obras.
+const SHOW_PROGRESS_PHOTOS = false;
+
 interface Obra {
   id: string;
   name: string;
@@ -153,6 +156,8 @@ export default function MisObras() {
   };
 
   const fetchAvances = async (obraId: string) => {
+    if (!SHOW_PROGRESS_PHOTOS) return;
+
     const { data } = await supabase
       .from('obra_avances_fotos')
       .select('*')
@@ -452,6 +457,7 @@ export default function MisObras() {
         </div>
 
         {/* Registro de Avances Fotográficos */}
+        {SHOW_PROGRESS_PHOTOS && (
         <div className="space-y-3 pt-2">
           <div className="flex justify-between items-center">
             <h3 className="text-xs font-black text-[#031530] uppercase tracking-wider flex items-center gap-1.5">
@@ -509,6 +515,8 @@ export default function MisObras() {
           )}
         </div>
 
+        )}
+
         {/* Botones de acción inferiores */}
         <div className="flex gap-3 pt-4 border-t border-slate-100">
           {isSpecialRole && (
@@ -529,6 +537,7 @@ export default function MisObras() {
         </div>
 
         {/* Dialog para Nuevo Avance Fotográfico */}
+        {SHOW_PROGRESS_PHOTOS && (
         <Dialog open={isAvanceDialogOpen} onOpenChange={setIsAvanceDialogOpen}>
           <DialogContent className="rounded-3xl w-[95%] max-w-md">
             <DialogHeader>
@@ -612,6 +621,7 @@ export default function MisObras() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        )}
       </div>
     );
   }
@@ -754,7 +764,7 @@ export default function MisObras() {
       )}
 
       {/* Fullscreen Progress Photo Preview Modal */}
-      {previewPhotoUrl && (
+      {SHOW_PROGRESS_PHOTOS && previewPhotoUrl && (
         <div 
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200"
           onClick={() => setPreviewPhotoUrl(null)}
