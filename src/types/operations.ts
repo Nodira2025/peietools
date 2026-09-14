@@ -37,10 +37,11 @@ export interface OperationalWorksite {
   name: string;
   address: string | null;
   encargado_name: string | null;
+  phone?: string | null;
   status: string | null;
   active: boolean;
-  latitude: number;
-  longitude: number;
+  latitude: number | null;
+  longitude: number | null;
   isSimulatedLocation: boolean;
   photo_url: string | null;
   workersCount: number;

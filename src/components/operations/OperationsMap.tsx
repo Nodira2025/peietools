@@ -29,7 +29,7 @@ export default function OperationsMap({
   const originMarkerRef = useRef<Marker | null>(null);
 
   const [mapError, setMapError] = useState(false);
-  const mappedWorksites = useMemo(() => worksites.filter(w => !w.isSimulatedLocation && hasStoredCoordinates(w)), [worksites]);
+  const mappedWorksites = useMemo(() => worksites.filter(hasStoredCoordinates).filter(w => !w.isSimulatedLocation), [worksites]);
   const boundsKey = mappedWorksites.map(w => w.id + ':' + w.latitude + ':' + w.longitude).join('|');
 
   // 1. Initialize MapLibre GL

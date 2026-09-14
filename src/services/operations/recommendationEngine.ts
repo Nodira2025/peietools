@@ -1,3 +1,4 @@
+import { hasStoredCoordinates } from '../../components/operations/operationsFeatures';
 import type { OperationalWorksite, OperationalEmployee, OperationalTool } from '../../types/operations';
 
 import { calculateHaversineDistance, formatDistance } from '../geo/haversine';
@@ -45,7 +46,7 @@ export function generateOperationalSuggestions(
       const rankedCandidates = availableWorkers
         .map((emp) => {
           let dist = 3.5; // Distancia estimada base si el operario no tiene GPS
-          if (emp.lastKnownLocation) {
+          if (emp.lastKnownLocation && hasStoredCoordinates(targetObra)) {
             dist = calculateHaversineDistance(emp.lastKnownLocation, {
               latitude: targetObra.latitude,
               longitude: targetObra.longitude,

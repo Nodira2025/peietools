@@ -1,4 +1,4 @@
-import { SHOW_EXTENDED_OPERATIONS } from './operationsFeatures';
+import { hasStoredCoordinates, SHOW_EXTENDED_OPERATIONS } from './operationsFeatures';
 import { formatARS } from '../../services/tools/toolPriceReference';
 import { progressLabel } from './worksiteBubble';
 import { useState } from 'react';
@@ -148,8 +148,9 @@ export default function OperationsSidebar({
           <div className="flex items-center gap-3 flex-wrap mt-1 text-xs text-slate-500 font-medium">
             <span className="flex items-center gap-1">
               <MapPin size={13} className="text-slate-400 shrink-0" />
-              {selectedWorksite.address || 'Tucumán, Argentina'}
+              {selectedWorksite.address || 'Sin dirección'}
             </span>
+            {hasStoredCoordinates(selectedWorksite) && <span className="font-mono text-[11px]">GPS: {selectedWorksite.latitude}, {selectedWorksite.longitude}</span>}
             {selectedWorksite.encargado_name && (
               <span className="text-slate-700 font-bold">
                 Coordinador: <b className="text-slate-900">{selectedWorksite.encargado_name}</b>

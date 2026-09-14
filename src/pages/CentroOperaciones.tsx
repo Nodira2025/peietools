@@ -17,7 +17,6 @@ import type {
   OperationsKPIs as KPIsType,
   OperationsFilterState,
 } from '../types/operations';
-import { resolveWorksiteCoordinates } from '../services/geo/tucumanGeoRegistry';
 import {
   calculateRawMagnitude,
   computeRelativeBubbleRadius,
@@ -69,9 +68,12 @@ export default function CentroOperaciones() {
 
   // 1. Data Fetching from Supabase
   useEffect(() => {
-    async function loadOperationalData() {
+    let cancelled = false;
+    let requestId = 0;
+    async function loadOperationalData(showLoader = false) {
+      const currentRequest = ++requestId;
       try {
-        setLoading(true);
+        if (showLoader) setLoading(true);
         setLoadError(false);
 
         const [obrasRes, empsRes, toolsRes, novsRes] = await Promise.all([
@@ -81,6 +83,7 @@ export default function CentroOperaciones() {
           SHOW_EXTENDED_OPERATIONS ? loadAll<Attendance>('novedades_diarias', '*') : Promise.resolve({ data: [] as Attendance[], error: null }),
         ]);
 
+        if (cancelled || currentRequest !== requestId) return;
         for (const result of [obrasRes, empsRes, toolsRes, novsRes]) if (result.error) throw result.error;
         const progress = SHOW_EXTENDED_OPERATIONS ? readLocalRecord(PROGRESS_KEY) : {};
         const rawObras = obrasRes.data || [];
@@ -103,7 +106,6 @@ export default function CentroOperaciones() {
         const initialWorksites: Omit<OperationalWorksite, 'bubbleRadiusPx'>[] = rawObras.map((obra: any) => {
           const assignedWorkers = rawEmps.filter((e) => e.obra_id === obra.id);
           const assignedTools = rawTools.filter((t) => t.current_obra_id === obra.id);
-          const { coordinates, isSimulated } = resolveWorksiteCoordinates(obra);
 
           const labor = laborMetrics(obra, rawNovs, rawEmps, localTarifasSaved);
 
@@ -119,11 +121,12 @@ export default function CentroOperaciones() {
             name: obra.name,
             address: obra.address || null,
             encargado_name: obra.encargado_name || null,
+            phone: obra.phone || null,
             status: obra.status || (obra.active ? 'Activa' : 'Inactiva'),
             active: obra.active ?? true,
-            latitude: coordinates.latitude,
-            longitude: coordinates.longitude,
-            isSimulatedLocation: !hasStoredCoordinates(obra) || isSimulated,
+            latitude: obra.latitude ?? null,
+            longitude: obra.longitude ?? null,
+            isSimulatedLocation: !hasStoredCoordinates(obra),
             photo_url: obra.photo_url || null,
             workersCount: assignedWorkers.length,
             toolsCount: assignedTools.length,
@@ -148,14 +151,27 @@ export default function CentroOperaciones() {
 
         setWorksites(finalWorksites);
       } catch (err) {
+        if (cancelled || currentRequest !== requestId) return;
         setLoadError(true);
         console.error('Error loading operational data:', err);
       } finally {
-        setLoading(false);
+        if (!cancelled && currentRequest === requestId) setLoading(false);
       }
     }
 
-    loadOperationalData();
+    void loadOperationalData(true);
+    const refresh = () => { void loadOperationalData(); };
+    window.addEventListener('focus', refresh);
+    const channel = supabase.channel('operations-worksite-data')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'obras' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'empleados' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'herramientas' }, refresh)
+      .subscribe();
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', refresh);
+      void supabase.removeChannel(channel);
+    };
   }, []);
 
   useEffect(() => {
@@ -214,7 +230,7 @@ export default function CentroOperaciones() {
 
     // Focus on the first match
     const target = filteredWorksites[0];
-    setFlyToCoords(target.isSimulatedLocation ? null : { latitude: target.latitude, longitude: target.longitude });
+    setFlyToCoords(!hasStoredCoordinates(target) ? null : { latitude: target.latitude, longitude: target.longitude });
     setSelectedWorksiteId(target.id);
   }, [filters.searchQuery, filteredWorksites]);
 
@@ -259,7 +275,7 @@ export default function CentroOperaciones() {
 
   const handleSelectWorksite = (worksite: OperationalWorksite) => {
     setSelectedWorksiteId(worksite.id);
-    setFlyToCoords(worksite.isSimulatedLocation ? null : { latitude: worksite.latitude, longitude: worksite.longitude });
+    setFlyToCoords(!hasStoredCoordinates(worksite) ? null : { latitude: worksite.latitude, longitude: worksite.longitude });
     setShowMobileDrawer(true);
     // Auto scroll suave al panel debajo del mapa para ver los detalles
     setTimeout(() => {

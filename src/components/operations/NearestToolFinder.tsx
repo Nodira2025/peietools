@@ -1,3 +1,4 @@
+import { hasStoredCoordinates } from './operationsFeatures';
 import { classifyTool, matchesToolSearch } from '../../lib/toolTaxonomy';
 import { useState, useMemo, useEffect } from 'react';
 import type { OperationalWorksite, OperationalTool, GeoCoordinates } from '../../types/operations';
@@ -5,7 +6,7 @@ import { calculateHaversineDistance, formatDistance } from '../../services/geo/h
 import { TUCUMAN_CENTER, KNOWN_TUCUMAN_LOCATIONS } from '../../services/geo/tucumanGeoRegistry';
 import { 
   MapPin, Navigation, Search, Wrench, ExternalLink, Sparkles, 
-  Building2, Crosshair, X, CheckCircle2, ChevronRight, Phone, Compass
+  Building2, Crosshair, X, ChevronRight, Phone, Compass
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -137,7 +138,7 @@ export default function NearestToolFinder({
       w.name.toUpperCase().includes(normText) || 
       (w.address && w.address.toUpperCase().includes(normText))
     );
-    if (matchedObra) {
+    if (matchedObra && hasStoredCoordinates(matchedObra)) {
       const coords = { latitude: matchedObra.latitude, longitude: matchedObra.longitude };
       setOriginCoords(coords);
       setOriginLabel(`Obra: ${matchedObra.name}`);
@@ -202,6 +203,7 @@ export default function NearestToolFinder({
         locationName = 'GPS directo de la herramienta';
       } else if (tool.current_obra_id && worksiteMap.has(tool.current_obra_id)) {
         worksite = worksiteMap.get(tool.current_obra_id)!;
+        if (!hasStoredCoordinates(worksite)) return;
         toolCoords = { latitude: worksite.latitude, longitude: worksite.longitude };
         locationName = worksite.name;
       } else {

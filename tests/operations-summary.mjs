@@ -37,6 +37,7 @@ try {
   for (const width of [1280, 390]) {
     const page = await browser.newPage({ viewport: { width, height: 900 }, serviceWorkers: 'block' });
     const tile = Buffer.from(await page.evaluate(() => { const canvas = document.createElement('canvas'); canvas.width = canvas.height = 256; const context = canvas.getContext('2d'); context.fillStyle = '#eaf0f5'; context.fillRect(0, 0, 256, 256); return canvas.toDataURL().split(',')[1]; }), 'base64');
+    let updatedWorksite = false;
     const errors = []; page.on('pageerror', error => errors.push(error.message));
     await page.addInitScript(() => {
       localStorage.setItem('peie_coordinadores_obra_estado_final_cache', JSON.stringify({ a: { avanceFinal: 65, esMuestra: false }, b: { avanceFinal: 100, esMuestra: false }, c: { avanceFinal: 25, esMuestra: true } }));
@@ -51,7 +52,7 @@ try {
       const table = url.pathname.split('/').at(-1);
       assert.notEqual(table, 'novedades_diarias', 'Resource view must not request labor records');
       const all = {
-        obras: [...['a', 'b', 'c'].map((id, i) => ({ id, name: `Obra ${id.toUpperCase()}`, address: `Calle ${i + 1}, Tucumán`, encargado_name: ['Carlos Grande', 'CARLOS GRANDE', 'Carlos '][i], active: true, latitude: -26.824 + i * .02, longitude: -65.222 + i * .02 })), { id: 'unknown', name: 'Sin coordenadas', encargado_name: 'Martin Grande', active: true }],
+        obras: [...['a', 'b', 'c'].map((id, i) => ({ id, name: updatedWorksite && id === 'a' ? 'Obra A actualizada' : `Obra ${id.toUpperCase()}`, address: updatedWorksite && id === 'a' ? 'Dirección guardada en Obras' : `Calle ${i + 1}, Tucumán`, encargado_name: ['Carlos Grande', 'CARLOS GRANDE', 'Carlos '][i], active: true, latitude: updatedWorksite && id === 'a' ? -26.9 : -26.824 + i * .02, longitude: updatedWorksite && id === 'a' ? -65.3 : -65.222 + i * .02 })), { id: 'unknown', name: 'Sin coordenadas', encargado_name: 'Martin Grande', active: true }],
         empleados: [{ ...employee, status: 'Trabajando', specialty: 'oficial' }],
         herramientas: [{ id: 't1', name: 'Taladro', code: 'T1', current_obra_id: 'a', status: 'En uso' }],
         novedades_diarias: [...records, ...Array.from({ length: 505 }, () => ({ obra_id: 'a', empleado_id: 'e1', horas_trabajadas: 1 }))],
@@ -75,6 +76,7 @@ try {
     await mkdir('scratch/operations-qa', { recursive: true });
     await page.screenshot({ path: 'scratch/operations-qa/hover-' + width + '.png' });
     await bubble.click();
+    await page.getByText('GPS: -26.824, -65.222', { exact: true }).waitFor();
     await page.getByRole('tab', { name: 'Herramientas (1)' }).click();
     await page.getByText('Taladro', { exact: true }).waitFor();
     assert.equal(await page.getByText(/Costo por horas|Valor de herramientas en obra|Finalización de obra|Índice de Carga/).count(), 0);
@@ -91,6 +93,12 @@ try {
     await page.getByText('Sin coordenadas', { exact: true }).waitFor();
     await coordinatorFilter.selectOption('');
     await bubble.waitFor();
+    updatedWorksite = true;
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    const updatedBubble = page.getByRole('button', { name: 'Obra A actualizada. Personal: 0. Herramientas: 1. Ver obra', exact: true });
+    await updatedBubble.click();
+    await page.locator('#panel-operativo').getByText('Dirección guardada en Obras', { exact: true }).waitFor();
+    await page.getByText('GPS: -26.9, -65.3', { exact: true }).waitFor();
     assert.deepEqual(errors, []);
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'No horizontal overflow');
     await page.screenshot({ path: 'scratch/operations-qa/detail-' + width + '.png', fullPage: true });

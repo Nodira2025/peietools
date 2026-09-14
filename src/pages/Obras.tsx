@@ -1,6 +1,7 @@
+import { hasStoredCoordinates } from '../components/operations/operationsFeatures';
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -138,8 +139,8 @@ export default function Obras() {
     setAddress(obra.address || '');
     setManager(obra.encargado_name || '');
     setPhone(obra.phone || '');
-    setLatitude(obra.latitude ? obra.latitude.toString() : '');
-    setLongitude(obra.longitude ? obra.longitude.toString() : '');
+    setLatitude(obra.latitude != null ? obra.latitude.toString() : '');
+    setLongitude(obra.longitude != null ? obra.longitude.toString() : '');
     setActive(obra.active !== false);
     setCurrentId(obra.id);
     setIsEditing(true);
@@ -355,7 +356,7 @@ export default function Obras() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {obra.latitude && obra.longitude ? (
+                    {hasStoredCoordinates(obra) ? (
                       <a 
                         href={`https://www.google.com/maps?q=${obra.latitude},${obra.longitude}`} 
                         target="_blank" 
