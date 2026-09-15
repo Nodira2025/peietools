@@ -79,36 +79,21 @@ try {
     });
 
     await page.goto(base+'__tool-catalog');
-    if (viewport.width < 640) {
-      await page.locator('article').first().waitFor();
-      assert.equal(await page.locator('article').count(), inventory.length);
-      await page.getByLabel('Subcategoría', {exact:true}).selectOption(JSON.stringify(['Escalera', '8 peldaños']));
-      await page.getByRole('heading', {name:'Escalera 8p',exact:true}).waitFor();
-      await page.getByLabel('Estado', {exact:true}).selectOption('Disponible');
-      await page.reload();
-      await page.getByRole('heading', {name:'Escalera 8p',exact:true}).waitFor();
-      assert.equal(await page.getByLabel('Estado', {exact:true}).inputValue(), 'Disponible');
-      assert.equal(await page.getByLabel('Subcategoría', {exact:true}).inputValue(), JSON.stringify(['Escalera', '8 peldaños']));
-      assert.deepEqual(errors, []);
-      console.log('PASS: mobile direct inventory, dropdown categories, filters and reload');
-      await page.close();
-      continue;
-    }
-    await page.locator('article').first().waitFor();
-    await page.getByLabel('Subcategoría', {exact:true}).selectOption(JSON.stringify(['Escalera', '8 peldaños']));
+    await page.locator('[data-tool-groups]').getByRole('button').filter({hasText:'Escalera'}).click();
+    await page.getByLabel('Buscar herramientas').fill('ESC-08');
     await page.getByLabel('Estado',{exact:true}).selectOption('Disponible');
     await page.getByRole('heading',{name:'Escalera 8p',exact:true}).waitFor();
     await page.getByRole('button',{name:'Ver ficha',exact:true}).click();
     await page.getByRole('button',{name:'Volver',exact:true}).click();
-    await page.getByRole('heading',{name:'8 peldaños',exact:true}).waitFor();
+    await page.getByRole('heading',{name:'Escalera',exact:true}).waitFor();
     assert.equal(await page.getByLabel('Estado',{exact:true}).inputValue(),'Disponible');
     await page.reload();
-    await page.getByRole('heading',{name:'8 peldaños',exact:true}).waitFor();
+    await page.getByRole('heading',{name:'Escalera',exact:true}).waitFor();
     assert.equal(await page.getByLabel('Estado',{exact:true}).inputValue(),'Disponible');
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'No horizontal overflow');
     await mkdir('scratch/catalog-qa',{recursive:true});
     await page.screenshot({path:'scratch/catalog-qa/tools-'+viewport.width+'.png',fullPage:true});
-    await page.getByRole('navigation',{name:'Ruta de herramientas'}).getByRole('button',{name:'Herramientas',exact:true}).click();
+    await page.getByRole('button',{name:'Volver a grupos',exact:true}).click();
     await page.getByLabel('Estado',{exact:true}).selectOption('');
     await page.getByLabel('Buscar herramientas').fill('Escalera 2 peldaños');
     await page.getByRole('heading',{name:'Escalera chica',exact:true}).waitFor();
@@ -123,7 +108,7 @@ try {
       await page.getByLabel('Categoría principal *',{exact:true}).click();
       await page.getByRole('option',{name:'Amoladora',exact:true}).click();
       await page.getByLabel('Subcategoría *',{exact:true}).click();
-      assert.equal(await page.getByRole('option',{name:'8 peldaños',exact:true}).count(),0,'Changing the parent must reset the variant');
+      assert.equal(await page.getByRole('option',{name:'Escalera',exact:true}).count(),0,'Changing the parent must reset the variant');
       await page.getByRole('option',{name:'4 1/2 pulgadas',exact:true}).click();
       await page.getByRole('button',{name:'Cancelar',exact:true}).click();
       await page.getByRole('button',{name:'Editar',exact:true}).click();

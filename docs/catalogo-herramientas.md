@@ -1,8 +1,8 @@
 # Catálogo de herramientas
 
-El inventario muestra las herramientas directamente. Un único filtro de subcategoría permite elegir opciones completas como «Amoladora · 7 pulgadas», sin seleccionar primero una categoría. Solo aparecen opciones con unidades según obra, coordinador y estado. La clasificación por categoría se conserva para altas, edición y administración.
+El inventario abre con tarjetas de grupos en dos columnas en celulares. Cada tarjeta muestra la cantidad real y las obras con asignaciones. Al entrar, se ven las unidades con foto, código, estado, obra y responsable. Los filtros de obra, coordinador y estado se combinan con el grupo y la búsqueda permite localizar unidades directamente. El regreso desde una ficha y la recarga conservan el grupo.
 
-En celulares (menos de 640 px) se muestran directamente todas las herramientas en dos columnas. Subcategoría es un único filtro desplegable de ancho completo; se combinan con obra, coordinador, estado y búsqueda. En escritorio, filtrar por obra o coordinador también muestra directamente sus herramientas. «Limpiar» restablece todos los filtros, incluida la categoría.
+Los cajones se reúnen en un solo grupo, igual que escaleras, taladros y las demás familias. Las amoladoras confirmadas de 7 pulgadas forman un grupo; todas las demás se reúnen en «Otras amoladoras». La medida registrada o pendiente se ve en cada unidad. No se deduce el diámetro por potencia ni se fuerza una cantidad. El agrupamiento visual no cambia la clasificación de cada registro.
 
 Los nombres principales se unifican en singular y las medidas se ordenan numéricamente. Los códigos, nombres originales, marcas, modelos, estados, ubicaciones e historial se conservan. «Escalera 3» no significa automáticamente tres peldaños; las especificaciones no confirmadas quedan señaladas.
 
@@ -33,4 +33,6 @@ La clasificación se contrastó con los 83 registros usados en la propuesta: las
 
 Las pruebas de navegador requieren Playwright y Chrome. La comprobación general de TypeScript conserva errores anteriores del proyecto; los archivos nuevos y la navegación del catálogo se verifican también con ESLint y pruebas funcionales.
 
-El desplegable de subcategoría está disponible en celular y escritorio. Las amoladoras unifican 7 pulgadas, 7" y 180 mm; también 4 1/2 pulgadas con 115 mm y 9 pulgadas con 230 mm. Se conservan las medidas pendientes de confirmar. Cambiar obra, coordinador o estado conserva la clasificación seleccionada si tiene unidades y restablece únicamente los niveles que quedan vacíos.
+
+
+Verificación de agrupamientos: `node tests/tool-groups.mjs` (seis amoladoras, cajones de variantes distintas juntos, localización, responsable, filtros, recarga y regreso de ficha en móvil y escritorio).
