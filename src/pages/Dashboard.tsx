@@ -1296,7 +1296,7 @@ export default function Dashboard() {
                   <strong className="text-slate-800">Lectores QR y de Barras:</strong> Utiliza la cámara de tu celular para escanear y registrar traslados rápidos sin tipear códigos manualmente.
                 </li>
                 <li>
-                  <strong className="text-slate-800">Modo Sin Conexión (PWA):</strong> Si te quedas sin señal en la obra, la app guarda datos clave en caché para que puedas seguir consultando.
+                  <strong className="text-slate-800">Modo Sin Conexión:</strong> Si te quedas sin señal en la obra, la app guarda datos clave en caché para que puedas seguir consultando.
                 </li>
               </ul>
             </div>

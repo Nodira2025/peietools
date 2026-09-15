@@ -27,7 +27,6 @@ import {
   Calendar
 } from 'lucide-react';
 
-import { showNativeNotification } from '../lib/pushNotifications';
 
 interface NotificacionHerramienta {
   id: string;
@@ -304,23 +303,7 @@ export default function Notificaciones() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
 
-
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              showNativeNotification('🔔 Alerta de Prueba PEIE', {
-                body: 'Esta es una notificación de prueba en la barra de tu dispositivo.',
-                onClickUrl: '/notificaciones',
-              });
-            }}
-            className="text-xs gap-1.5 font-bold border-amber-300 text-amber-800 hover:bg-amber-50 rounded-xl"
-          >
-            <Bell className="h-3.5 w-3.5" /> Probar Alerta Nativa
-          </Button>
-        </div>
 
       </div>
 

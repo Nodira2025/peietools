@@ -1,5 +1,4 @@
 import { supabase } from './supabase';
-import { showNativeNotification } from './pushNotifications';
 
 export interface ReservaHerramienta {
   id: string;
@@ -146,11 +145,6 @@ export async function crearReservaHerramienta(reserva: {
     console.error('Error creando reserva:', error);
     return { success: false, message: error.message };
   }
-
-  // Emitir notificación nativa local inmediata
-  showNativeNotification('Reserva Confirmada', {
-    body: `Reserva agendada para el ${new Date(reserva.fecha_inicio).toLocaleDateString()}`,
-  });
 
   return { success: true, data: data as ReservaHerramienta };
 }
