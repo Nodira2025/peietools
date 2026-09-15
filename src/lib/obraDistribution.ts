@@ -8,7 +8,6 @@ export async function renderObraDistribution(data: CatalogData[], date: string):
   if (!ctx) throw new Error('No se pudo crear el informe de obras.');
   const ink = '#111827';
   const xs = [48, 112, 702, 1062, 1192];
-  const bottom = 1620;
   const pages: CatalogPage[] = [];
   let y = 0;
   let number = 0;
@@ -27,6 +26,20 @@ export async function renderObraDistribution(data: CatalogData[], date: string):
     if (line) lines.push(line);
     return lines;
   };
+  // Measure every group before drawing: the export is one continuous sheet.
+  const groups = [...data].sort((a, b) => a.obra.name.localeCompare(b.obra.name, 'es', { numeric: true })).map(({ obra, tools }) => {
+    const rows = tools.length ? tools.map(tool => ({ lines: wrap(`${tool.name} · ${tool.code}`, 554, 21), real: true })) : [{ lines: ['Sin herramientas asignadas'], real: false }];
+    const labels = wrap(obra.name.toUpperCase(), 320, 22);
+    const heights = rows.map(row => Math.max(44, row.lines.length * 26.25 + 16));
+    const height = Math.max(labels.length * 27.5 + 24, heights.reduce((sum, h) => sum + h, 0));
+    heights[heights.length - 1] += height - heights.reduce((sum, h) => sum + h, 0);
+    return { tools, rows, labels, heights, height };
+  });
+  const sheetHeight = Math.ceil(234 + groups.reduce((sum, group) => sum + group.height, 0) + 108);
+  // Keep a valid canvas size even for exceptionally large inventories.
+  const scale = Math.min(1, 16000 / sheetHeight);
+  canvas.width = Math.round(1240 * scale); canvas.height = Math.round(sheetHeight * scale);
+  ctx.scale(scale, scale);
   const text = (lines: string[], x: number, top: number, size: number, align: CanvasTextAlign = 'left', color = ink) => {
     ctx.font = `700 ${size}px Arial`; ctx.fillStyle = color; ctx.textAlign = align;
     lines.forEach((line, i) => ctx.fillText(line, x, top + size + i * size * 1.25));
@@ -37,8 +50,8 @@ export async function renderObraDistribution(data: CatalogData[], date: string):
     ctx.strokeStyle = ink; ctx.lineWidth = 1; ctx.strokeRect(x, top, w, h);
   };
   const start = () => {
-    ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, 1240, 1754);
-    ctx.strokeStyle = ink; ctx.lineWidth = 2; ctx.strokeRect(2, 2, 1236, 1750);
+    ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, 1240, sheetHeight);
+    ctx.strokeStyle = ink; ctx.lineWidth = 2; ctx.strokeRect(2, 2, 1236, sheetHeight - 4);
     text(['DISTRIBUCIÓN DE HERRAMIENTAS POR OBRA'], 620, 54, 35, 'center');
     text([`PEIE Tools · ${date}`], 620, 108, 20, 'center');
     ctx.beginPath(); ctx.moveTo(48, 151); ctx.lineTo(1192, 151); ctx.stroke();
@@ -50,32 +63,14 @@ export async function renderObraDistribution(data: CatalogData[], date: string):
     y += 52;
   };
   const finish = async () => {
-    text([`Página ${pages.length + 1}`], 1192, 1676, 19, 'right');
     const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('No se pudo generar el informe.')), 'image/jpeg', 0.93));
-    pages.push({ blob, name: `PEIE-distribucion-herramientas-${pages.length + 1}.jpeg` });
+    pages.push({ blob, name: 'PEIE-distribucion-herramientas.jpeg', width: canvas.width, height: canvas.height });
   };
   start();
-  for (const { obra, tools } of [...data].sort((a, b) => a.obra.name.localeCompare(b.obra.name, 'es', { numeric: true }))) {
-    const rows = tools.length ? tools.map(tool => ({ lines: wrap(`${tool.name} · ${tool.code}`, 554, 21), real: true })) : [{ lines: ['Sin herramientas asignadas'], real: false }];
-    const obraLines = wrap(obra.name.toUpperCase(), 320, 22);
-    const labelHeight = obraLines.length * 27.5 + 24;
-    const heights = rows.map(row => Math.max(44, row.lines.length * 26.25 + 16));
-    const groupHeight = Math.max(labelHeight, heights.reduce((sum, h) => sum + h, 0));
-    if (groupHeight <= bottom - 234 && y + groupHeight > bottom) { await finish(); start(); }
-    for (let index = 0; index < rows.length;) {
-      const continued = index > 0;
-      const labels = continued ? [...obraLines, '(continuación)'] : obraLines;
-      const minHeight = labels.length * 27.5 + 24;
-      if (bottom - y < Math.max(minHeight, heights[index])) { await finish(); start(); }
-      const first = index;
-      let height = 0;
-      while (index < rows.length && height + heights[index] <= bottom - y) { height += heights[index]; index++; }
-      if (index === first) throw new Error('Un nombre de herramienta es demasiado largo para el informe.');
-      const extra = Math.max(0, minHeight - height);
-      height += extra;
+  for (const { tools, rows, labels, heights, height } of groups) {
       let rowY = y;
-      for (let i = first; i < index; i++) {
-        const h = heights[i] + (i === index - 1 ? extra : 0);
+      for (let i = 0; i < rows.length; i++) {
+        const h = heights[i];
         cell(xs[0], rowY, xs[1] - xs[0], h);
         cell(xs[1], rowY, xs[2] - xs[1], h);
         if (rows[i].real) text([String(++number)], 80, rowY + (h - 26) / 2, 20, 'center');
@@ -87,10 +82,7 @@ export async function renderObraDistribution(data: CatalogData[], date: string):
       text(labels, (xs[2] + xs[3]) / 2, y + (height - labels.length * 27.5) / 2, 22, 'center');
       text([String(tools.length)], (xs[3] + xs[4]) / 2, y + (height - 30) / 2, 24, 'center');
       y += height;
-      if (index < rows.length) { await finish(); start(); }
-    }
   }
-  if (y + 60 > bottom) { await finish(); start(); }
   cell(48, y, 1014, 60, '#F1F5F9'); cell(1062, y, 130, 60, '#E2E8F0');
   text([`TOTAL HERRAMIENTAS EN ${data.length} OBRAS:`], 1044, y + 16, 22, 'right');
   text([String(data.reduce((sum, row) => sum + row.tools.length, 0))], 1127, y + 14, 25, 'center');

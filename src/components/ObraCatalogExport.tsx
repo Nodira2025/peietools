@@ -76,7 +76,7 @@ export default function ObraCatalogExport({ obras, selectedObra, disabled = fals
       <DialogContent className="max-h-[90dvh] overflow-y-auto">
         <DialogHeader><DialogTitle>Exportar catálogo PEIE</DialogTitle></DialogHeader>
         <p className="text-sm text-slate-600">{scope?.length === 1 ? scope[0].name : `${scope?.length || 0} obras accesibles, incluidas las inactivas y las que no aparecen con los filtros actuales.`}</p>
-        <p className="text-sm text-slate-600">PDF reúne todas las páginas. JPEG genera una imagen por página, lista para descargar y adjuntar en WhatsApp.</p>
+        <p className="text-sm text-slate-600">{allObras ? 'PDF de una sola página continua con todas las obras. JPEG genera una única imagen con el mismo contenido.' : 'PDF reúne todas las páginas. JPEG genera una imagen por página, lista para descargar y adjuntar en WhatsApp.'}</p>
         {allObras && <p className="text-sm text-slate-600">Tabla de herramientas agrupadas por obra, con cantidades por obra y total general.</p>}
         <div className="grid grid-cols-2 gap-2">
           <Button disabled={busy} onClick={() => void generate('pdf')}>Generar PDF</Button>

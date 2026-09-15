@@ -94,7 +94,8 @@ try {
     const pages = await renderObraDistribution(data, '15/9/2026');
     return { count:pages.length, pdf:Array.from(new Uint8Array(await (await catalogPdf(pages)).arrayBuffer())) };
   }, { obras, tools });
-  assert.ok(multi.count >= 3, 'Large obra spans pages');
+  assert.equal(multi.count, 1, 'All obras remain on one continuous sheet even with 70 tools');
+  assert.equal((Buffer.from(multi.pdf).toString('latin1').match(/\/Type \/Page\b/g) || []).length, 1, 'PDF has exactly one page');
   await writeFile('scratch/obra-catalog/multipage.pdf', Buffer.from(multi.pdf));
   failTools = true;
   await page.getByRole('button', { name: 'Generar PDF', exact: true }).click();

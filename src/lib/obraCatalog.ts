@@ -12,7 +12,7 @@ export interface CatalogObra {
 interface Worker { id: string; full_name: string; specialty: string | null; photo_url: string | null }
 interface Tool { id: string; name: string; code: string; brand: string | null; status: string; photo_url: string | null }
 export interface CatalogData { obra: CatalogObra; workers: Worker[]; tools: Tool[] }
-export interface CatalogPage { blob: Blob; name: string }
+export interface CatalogPage { blob: Blob; name: string; width?: number; height?: number }
 
 // Explicit ranges prevent Supabase's row limit from silently truncating a catalog.
 export async function loadObraCatalog(obra: CatalogObra, toolsOnly = false): Promise<CatalogData> {
@@ -141,11 +141,19 @@ export async function renderObraCatalog(data: CatalogData, date: string): Promis
 
 export async function catalogPdf(pages: CatalogPage[]): Promise<Blob> {
   const { jsPDF } = await import('jspdf');
-  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+  const dimensions = (page: CatalogPage) => {
+    const height = page.width && page.height ? 210 * page.height / page.width : 297;
+    const scale = Math.min(1, 5000 / height);
+    return { width: 210 * scale, height: height * scale };
+  };
+  if (!pages.length) throw new Error('No hay contenido para exportar.');
+  const first = dimensions(pages[0]);
+  const pdf = new jsPDF({ orientation: first.height >= first.width ? 'portrait' : 'landscape', unit: 'mm', format: [first.width, first.height], compress: true });
   pdf.setProperties({ title: 'PEIE - Catálogo de obras', author: 'PEIE' });
   for (let index = 0; index < pages.length; index++) {
-    if (index) pdf.addPage();
-    pdf.addImage(new Uint8Array(await pages[index].blob.arrayBuffer()), 'JPEG', 0, 0, 210, 297);
+    const { width, height } = dimensions(pages[index]);
+    if (index) pdf.addPage([width, height], height >= width ? 'portrait' : 'landscape');
+    pdf.addImage(new Uint8Array(await pages[index].blob.arrayBuffer()), 'JPEG', 0, 0, width, height);
   }
   return pdf.output('blob');
 }
