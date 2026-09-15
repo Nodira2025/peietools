@@ -460,11 +460,6 @@ export default function HerramientaDetail() {
     );
   };
 
-  // URL del QR generado vía API pública (sin dependencias de React problemáticas)
-  const qrUrl = herramienta
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${window.location.origin}/herramientas/${herramienta.id}`)}`
-    : '';
-
   if (loading) return <div className="p-8 text-center text-muted-foreground">Cargando ficha...</div>;
   if (!herramienta) return null;
 

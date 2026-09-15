@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Wrench, Plus, QrCode, Search, Layers, Disc, Hammer, Shield, Ruler, ChevronLeft, ChevronRight, Building2, LayoutGrid, List, Download, Truck, Camera, Package, FileSpreadsheet, Tag, type LucideIcon } from 'lucide-react';
+import { Wrench, Plus, Search, Layers, Disc, Hammer, Shield, Ruler, ChevronLeft, ChevronRight, Building2, LayoutGrid, List, Download, Truck, Camera, Package, FileSpreadsheet, Tag, type LucideIcon } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/auth';
 import { useToast } from '@/hooks/use-toast';
@@ -209,7 +209,6 @@ export default function Herramientas() {
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="outline" aria-label="Buscar con cámara" onClick={() => navigate('/herramientas/busqueda-visual')}><Camera className="h-4 w-4 mr-2" /><span className="hidden sm:inline">Buscar con foto</span><span className="sm:hidden">Foto</span></Button>
-        <Button variant="outline" aria-label="Escanear QR" onClick={() => navigate('/herramientas/scanner')}><QrCode className="h-4 w-4 mr-2" />QR</Button>
         {canManageTools && <Button className="bg-peie-blue" aria-label="Nueva herramienta" onClick={() => navigate('/herramientas/nueva')}><Plus className="h-4 w-4 mr-2" /><span className="hidden sm:inline">Nueva herramienta</span><span className="sm:hidden">Nueva</span></Button>}
       </div>
     </div>
