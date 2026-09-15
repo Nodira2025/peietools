@@ -10,6 +10,7 @@ import { useAuthStore } from '../store/auth';
 import { compressImage } from '../lib/imageUtils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import ObraCatalogExport from '../components/ObraCatalogExport';
 
 // Mantener el registro disponible para reactivarlo, oculto en Mis obras.
 const SHOW_PROGRESS_PHOTOS = false;
@@ -261,6 +262,8 @@ export default function MisObras() {
         >
           <ChevronRight className="h-4 w-4 rotate-180" /> Volver a obras
         </button>
+
+        <ObraCatalogExport obras={obras} selectedObra={selectedObra} />
 
         {/* Ubicación e información principal de la obra */}
         <div className="rounded-[24px] shadow-md overflow-hidden bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-800 text-white">
@@ -637,6 +640,7 @@ export default function MisObras() {
       </div>
 
       {/* Buscador */}
+      <ObraCatalogExport obras={obras} disabled={loading} />
       <div className="relative">
         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
         <Input

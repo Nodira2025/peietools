@@ -1,0 +1,87 @@
+import assert from 'node:assert/strict';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { createServer } from 'vite';
+import { chromium } from 'playwright';
+
+const server = await createServer({ cacheDir: 'scratch/vite-obra-catalog', server: { host: '127.0.0.1', port: 0 },
+  plugins: [{ name: 'obra-catalog-fixture', configureServer(server) {
+    server.middlewares.use(async (req, res, next) => {
+      if (!['/mis-obras', '/herramientas'].includes(req.url?.split('?')[0])) return next();
+      try { const html = (await readFile('index.html', 'utf8')).replace('/src/main.tsx', '/tests/fixtures/obra-catalog.tsx');
+        res.setHeader('Content-Type', 'text/html'); res.end(await server.transformIndexHtml(req.url, html));
+      } catch (error) { next(error); }
+    });
+  } }],
+});
+let browser;
+try {
+  await mkdir('scratch/obra-catalog', { recursive: true });
+  await server.listen();
+  browser = await chromium.launch({ channel: 'chrome', headless: true });
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
+  const base = server.resolvedUrls.local[0];
+  const obras = [
+    { id: 'obra-1', name: 'Edificio Central', address: 'Av. Belgrano 1250, San Miguel de Tucumán', encargado_name: 'María Rodríguez', active: true },
+    { id: 'obra-2', name: 'Obra sin asignaciones', address: null, encargado_name: null, active: false },
+  ];
+  const workers = Array.from({ length: 9 }, (_, i) => ({ id: 'worker-' + i, full_name: i ? 'Trabajador de prueba ' + i : 'José María Fernández de la Cruz', specialty: i ? 'Oficial albañil' : 'Responsable de instalaciones eléctricas', photo_url: i === 1 ? 'https://test.invalid/missing.jpg' : '/logo-peie.png', obra_id: 'obra-1', active: true }));
+  const tools = Array.from({ length: 5 }, (_, i) => ({ id: 'tool-' + i, name: i % 2 ? 'Amoladora 750W' : 'Escalera 8 peldaños', code: 'H-' + i, category: i % 2 ? 'Amoladora' : 'Escalera', brand: 'Total', model: null, status: 'En uso', photo_url: null, current_obra_id: 'obra-1', obras: { name: obras[0].name, encargado_name: obras[0].encargado_name } }));
+  let failTools = false;
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.route('**/*', async route => {
+    const url = new URL(route.request().url());
+    if (url.origin === new URL(base).origin) return route.continue();
+    if (!url.pathname.startsWith('/rest/v1/')) return route.abort();
+    const table = url.pathname.split('/').pop();
+    if (table === 'herramientas' && failTools) return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'Test failure' }) });
+    let data = table === 'obras' ? obras : table === 'empleados' ? workers : table === 'herramientas' ? tools : [];
+    const key = table === 'empleados' ? 'obra_id' : 'current_obra_id';
+    if (url.searchParams.has(key)) data = data.filter(row => 'eq.' + row[key] === url.searchParams.get(key));
+    if (url.searchParams.get('select') === 'photo_url') data = { photo_url: null };
+    return route.fulfill({ contentType: 'application/json', body: JSON.stringify(data) });
+  });
+  await page.goto(base + 'herramientas');
+  await page.locator('article').first().waitFor();
+  assert.equal(await page.locator('article').count(), 5, 'All tools shown immediately');
+  const cards = await page.locator('article').evaluateAll(rows => rows.slice(0, 2).map(row => ({ x: row.getBoundingClientRect().x, y: row.getBoundingClientRect().y })));
+  assert.equal(cards[0].y, cards[1].y); assert.ok(cards[1].x > cards[0].x);
+  await page.getByLabel('Categoría', { exact: true }).selectOption('Escalera');
+  assert.equal(await page.locator('article').count(), 3);
+  await page.getByLabel('Subcategoría', { exact: true }).selectOption('8 peldaños');
+  await page.getByLabel('Obra actual', { exact: true }).selectOption(obras[0].name);
+  await page.getByLabel('Coordinador', { exact: true }).selectOption(obras[0].encargado_name);
+  assert.equal(await page.locator('article').count(), 3);
+  await page.reload();
+  await page.locator('article').first().waitFor();
+  assert.equal(await page.getByLabel('Categoría', { exact: true }).inputValue(), 'Escalera');
+  await page.screenshot({ path: 'scratch/obra-catalog/mobile-tools.png', fullPage: true });
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'No mobile horizontal overflow');
+  await page.goto(base + 'mis-obras');
+  await page.getByText('Edificio Central', { exact: true }).click();
+  await page.getByRole('button', { name: 'Exportar obra', exact: true }).click();
+  await page.getByRole('button', { name: 'Generar JPEG', exact: true }).click();
+  await page.getByText('3 archivos listos', { exact: true }).waitFor();
+  assert.ok(await page.getByText(/1 fotos no se pudieron cargar/).isVisible());
+  const images = await page.locator('a[download]').evaluateAll(async links => Promise.all(links.map(async link => ({ name: link.download, bytes: Array.from(new Uint8Array(await (await fetch(link.href)).arrayBuffer())) }))));
+  for (const item of images) await writeFile('scratch/obra-catalog/' + item.name, Buffer.from(item.bytes));
+  await page.getByRole('button', { name: 'Generar PDF', exact: true }).click();
+  await page.getByText('1 archivo listo', { exact: true }).waitFor();
+  const single = await page.locator('a[download]').evaluate(async link => Array.from(new Uint8Array(await (await fetch(link.href)).arrayBuffer())));
+  await writeFile('scratch/obra-catalog/single.pdf', Buffer.from(single));
+  assert.ok(Buffer.from(single).toString('latin1').startsWith('%PDF'));
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('button', { name: 'Exportar todas las obras', exact: true }).click();
+  await page.getByText(/2 obras accesibles/).waitFor();
+  await page.getByRole('button', { name: 'Generar PDF', exact: true }).click();
+  await page.getByText('1 archivo listo', { exact: true }).waitFor();
+  const all = await page.locator('a[download]').evaluate(async link => Array.from(new Uint8Array(await (await fetch(link.href)).arrayBuffer())));
+  await writeFile('scratch/obra-catalog/all.pdf', Buffer.from(all));
+  assert.equal((Buffer.from(all).toString('latin1').match(/\/Type \/Page\b/g) || []).length, 5, 'All export includes inactive empty obra');
+  failTools = true;
+  await page.getByRole('button', { name: 'Generar PDF', exact: true }).click();
+  await page.getByRole('alert').filter({ hasText: 'No se pudieron cargar las herramientas' }).waitFor();
+  assert.equal(await page.locator('a[download]').count(), 0, 'Never offer a partial export after query failure');
+  assert.deepEqual(errors, []);
+  console.log('PASS mobile 2 columns, direct inventory, filters + reload, JPEG pagination, PDF single/all, missing photos, empty/inactive obra, API failure');
+} finally { await browser?.close(); await server.close(); }

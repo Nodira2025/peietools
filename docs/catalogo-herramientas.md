@@ -2,6 +2,8 @@
 
 El inventario se navega por **categoría principal → subcategoría → herramienta**. Por ejemplo: Escalera → 2 peldaños. La categoría Escalera muestra esa subcategoría incluso cuando no tiene unidades. Los demás grupos se forman con el inventario y las entradas registradas del catálogo.
 
+En celulares (menos de 640 px) se muestran directamente todas las herramientas en dos columnas. Categoría y subcategoría son dos filtros desplegables colocados uno al lado del otro; se combinan con obra, coordinador, estado y búsqueda. En escritorio, filtrar por obra o coordinador también muestra directamente sus herramientas. «Limpiar» restablece todos los filtros, incluida la categoría.
+
 Los nombres principales se unifican en singular y las medidas se ordenan numéricamente. Los códigos, nombres originales, marcas, modelos, estados, ubicaciones e historial se conservan. «Escalera 3» no significa automáticamente tres peldaños; las especificaciones no confirmadas quedan señaladas.
 
 ## Uso

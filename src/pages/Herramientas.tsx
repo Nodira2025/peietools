@@ -64,6 +64,13 @@ export default function Herramientas() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(location.state?.viewMode === 'list' ? 'list' : 'grid');
   const [isGestionCategoriasOpen, setIsGestionCategoriasOpen] = useState(false);
   const [isImportarExcelOpen, setIsImportarExcelOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 639px)').matches);
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 639px)');
+    const update = () => setIsMobile(media.matches);
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
   const requestSequence = useRef(0);
   const isAdmin = profile?.role === 'admin' || profile?.role === 'logistica';
   const canManageTools = ['admin', 'logistica', 'encargado', 'solicitante', 'coordinador'].includes(profile?.role || '');
@@ -161,11 +168,11 @@ export default function Herramientas() {
   const obras = useMemo(() => [...new Set(herramientas.flatMap(t => t.obras?.name ? [t.obras.name] : []))].sort(), [herramientas]);
   const encargados = useMemo(() => [...new Set(herramientas.flatMap(t => t.obras?.encargado_name ? [t.obras.encargado_name] : []))].sort(), [herramientas]);
   const statuses = useMemo(() => [...new Set(herramientas.map(t => t.status))].sort(), [herramientas]);
-  const showUnits = Boolean(selectedSubcategory || searchTerm.trim());
+  const showUnits = isMobile || Boolean(selectedSubcategory || searchTerm.trim() || filterObra || filterEncargado);
   const stage = showUnits ? 3 : selectedCategory ? 2 : 1;
   const goHome = () => { setSelectedCategory(null); setSelectedSubcategory(null); setSearchTerm(''); };
   const goCategory = () => { setSelectedSubcategory(null); setSearchTerm(''); };
-  const clearFilters = () => { setSearchTerm(''); setFilterObra(''); setFilterStatus(''); setFilterEncargado(''); };
+  const clearFilters = () => { setSearchTerm(''); setFilterObra(''); setFilterStatus(''); setFilterEncargado(''); setSelectedCategory(null); setSelectedSubcategory(null); };
   const openTool = (id: string) => navigate('/herramientas/' + id, { state: navigationState });
   const exportToExcel = async (all = false) => {
     const rows = all ? classified : filtered;
@@ -207,7 +214,7 @@ export default function Herramientas() {
       </div>
     </div>
 
-    <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm flex-wrap" aria-label="Pasos de selección">
+    <div className="hidden sm:flex items-center gap-2 sm:gap-4 text-xs sm:text-sm flex-wrap" aria-label="Pasos de selección">
       {['Categoría', 'Subcategoría', 'Herramientas'].map((label, i) => <span key={label} aria-current={stage === i+1 ? 'step' : undefined} className={'flex items-center gap-2 ' + (stage === i+1 ? 'font-semibold text-peie-blue' : 'text-slate-500')}>
         <span className={'w-6 h-6 grid place-items-center rounded-full ' + (stage === i+1 ? 'bg-peie-blue text-white' : 'bg-slate-100')}>{i+1}</span>{label}
         {i<2 && <ChevronRight className="h-3 w-3 text-slate-400 ml-1" />}
@@ -215,6 +222,20 @@ export default function Herramientas() {
     </div>
 
     <div className="space-y-3">
+      {isMobile && <div className="grid grid-cols-2 gap-2 sm:hidden">
+        <label className="min-w-0 text-xs font-semibold text-slate-600">Categoría
+          <select aria-label="Categoría" value={selectedCategory || ''} onChange={e => { setSelectedCategory(e.target.value || null); setSelectedSubcategory(null); }} className="mt-1 w-full h-11 rounded-xl border border-slate-200 bg-white px-2">
+            <option value="">Todas las categorías</option>
+            {categories.map(group => <option key={group.name} value={group.name}>{group.name} ({group.rows.length})</option>)}
+          </select>
+        </label>
+        <label className="min-w-0 text-xs font-semibold text-slate-600">Subcategoría
+          <select aria-label="Subcategoría" disabled={!selectedCategory} value={selectedSubcategory || ''} onChange={e => setSelectedSubcategory(e.target.value || null)} className="mt-1 w-full h-11 rounded-xl border border-slate-200 bg-white px-2 disabled:opacity-50">
+            <option value="">Todas las subcategorías</option>
+            {subcategories.map(group => <option key={group.name} value={group.name}>{group.name} ({group.rows.length})</option>)}
+          </select>
+        </label>
+      </div>}
       <div className="flex flex-wrap gap-2">
         <div className="relative flex-1 min-w-[200px]"><Search className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" /><Input aria-label="Buscar herramientas" placeholder="Buscar por nombre, medida, código o marca..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="h-11 pl-10 rounded-xl" /></div>
         <Button variant="outline" className="h-11" onClick={clearFilters}>Limpiar</Button>
@@ -238,7 +259,7 @@ export default function Herramientas() {
 
     {loadError && <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{loadError}<Button size="sm" variant="ghost" onClick={() => void fetchHerramientas()}>Reintentar</Button></div>}
     {loading ? <p className="py-12 text-center text-slate-500">Cargando inventario…</p> : !showUnits ? <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         {(selectedCategory ? subcategories : categories).map(group => {
           const Icon = icons[selectedCategory || group.name] || Wrench;
           const available = group.rows.filter(tool => tool.status === 'Disponible').length;
@@ -256,26 +277,26 @@ export default function Herramientas() {
     </> : <>
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-slate-500" aria-live="polite">{quantity(filtered.length)} · {availabilityLabel(filtered.filter(t=>t.status==='Disponible').length)}</p>
-        <div className="flex gap-1">
+        <div className="hidden sm:flex gap-1">
           <Button variant={viewMode==='grid'?'default':'outline'} size="sm" aria-label="Vista de tarjetas" aria-pressed={viewMode==='grid'} onClick={()=>setViewMode('grid')}><LayoutGrid className="h-4 w-4" /></Button>
           <Button variant={viewMode==='list'?'default':'outline'} size="sm" aria-label="Vista de lista" aria-pressed={viewMode==='list'} onClick={()=>setViewMode('list')}><List className="h-4 w-4" /></Button>
         </div>
       </div>
-      <div className={viewMode==='grid'?'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4':'flex flex-col gap-3'}>
+      <div className={isMobile || viewMode==='grid'?'grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-4':'flex flex-col gap-3'}>
         {filtered.map(tool => {
           const Icon = icons[tool.classification.category] || Wrench;
-          return <article key={tool.id} className={'rounded-2xl border border-slate-200 bg-white overflow-hidden ' + (viewMode==='list'?'sm:flex sm:items-center':'flex flex-col')}>
-            {viewMode==='grid' && <button type="button" aria-label={'Abrir ' + tool.name + ' ' + tool.code} onClick={()=>openTool(tool.id)} className="h-36 w-full bg-slate-50 overflow-hidden"><ToolPhoto id={tool.id} name={tool.name} className="w-full h-full object-cover" fallback={<Icon className="h-8 w-8 text-slate-400" />} /></button>}
-            <div className="p-4 flex-1 min-w-0 space-y-2">
+          return <article key={tool.id} className={'min-w-0 rounded-2xl border border-slate-200 bg-white overflow-hidden ' + (!isMobile && viewMode==='list'?'sm:flex sm:items-center':'flex flex-col')}>
+            {(isMobile || viewMode==='grid') && <button type="button" aria-label={'Abrir ' + tool.name + ' ' + tool.code} onClick={()=>openTool(tool.id)} className="h-28 sm:h-36 w-full bg-slate-50 overflow-hidden"><ToolPhoto id={tool.id} name={tool.name} className="w-full h-full object-cover" fallback={<Icon className="h-8 w-8 text-slate-400" />} /></button>}
+            <div className="p-2 sm:p-4 flex-1 min-w-0 space-y-2 break-words">
               <div className="flex flex-wrap gap-2 items-center justify-between"><span className="font-mono text-xs text-slate-500 break-all">{tool.code}</span><span className={'text-xs px-2 py-1 border rounded-full ' + statusStyle(tool.status)}>{tool.status}</span></div>
               <button type="button" onClick={()=>openTool(tool.id)} className="text-left hover:text-peie-blue"><h2 className="text-base font-semibold">{tool.name}</h2></button>
               <p className="text-xs font-medium text-peie-blue">{tool.classification.category} › {tool.classification.subcategory}</p>
               <p className="text-xs text-slate-500">{tool.brand || 'Marca sin registrar'}{tool.model ? ' · ' + tool.model : ''}</p>
               <p className="text-xs text-slate-500 flex gap-1 items-center"><Building2 className="h-3.5 w-3.5 shrink-0" />{tool.obras?.name || 'Sin ubicación asignada'}</p>
             </div>
-            <div className="p-3 border-t border-slate-100 flex gap-2 justify-between sm:shrink-0">
-              <Button size="sm" variant="ghost" onClick={()=>openTool(tool.id)}>Ver ficha</Button>
-              <Button size="sm" className="bg-peie-blue" onClick={()=>navigate('/solicitudes/nueva',{state:{herramientaId:tool.id}})}><Truck className="h-3.5 w-3.5 mr-1" />Pedir</Button>
+            <div className="p-2 sm:p-3 border-t border-slate-100 flex flex-wrap gap-1 justify-between sm:shrink-0">
+              <Button size="sm" className="px-2 text-xs sm:text-sm" variant="ghost" onClick={()=>openTool(tool.id)}>Ver ficha</Button>
+              <Button size="sm" className="bg-peie-blue px-2 text-xs sm:text-sm" onClick={()=>navigate('/solicitudes/nueva',{state:{herramientaId:tool.id}})}><Truck className="h-3.5 w-3.5 mr-1" />Pedir</Button>
             </div>
           </article>;
         })}

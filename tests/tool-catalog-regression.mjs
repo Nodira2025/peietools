@@ -79,6 +79,22 @@ try {
     });
 
     await page.goto(base+'__tool-catalog');
+    if (viewport.width < 640) {
+      await page.locator('article').first().waitFor();
+      assert.equal(await page.locator('article').count(), inventory.length);
+      await page.getByLabel('Categoría', {exact:true}).selectOption('Escalera');
+      await page.getByLabel('Subcategoría', {exact:true}).selectOption('8 peldaños');
+      await page.getByRole('heading', {name:'Escalera 8p',exact:true}).waitFor();
+      await page.getByLabel('Estado', {exact:true}).selectOption('Disponible');
+      await page.reload();
+      await page.getByRole('heading', {name:'Escalera 8p',exact:true}).waitFor();
+      assert.equal(await page.getByLabel('Estado', {exact:true}).inputValue(), 'Disponible');
+      assert.equal(await page.getByLabel('Subcategoría', {exact:true}).inputValue(), '8 peldaños');
+      assert.deepEqual(errors, []);
+      console.log('PASS: mobile direct inventory, dropdown categories, filters and reload');
+      await page.close();
+      continue;
+    }
     await page.getByText('Escalera',{exact:true}).waitFor();
     assert.equal(photos,0);
     await page.getByText('Escalera',{exact:true}).click();
