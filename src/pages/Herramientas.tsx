@@ -54,7 +54,7 @@ export default function Herramientas() {
   const [herramientas, setHerramientas] = useState<Herramienta[]>(cachedInventory);
   const [loading, setLoading] = useState(herramientas.length === 0);
   const [loadError, setLoadError] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(() => location.state?.category ? canonicalCategory(parseCategoryPath(location.state.category)?.category || location.state.category) : null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(() => location.state?.subcategory && location.state?.category ? canonicalCategory(parseCategoryPath(location.state.category)?.category || location.state.category) : null);
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(location.state?.subcategory ?? null);
   const [searchTerm, setSearchTerm] = useState<string>(location.state?.searchTerm ?? '');
   const [filterObra, setFilterObra] = useState<string>(location.state?.filterObra ?? '');
@@ -135,17 +135,18 @@ export default function Herramientas() {
     matchesToolSearch(tool, searchTerm)
   ).sort((a,b) => a.name.localeCompare(b.name, 'es', { numeric: true }) || a.code.localeCompare(b.code, 'es', { numeric: true })), [scoped, selectedCategory, selectedSubcategory, searchTerm]);
 
-  const categories = useMemo(() => [...new Set(scoped.map(tool => tool.classification.category))]
-    .sort(compareCategories).map(name => ({
-      name,
-      rows: scoped.filter(tool => tool.classification.category === name),
-      subcategories: [...new Set(scoped.filter(tool => tool.classification.category === name).map(tool => tool.classification.subcategory))].sort(compareSubcategories),
-    })), [scoped]);
-
-  const subcategories = useMemo(() => [...new Set(scoped.filter(tool => tool.classification.category === selectedCategory).map(tool => tool.classification.subcategory))]
-    .sort(compareSubcategories).map(name => ({
-      name, rows: scoped.filter(tool => tool.classification.category === selectedCategory && tool.classification.subcategory === name),
-    })), [scoped, selectedCategory]);
+  const subcategories = useMemo(() => {
+    const groups = new Map<string, { category: string; name: string; count: number }>();
+    scoped.forEach(tool => {
+      const { category, subcategory } = tool.classification;
+      const key = JSON.stringify([category, subcategory]);
+      const group = groups.get(key);
+      if (group) group.count++;
+      else groups.set(key, { category, name: subcategory, count: 1 });
+    });
+    return [...groups.entries()].map(([value, group]) => ({ value, ...group }))
+      .sort((a, b) => compareCategories(a.category, b.category) || compareSubcategories(a.name, b.name));
+  }, [scoped]);
 
   const changeScope = (key: string, value: string) => {
     const obra = key === "obra" ? value : filterObra;
@@ -154,7 +155,7 @@ export default function Herramientas() {
     const remaining = classified.filter(tool => (!obra || tool.obras?.name === obra) && (!status || tool.status === status) && (!encargado || tool.obras?.encargado_name === encargado));
     if (selectedCategory && !remaining.some(tool => tool.classification.category === selectedCategory)) {
       setSelectedCategory(null); setSelectedSubcategory(null);
-    } else if (selectedSubcategory && !remaining.some(tool => tool.classification.category === selectedCategory && tool.classification.subcategory === selectedSubcategory)) setSelectedSubcategory(null);
+    } else if (selectedSubcategory && !remaining.some(tool => tool.classification.category === selectedCategory && tool.classification.subcategory === selectedSubcategory)) { setSelectedCategory(null); setSelectedSubcategory(null); }
     if (key === 'obra') setFilterObra(obra);
     if (key === 'status') setFilterStatus(status);
     if (key === 'encargado') setFilterEncargado(encargado);
@@ -163,10 +164,7 @@ export default function Herramientas() {
   const obras = useMemo(() => [...new Set(herramientas.flatMap(t => t.obras?.name ? [t.obras.name] : []))].sort(), [herramientas]);
   const encargados = useMemo(() => [...new Set(herramientas.flatMap(t => t.obras?.encargado_name ? [t.obras.encargado_name] : []))].sort(), [herramientas]);
   const statuses = useMemo(() => [...new Set(herramientas.map(t => t.status))].sort(), [herramientas]);
-  const showUnits = isMobile || Boolean(selectedSubcategory || searchTerm.trim() || filterObra || filterEncargado);
-  const stage = showUnits ? 3 : selectedCategory ? 2 : 1;
   const goHome = () => { setSelectedCategory(null); setSelectedSubcategory(null); setSearchTerm(''); };
-  const goCategory = () => { setSelectedSubcategory(null); setSearchTerm(''); };
   const clearFilters = () => { setSearchTerm(''); setFilterObra(''); setFilterStatus(''); setFilterEncargado(''); setSelectedCategory(null); setSelectedSubcategory(null); };
   const openTool = (id: string) => navigate('/herramientas/' + id, { state: navigationState });
   const exportToExcel = async (all = false) => {
@@ -193,14 +191,13 @@ export default function Herramientas() {
       <div className="min-w-0">
         <nav aria-label="Ruta de herramientas" className="hidden sm:flex flex-wrap items-center gap-2 text-sm mb-3">
           <button type="button" onClick={goHome} className="text-peie-blue hover:underline py-1">Herramientas</button>
-          {selectedCategory && <><ChevronRight className="h-4 w-4 text-slate-400" /><button type="button" onClick={goCategory} className="text-peie-blue hover:underline py-1">{selectedCategory}</button></>}
           {selectedSubcategory && <><ChevronRight className="h-4 w-4 text-slate-400" /><span aria-current="page" className="text-slate-600">{selectedSubcategory}</span></>}
         </nav>
         <div className="flex items-center gap-2">
-          {!isMobile && (selectedCategory || searchTerm) && <Button variant="ghost" size="icon" aria-label="Volver al nivel anterior" onClick={() => searchTerm ? setSearchTerm('') : selectedSubcategory ? goCategory() : goHome()}><ChevronLeft className="h-5 w-5" /></Button>}
+          {!isMobile && (selectedCategory || searchTerm) && <Button variant="ghost" size="icon" aria-label="Volver al nivel anterior" onClick={() => searchTerm ? setSearchTerm('') : goHome()}><ChevronLeft className="h-5 w-5" /></Button>}
           <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-peie-blue">{isMobile ? 'Herramientas' : searchTerm.trim() ? 'Resultados de búsqueda' : selectedSubcategory || selectedCategory || 'Herramientas'}</h1>
         </div>
-        <p className="hidden sm:block text-sm text-slate-500 mt-1">{showUnits ? quantity(filtered.length) : selectedCategory ? 'Elegí una subcategoría para ver sus herramientas.' : 'Elegí una categoría principal.'}</p>
+        <p className="hidden sm:block text-sm text-slate-500 mt-1">{quantity(filtered.length)}</p>
       </div>
       <div className="flex items-center gap-1 sm:gap-2 shrink-0">
         <Button variant="outline" className="h-9 w-9 p-0 sm:h-10 sm:w-auto sm:px-4" aria-label="Buscar con cámara" onClick={() => navigate('/herramientas/busqueda-visual')}><Camera className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">Buscar con foto</span></Button>
@@ -208,28 +205,14 @@ export default function Herramientas() {
       </div>
     </div>
 
-    <div className="hidden sm:flex items-center gap-2 sm:gap-4 text-xs sm:text-sm flex-wrap" aria-label="Pasos de selección">
-      {['Categoría', 'Subcategoría', 'Herramientas'].map((label, i) => <span key={label} aria-current={stage === i+1 ? 'step' : undefined} className={'flex items-center gap-2 ' + (stage === i+1 ? 'font-semibold text-peie-blue' : 'text-slate-500')}>
-        <span className={'w-6 h-6 grid place-items-center rounded-full ' + (stage === i+1 ? 'bg-peie-blue text-white' : 'bg-slate-100')}>{i+1}</span>{label}
-        {i<2 && <ChevronRight className="h-3 w-3 text-slate-400 ml-1" />}
-      </span>)}
-    </div>
-
     <div className="space-y-2 sm:space-y-3">
-      <div className="grid grid-cols-2 gap-2">
-        <label className="min-w-0 text-xs font-semibold text-slate-600"><span className="sr-only">Categoría</span>
-          <select aria-label="Categoría" value={selectedCategory || ''} onChange={e => { setSelectedCategory(e.target.value || null); setSelectedSubcategory(null); }} className="w-full h-9 rounded-lg border border-slate-200 bg-white px-2">
-            <option value="">Todas las categorías</option>
-            {categories.map(group => <option key={group.name} value={group.name}>{group.name} ({group.rows.length})</option>)}
-          </select>
-        </label>
-        <label className="min-w-0 text-xs font-semibold text-slate-600"><span className="sr-only">Subcategoría</span>
-          <select aria-label="Subcategoría" disabled={!selectedCategory} value={selectedSubcategory || ''} onChange={e => setSelectedSubcategory(e.target.value || null)} className="w-full h-9 rounded-lg border border-slate-200 bg-white px-2 disabled:opacity-50">
-            <option value="">Todas las subcategorías</option>
-            {subcategories.map(group => <option key={group.name} value={group.name}>{group.name} ({group.rows.length})</option>)}
-          </select>
-        </label>
-      </div>
+      <select aria-label="Subcategoría" value={selectedCategory && selectedSubcategory ? JSON.stringify([selectedCategory, selectedSubcategory]) : ""} onChange={e => {
+        const group = subcategories.find(option => option.value === e.target.value);
+        setSelectedCategory(group?.category || null); setSelectedSubcategory(group?.name || null);
+      }} className="w-full h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-600">
+        <option value="">Todas las subcategorías</option>
+        {subcategories.map(group => <option key={group.value} value={group.value}>{group.category} · {group.name} ({group.count})</option>)}
+      </select>
       <div className="flex gap-1 sm:gap-2">
         <div className="relative flex-1 min-w-0"><Search className="absolute left-2 top-2.5 sm:top-3.5 h-4 w-4 text-slate-400" /><Input aria-label="Buscar herramientas" placeholder="Buscar herramienta..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="h-9 sm:h-11 pl-7 text-sm rounded-lg" /></div>
         <Button variant="outline" className="h-9 sm:h-11 px-2 text-xs sm:text-sm" onClick={clearFilters}>Limpiar</Button>
@@ -254,23 +237,7 @@ export default function Herramientas() {
     </details>}
 
     {loadError && <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{loadError}<Button size="sm" variant="ghost" onClick={() => void fetchHerramientas()}>Reintentar</Button></div>}
-    {loading ? <p className="py-12 text-center text-slate-500">Cargando inventario…</p> : !showUnits ? <>
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-        {(selectedCategory ? subcategories : categories).map(group => {
-          const Icon = icons[selectedCategory || group.name] || Wrench;
-          const available = group.rows.filter(tool => tool.status === 'Disponible').length;
-          const categorySummary = 'subcategories' in group ? (group.subcategories as string[]).slice(0,3).join(' · ') : '';
-          return <button key={group.name} type="button" onClick={() => selectedCategory ? setSelectedSubcategory(group.name) : (setSelectedCategory(group.name), setSelectedSubcategory(null))} className="rounded-2xl border border-slate-200 bg-white p-5 text-left flex flex-col gap-4 hover:border-blue-400 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-peie-blue">
-            <span className="flex items-center justify-between gap-2"><span className="p-3 rounded-xl bg-blue-50 text-peie-blue"><Icon className="h-6 w-6" /></span><span className="text-xs rounded-full bg-slate-100 px-3 py-1 text-slate-600">{quantity(group.rows.length)}</span></span>
-            <span className="font-bold text-base text-slate-800">{group.name}</span>
-            {categorySummary && <span className="text-xs text-slate-500">{categorySummary}</span>}
-            <span className={'text-xs ' + (/confirmar|Por clasificar/.test(group.name) ? 'text-amber-700' : 'text-slate-500')}>{/confirmar|Por clasificar/.test(group.name) ? 'Datos pendientes de confirmar' : group.rows.length ? availabilityLabel(available) : 'Sin unidades con los filtros actuales'}</span>
-            <span className="flex justify-between items-center mt-auto text-sm font-medium text-peie-blue">{selectedCategory ? 'Ver herramientas' : 'Ver subcategorías'}<ChevronRight className="h-4 w-4" /></span>
-          </button>;
-        })}
-      </div>
-      {selectedCategory && !subcategories.length && <p className="text-center p-10 text-slate-500">Todavía no hay herramientas ni subcategorías registradas en esta categoría.</p>}
-    </> : <>
+    {loading ? <p className="py-12 text-center text-slate-500">Cargando inventario…</p> : <>
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-slate-500" aria-live="polite">{quantity(filtered.length)} · {availabilityLabel(filtered.filter(t=>t.status==='Disponible').length)}</p>
         <div className="hidden sm:flex gap-1">

@@ -82,31 +82,22 @@ try {
     if (viewport.width < 640) {
       await page.locator('article').first().waitFor();
       assert.equal(await page.locator('article').count(), inventory.length);
-      await page.getByLabel('Categoría', {exact:true}).selectOption('Escalera');
-      await page.getByLabel('Subcategoría', {exact:true}).selectOption('8 peldaños');
+      await page.getByLabel('Subcategoría', {exact:true}).selectOption(JSON.stringify(['Escalera', '8 peldaños']));
       await page.getByRole('heading', {name:'Escalera 8p',exact:true}).waitFor();
       await page.getByLabel('Estado', {exact:true}).selectOption('Disponible');
       await page.reload();
       await page.getByRole('heading', {name:'Escalera 8p',exact:true}).waitFor();
       assert.equal(await page.getByLabel('Estado', {exact:true}).inputValue(), 'Disponible');
-      assert.equal(await page.getByLabel('Subcategoría', {exact:true}).inputValue(), '8 peldaños');
+      assert.equal(await page.getByLabel('Subcategoría', {exact:true}).inputValue(), JSON.stringify(['Escalera', '8 peldaños']));
       assert.deepEqual(errors, []);
       console.log('PASS: mobile direct inventory, dropdown categories, filters and reload');
       await page.close();
       continue;
     }
-    await page.getByText('Escalera',{exact:true}).waitFor();
-    assert.equal(photos,0);
-    await page.getByText('Escalera',{exact:true}).click();
-    await page.getByRole('button',{name:/8 peldaños.*Ver herramientas/}).waitFor();
-    assert.equal(photos,0,'Category and subcategory levels must not load photos');
-    const labels=await page.locator('button').filter({hasText:'Ver herramientas'}).allTextContents();
-    assert.ok(labels.findIndex(t=>t.includes('2 peldaños')&&!t.includes('12'))<labels.findIndex(t=>t.includes('8 peldaños')));
+    await page.locator('article').first().waitFor();
+    await page.getByLabel('Subcategoría', {exact:true}).selectOption(JSON.stringify(['Escalera', '8 peldaños']));
     await page.getByLabel('Estado',{exact:true}).selectOption('Disponible');
-    const photoRequest=page.waitForRequest(req=>new URL(req.url()).searchParams.get('select')==='photo_url');
-    await page.getByRole('button',{name:/8 peldaños.*Ver herramientas/}).click();
     await page.getByRole('heading',{name:'Escalera 8p',exact:true}).waitFor();
-    await photoRequest;
     await page.getByRole('button',{name:'Ver ficha',exact:true}).click();
     await page.getByRole('button',{name:'Volver',exact:true}).click();
     await page.getByRole('heading',{name:'8 peldaños',exact:true}).waitFor();
