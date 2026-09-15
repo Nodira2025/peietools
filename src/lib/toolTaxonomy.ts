@@ -42,6 +42,7 @@ const tidy = (value: string) => value.trim().replace(/\s+/g, ' ');
 export const normalizeToolText = (value: string) => tidy(value)
   .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
   .replace(/[–—]/g, '-')
+  .replace(/½/g, ' 1/2').replace(/\bpulgas\b|\bpulg\.?\b/g, 'pulgadas')
   .replace(/\bidentar\b/g, 'indentar').replace(/\b(\d+)\s*p\b/g, '$1 peldanos');
 
 const legacyAliases: Record<string, string> = {
@@ -66,7 +67,7 @@ export function canonicalCategory(value: string): string {
   if (standard) return standard;
   if (legacyAliases[key]) return legacyAliases[key];
   if (/^escalera\b/.test(key)) return 'Escalera';
-  if (/^amoladora\b/.test(key)) return 'Amoladora';
+  if (/^amoladoras?\b/.test(key)) return 'Amoladora';
   if (/^rotomartillo\b/.test(key)) return 'Rotomartillo';
   return text ? text[0].toLocaleUpperCase('es') + text.slice(1).toLocaleLowerCase('es') : 'Por clasificar';
 }
@@ -83,6 +84,12 @@ export function canonicalSubcategory(category: string, value: string): string {
   if (category === 'Escalera') {
     const steps = key.match(/^(?:de\s+)?(\d{1,2})\s*(?:peldanos?|pel|peld\.?)$/);
     if (steps) return `${Number(steps[1])} peldaños`;
+  }
+  if (category === 'Amoladora') {
+    const measure = key.replace(/^amoladoras?\s*/, '').replace(/[()]/g, '').trim();
+    if (/^(?:4\s*1\s*\/\s*2|4[.,]5)\s*(?:pulgadas?|["″])$|^115\s*mm$/.test(measure)) return '4 1/2 pulgadas';
+    if (/^7\s*(?:pulgadas?|["″])$|^180\s*mm$/.test(measure)) return '7 pulgadas';
+    if (/^9\s*(?:pulgadas?|["″])$|^230\s*mm$/.test(measure)) return '9 pulgadas';
   }
   const standard = STANDARD_CATALOG[category]?.find(s => normalizeToolText(s) === key);
   return standard || text[0].toLocaleUpperCase('es') + text.slice(1);
@@ -102,7 +109,7 @@ export function serializeClassification(value: ToolClassification): string {
 
 function familyFromName(name: string): string | null {
   if (/\bescalera\b/.test(name)) return 'Escalera';
-  if (/\bamoladora\b/.test(name)) return 'Amoladora';
+  if (/\bamoladoras?\b/.test(name)) return 'Amoladora';
   if (/rotomartillo|roto.?martillo|retro.*sds/.test(name)) return 'Rotomartillo';
   if (/\btaladro\b/.test(name)) return 'Taladro';
   if (/\bandamio\b/.test(name)) return 'Andamio';

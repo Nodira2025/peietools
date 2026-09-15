@@ -1,6 +1,6 @@
 # Catálogo de herramientas
 
-El inventario se navega por **categoría principal → subcategoría → herramienta**. Por ejemplo: Escalera → 2 peldaños. La categoría Escalera muestra esa subcategoría incluso cuando no tiene unidades. Los demás grupos se forman con el inventario y las entradas registradas del catálogo.
+El inventario se navega por **categoría principal → subcategoría → herramienta**. Por ejemplo: Escalera → 2 peldaños. Los filtros y las tarjetas de categorías muestran únicamente grupos con unidades en el inventario, según obra, coordinador y estado. Las categorías registradas sin unidades siguen disponibles en los formularios de alta y administración, pero no en los filtros.
 
 En celulares (menos de 640 px) se muestran directamente todas las herramientas en dos columnas. Categoría y subcategoría son dos filtros desplegables colocados uno al lado del otro; se combinan con obra, coordinador, estado y búsqueda. En escritorio, filtrar por obra o coordinador también muestra directamente sus herramientas. «Limpiar» restablece todos los filtros, incluida la categoría.
 
@@ -32,3 +32,5 @@ La clasificación se contrastó con los 83 registros usados en la propuesta: las
 - `npm run build -- --outDir scratch/performance-dist --manifest` y `node tests/inventory-performance.mjs`: compilación, fotos diferidas y carga inicial del acceso.
 
 Las pruebas de navegador requieren Playwright y Chrome. La comprobación general de TypeScript conserva errores anteriores del proyecto; los archivos nuevos y la navegación del catálogo se verifican también con ESLint y pruebas funcionales.
+
+Los desplegables de categoría y subcategoría están disponibles en celular y escritorio. Las amoladoras unifican 7 pulgadas, 7" y 180 mm; también 4 1/2 pulgadas con 115 mm y 9 pulgadas con 230 mm. Se conservan las medidas pendientes de confirmar. Cambiar obra, coordinador o estado conserva la clasificación seleccionada si tiene unidades y restablece únicamente los niveles que quedan vacíos.

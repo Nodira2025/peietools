@@ -15,6 +15,10 @@ try {
     [{ name:'Amoladora chica 750W',category:'Amoladora (4 1/2")' },'Amoladora','4 1/2 pulgadas'],
     [{ name:'Amoladora 750W modelo 900',category:'Amoladoras' },'Amoladora','Diámetro por confirmar'],
     [{ name:'Amoladora 230 mm',category:'Amoladoras' },'Amoladora','9 pulgadas'],
+    [{ name:'Amoladoras 7 pulgas',category:'Amoladoras' },'Amoladora','7 pulgadas'],
+    [{ name:'Amoladora',category:'Amoladoras › 7"' },'Amoladora','7 pulgadas'],
+    [{ name:'Amoladora',category:'Amoladora › 180 mm' },'Amoladora','7 pulgadas'],
+    [{ name:'Amoladora',category:'Amoladora › 4½ pulgadas' },'Amoladora','4 1/2 pulgadas'],
     [{ name:'Taladro',category:'Taladros' },'Taladro','Tipo por confirmar'],
     [{ name:'Retro Barovo',category:'Retro' },'Por clasificar','Retro · confirmar herramienta'],
     [{ name:'Retro Total SDS Plus',category:'Retro' },'Rotomartillo','SDS Plus'],
@@ -30,6 +34,7 @@ try {
   assert.equal(matchesToolSearch({name:'Amoladora 750W',category:'Amoladora (4 1/2")'},'Amoladora 7 pulgadas'),false);
   assert.equal(matchesToolSearch({name:'Amoladora 750W',category:'Amoladora (4 1/2")'},'Amoladora 7"'),false);
   assert.equal(matchesToolSearch({name:'Amoladora',category:'Amoladora (7")'},'7 pulgadas'),true);
+  assert.equal(matchesToolSearch({name:'Amoladora',category:'Amoladora (7")'},'amoladoras 7 pulgas'),true);
   assert.equal(matchesToolSearch({name:'Pinza de indentar'},'pinza de identar'),true);
   assert.deepEqual(['10 peldaños','Por confirmar','2 peldaños','8 peldaños'].sort(compareSubcategories),['2 peldaños','8 peldaños','10 peldaños','Por confirmar']);
   const catalog = buildToolCatalog([ladder],['Escaleras','Escalera 8p','Escalera › 8 peldaños']);

@@ -169,7 +169,7 @@ try {
       await page.getByRole('dialog').waitFor({state:'hidden'});
       await page.getByRole('button',{name:'Gestionar categorías',exact:true}).click();
       await page.getByRole('button',{name:'Agregar',exact:true}).click();
-      await page.getByLabel('Subcategoría',{exact:true}).fill('16 peldaños');
+      await page.getByRole('dialog').getByLabel('Subcategoría',{exact:true}).fill('16 peldaños');
       await page.getByRole('button',{name:'Guardar',exact:true}).click();
       await page.getByText('Catálogo actualizado',{exact:true}).waitFor();
       assert.ok(registry.some(r=>r.name==='Escalera › 16 peldaños'));

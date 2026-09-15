@@ -4,7 +4,6 @@ import { Wrench, Plus, Search, Layers, Disc, Hammer, Shield, Ruler, ChevronLeft,
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/auth';
 import { useToast } from '@/hooks/use-toast';
-import { useCategories } from '../lib/useCategories';
 import { canonicalCategory, classifyTool, compareCategories, compareSubcategories, matchesToolSearch, parseCategoryPath, type ToolClassification } from '../lib/toolTaxonomy';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -74,7 +73,6 @@ export default function Herramientas() {
   const requestSequence = useRef(0);
   const isAdmin = profile?.role === 'admin' || profile?.role === 'logistica';
   const canManageTools = ['admin', 'logistica', 'encargado', 'solicitante', 'coordinador'].includes(profile?.role || '');
-  const { registeredNames } = useCategories(herramientas);
 
   const fetchHerramientas = useCallback(async () => {
     const sequence = ++requestSequence.current;
@@ -137,33 +135,30 @@ export default function Herramientas() {
     matchesToolSearch(tool, searchTerm)
   ).sort((a,b) => a.name.localeCompare(b.name, 'es', { numeric: true }) || a.code.localeCompare(b.code, 'es', { numeric: true })), [scoped, selectedCategory, selectedSubcategory, searchTerm]);
 
-  const categories = useMemo(() => {
-    const names = new Set(classified.map(tool => tool.classification.category));
-    names.add('Escalera');
-    names.add('Rotuladora');
-    registeredNames.forEach(name => {
-      const explicit = parseCategoryPath(name);
-      if (explicit) names.add(explicit.category);
-      else if (name === canonicalCategory(name)) names.add(name);
-    });
-    return [...names].sort(compareCategories).map(name => ({
+  const categories = useMemo(() => [...new Set(scoped.map(tool => tool.classification.category))]
+    .sort(compareCategories).map(name => ({
       name,
       rows: scoped.filter(tool => tool.classification.category === name),
-      subcategories: [...new Set(classified.filter(tool => tool.classification.category === name).map(tool => tool.classification.subcategory))].sort(compareSubcategories),
-    }));
-  }, [classified, scoped, registeredNames]);
+      subcategories: [...new Set(scoped.filter(tool => tool.classification.category === name).map(tool => tool.classification.subcategory))].sort(compareSubcategories),
+    })), [scoped]);
 
-  const subcategories = useMemo(() => {
-    const names = new Set(classified.filter(tool => tool.classification.category === selectedCategory).map(tool => tool.classification.subcategory));
-    registeredNames.forEach(name => {
-      const explicit = parseCategoryPath(name);
-      if (explicit?.category === selectedCategory) names.add(explicit.subcategory);
-    });
-    if (selectedCategory === 'Escalera') names.add('2 peldaños');
-    return [...names].sort(compareSubcategories).map(name => ({
+  const subcategories = useMemo(() => [...new Set(scoped.filter(tool => tool.classification.category === selectedCategory).map(tool => tool.classification.subcategory))]
+    .sort(compareSubcategories).map(name => ({
       name, rows: scoped.filter(tool => tool.classification.category === selectedCategory && tool.classification.subcategory === name),
-    }));
-  }, [classified, scoped, selectedCategory, registeredNames]);
+    })), [scoped, selectedCategory]);
+
+  const changeScope = (key: string, value: string) => {
+    const obra = key === "obra" ? value : filterObra;
+    const status = key === "status" ? value : filterStatus;
+    const encargado = key === "encargado" ? value : filterEncargado;
+    const remaining = classified.filter(tool => (!obra || tool.obras?.name === obra) && (!status || tool.status === status) && (!encargado || tool.obras?.encargado_name === encargado));
+    if (selectedCategory && !remaining.some(tool => tool.classification.category === selectedCategory)) {
+      setSelectedCategory(null); setSelectedSubcategory(null);
+    } else if (selectedSubcategory && !remaining.some(tool => tool.classification.category === selectedCategory && tool.classification.subcategory === selectedSubcategory)) setSelectedSubcategory(null);
+    if (key === 'obra') setFilterObra(obra);
+    if (key === 'status') setFilterStatus(status);
+    if (key === 'encargado') setFilterEncargado(encargado);
+  };
 
   const obras = useMemo(() => [...new Set(herramientas.flatMap(t => t.obras?.name ? [t.obras.name] : []))].sort(), [herramientas]);
   const encargados = useMemo(() => [...new Set(herramientas.flatMap(t => t.obras?.encargado_name ? [t.obras.encargado_name] : []))].sort(), [herramientas]);
@@ -221,7 +216,7 @@ export default function Herramientas() {
     </div>
 
     <div className="space-y-2 sm:space-y-3">
-      {isMobile && <div className="grid grid-cols-2 gap-2 sm:hidden">
+      <div className="grid grid-cols-2 gap-2">
         <label className="min-w-0 text-xs font-semibold text-slate-600"><span className="sr-only">Categoría</span>
           <select aria-label="Categoría" value={selectedCategory || ''} onChange={e => { setSelectedCategory(e.target.value || null); setSelectedSubcategory(null); }} className="w-full h-9 rounded-lg border border-slate-200 bg-white px-2">
             <option value="">Todas las categorías</option>
@@ -234,7 +229,7 @@ export default function Herramientas() {
             {subcategories.map(group => <option key={group.name} value={group.name}>{group.name} ({group.rows.length})</option>)}
           </select>
         </label>
-      </div>}
+      </div>
       <div className="flex gap-1 sm:gap-2">
         <div className="relative flex-1 min-w-0"><Search className="absolute left-2 top-2.5 sm:top-3.5 h-4 w-4 text-slate-400" /><Input aria-label="Buscar herramientas" placeholder="Buscar herramienta..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="h-9 sm:h-11 pl-7 text-sm rounded-lg" /></div>
         <Button variant="outline" className="h-9 sm:h-11 px-2 text-xs sm:text-sm" onClick={clearFilters}>Limpiar</Button>
@@ -245,7 +240,7 @@ export default function Herramientas() {
         { key: 'status', label: 'Estado', value: filterStatus, options: statuses.map(s => ({ value:s, label:s })) },
         { key: 'obra', label: 'Obra actual', value: filterObra, options: obras.map(s => ({ value:s, label:s })) },
         { key: 'encargado', label: 'Coordinador', value: filterEncargado, options: encargados.map(s => ({ value:s, label:s })) },
-      ]} onFilterChange={(key, value) => { if(key==='status') setFilterStatus(value); if(key==='obra') setFilterObra(value); if(key==='encargado') setFilterEncargado(value); }} />
+      ]} onFilterChange={changeScope} />
       </div>
     </div>
 

@@ -26,6 +26,8 @@ try {
   ];
   const workers = Array.from({ length: 9 }, (_, i) => ({ id: 'worker-' + i, full_name: i ? 'Trabajador de prueba ' + i : 'José María Fernández de la Cruz', specialty: i ? 'Oficial albañil' : 'Responsable de instalaciones eléctricas', photo_url: i === 1 ? 'https://test.invalid/missing.jpg' : '/logo-peie.png', obra_id: 'obra-1', active: true }));
   const tools = Array.from({ length: 5 }, (_, i) => ({ id: 'tool-' + i, name: i % 2 ? 'Amoladora 750W' : 'Escalera 8 peldaños', code: 'H-' + i, category: i % 2 ? 'Amoladora' : 'Escalera', brand: 'Total', model: null, status: 'En uso', photo_url: null, current_obra_id: 'obra-1', obras: { name: obras[0].name, encargado_name: obras[0].encargado_name } }));
+  tools[1].category = 'Amoladoras › 7"';
+  tools[1].status = 'Disponible';
   let failTools = false;
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -51,6 +53,16 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   const cards = await page.locator('article').evaluateAll(rows => rows.slice(0, 2).map(row => ({ x: row.getBoundingClientRect().x, y: row.getBoundingClientRect().y })));
   assert.equal(cards[0].y, cards[1].y); assert.ok(cards[1].x > cards[0].x);
+  assert.equal(await page.getByLabel('Categoría', {exact:true}).locator('option[value="Rotuladora"]').count(), 0, 'No empty categories');
+  await page.getByLabel('Categoría', {exact:true}).selectOption('Amoladora');
+  assert.equal(await page.getByLabel('Subcategoría', {exact:true}).locator('option[value="9 pulgadas"]').count(), 0, 'No empty standard variants');
+  await page.getByLabel('Subcategoría', {exact:true}).selectOption('7 pulgadas');
+  assert.equal(await page.locator('article').count(), 1, 'Canonical inch filter matches explicit legacy variant');
+  await page.getByLabel('Estado', {exact:true}).selectOption('En uso');
+  assert.equal(await page.getByLabel('Subcategoría', {exact:true}).inputValue(), '', 'Invalid subcategory resets when scope changes');
+  assert.equal(await page.getByLabel('Subcategoría', {exact:true}).locator('option[value="7 pulgadas"]').count(), 0);
+  assert.equal(await page.locator('article').count(), 1);
+  await page.getByLabel('Estado', {exact:true}).selectOption('');
   await page.getByLabel('Categoría', { exact: true }).selectOption('Escalera');
   assert.equal(await page.locator('article').count(), 3);
   await page.getByLabel('Subcategoría', { exact: true }).selectOption('8 peldaños');
