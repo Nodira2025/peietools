@@ -15,10 +15,10 @@ export interface CatalogData { obra: CatalogObra; workers: Worker[]; tools: Tool
 export interface CatalogPage { blob: Blob; name: string }
 
 // Explicit ranges prevent Supabase's row limit from silently truncating a catalog.
-export async function loadObraCatalog(obra: CatalogObra): Promise<CatalogData> {
+export async function loadObraCatalog(obra: CatalogObra, toolsOnly = false): Promise<CatalogData> {
   const workers: Worker[] = [];
   const tools: Tool[] = [];
-  for (let offset = 0; ; offset += 500) {
+  for (let offset = 0; !toolsOnly; offset += 500) {
     const result = await supabase.from('empleados').select('id, full_name, specialty, photo_url')
       .eq('obra_id', obra.id).eq('active', true).order('full_name').order('id').range(offset, offset + 499);
     if (result.error) throw new Error('No se pudo cargar el personal de ' + obra.name);
@@ -26,10 +26,13 @@ export async function loadObraCatalog(obra: CatalogObra): Promise<CatalogData> {
     if ((result.data?.length || 0) < 500) break;
   }
   for (let offset = 0; ; offset += 500) {
-    const result = await supabase.from('herramientas').select('id, name, code, brand, status, photo_url')
+    const query = toolsOnly
+      ? supabase.from('herramientas').select('id, name, code, brand, status')
+      : supabase.from('herramientas').select('id, name, code, brand, status, photo_url');
+    const result = await query
       .eq('current_obra_id', obra.id).order('name').order('id').range(offset, offset + 499);
     if (result.error) throw new Error('No se pudieron cargar las herramientas de ' + obra.name);
-    tools.push(...(result.data || []));
+    tools.push(...(result.data || []).map(tool => ({ ...tool, photo_url: 'photo_url' in tool ? tool.photo_url : null })) as Tool[]);
     if ((result.data?.length || 0) < 500) break;
   }
   return { obra, workers, tools };

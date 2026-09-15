@@ -10,6 +10,7 @@ export default function ObraCatalogExport({ obras, selectedObra, disabled = fals
   obras: CatalogObra[]; selectedObra?: CatalogObra | null; disabled?: boolean;
 }) {
   const [scope, setScope] = useState<CatalogObra[] | null>(null);
+  const [allObras, setAllObras] = useState(false);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState('');
   const [error, setError] = useState('');
@@ -19,7 +20,8 @@ export default function ObraCatalogExport({ obras, selectedObra, disabled = fals
   const sequence = useRef(0);
   const revoke = () => { urls.current.forEach(url => URL.revokeObjectURL(url)); urls.current = []; };
   useEffect(() => () => { sequence.current++; urls.current.forEach(url => URL.revokeObjectURL(url)); }, []);
-  const open = (selection: CatalogObra[]) => {
+  const open = (selection: CatalogObra[], all = false) => {
+    setAllObras(all);
     revoke(); setFiles([]); setError(''); setWarning(''); setScope(selection);
   };
   const close = () => {
@@ -32,17 +34,23 @@ export default function ObraCatalogExport({ obras, selectedObra, disabled = fals
     try {
       const { loadObraCatalog, renderObraCatalog, catalogPdf } = await import('../lib/obraCatalog');
       const pages = [];
+      const distribution = [];
       let missingPhotos = 0;
       const date = new Date().toLocaleString('es-AR');
       for (const [index, obra] of scope.entries()) {
         setProgress(`Preparando obra ${index + 1} de ${scope.length}: ${obra.name}`);
-        const data = await loadObraCatalog(obra);
+        const data = await loadObraCatalog(obra, allObras);
         if (sequence.current !== request) return;
+        if (allObras) { distribution.push(data); continue; }
         const result = await renderObraCatalog(data, date);
         if (sequence.current !== request) return;
         pages.push(...result.pages); missingPhotos += result.missingPhotos;
       }
-      const name = scope.length === 1 ? catalogFilename(scope[0].name) : 'todas-las-obras';
+      if (allObras) {
+        const { renderObraDistribution } = await import('../lib/obraDistribution');
+        pages.push(...await renderObraDistribution(distribution, date.split(',')[0]));
+      }
+      const name = allObras ? 'todas-las-obras' : catalogFilename(scope[0].name);
       const output = format === 'pdf'
         ? [new File([await catalogPdf(pages)], `PEIE-${name}.pdf`, { type: 'application/pdf' })]
         : pages.map(page => new File([page.blob], page.name, { type: 'image/jpeg' }));
@@ -62,13 +70,14 @@ export default function ObraCatalogExport({ obras, selectedObra, disabled = fals
   return <>
     <div className="flex flex-wrap gap-2">
       {selectedObra && <Button variant="outline" disabled={disabled || busy} onClick={() => open([selectedObra])}><Download className="mr-2 h-4 w-4" />Exportar obra</Button>}
-      <Button variant="outline" disabled={disabled || busy || !obras.length} onClick={() => open(obras)}><Download className="mr-2 h-4 w-4" />Exportar todas las obras</Button>
+      <Button variant="outline" disabled={disabled || busy || !obras.length} onClick={() => open(obras, true)}><Download className="mr-2 h-4 w-4" />Exportar todas las obras</Button>
     </div>
     <Dialog open={scope !== null} onOpenChange={value => { if (!value) close(); }}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto">
         <DialogHeader><DialogTitle>Exportar catálogo PEIE</DialogTitle></DialogHeader>
         <p className="text-sm text-slate-600">{scope?.length === 1 ? scope[0].name : `${scope?.length || 0} obras accesibles, incluidas las inactivas y las que no aparecen con los filtros actuales.`}</p>
         <p className="text-sm text-slate-600">PDF reúne todas las páginas. JPEG genera una imagen por página, lista para descargar y adjuntar en WhatsApp.</p>
+        {allObras && <p className="text-sm text-slate-600">Tabla de herramientas agrupadas por obra, con cantidades por obra y total general.</p>}
         <div className="grid grid-cols-2 gap-2">
           <Button disabled={busy} onClick={() => void generate('pdf')}>Generar PDF</Button>
           <Button disabled={busy} onClick={() => void generate('jpeg')}>Generar JPEG</Button>

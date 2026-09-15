@@ -193,23 +193,23 @@ export default function Herramientas() {
     } catch { toast({ variant: 'destructive', title: 'Error', description: 'No se pudo exportar el inventario.' }); }
   };
 
-  return <div className="space-y-5 pb-safe">
-    <div className="flex flex-col xl:flex-row justify-between gap-4">
-      <div>
-        <nav aria-label="Ruta de herramientas" className="flex flex-wrap items-center gap-2 text-sm mb-3">
+  return <div className="space-y-2 sm:space-y-5 pb-safe">
+    <div className="flex flex-row sm:flex-col xl:flex-row justify-between items-center sm:items-stretch gap-2 sm:gap-4">
+      <div className="min-w-0">
+        <nav aria-label="Ruta de herramientas" className="hidden sm:flex flex-wrap items-center gap-2 text-sm mb-3">
           <button type="button" onClick={goHome} className="text-peie-blue hover:underline py-1">Herramientas</button>
           {selectedCategory && <><ChevronRight className="h-4 w-4 text-slate-400" /><button type="button" onClick={goCategory} className="text-peie-blue hover:underline py-1">{selectedCategory}</button></>}
           {selectedSubcategory && <><ChevronRight className="h-4 w-4 text-slate-400" /><span aria-current="page" className="text-slate-600">{selectedSubcategory}</span></>}
         </nav>
         <div className="flex items-center gap-2">
-          {(selectedCategory || searchTerm) && <Button variant="ghost" size="icon" aria-label="Volver al nivel anterior" onClick={() => searchTerm ? setSearchTerm('') : selectedSubcategory ? goCategory() : goHome()}><ChevronLeft className="h-5 w-5" /></Button>}
-          <h1 className="text-2xl font-bold tracking-tight text-peie-blue">{searchTerm.trim() ? 'Resultados de búsqueda' : selectedSubcategory || selectedCategory || 'Herramientas'}</h1>
+          {!isMobile && (selectedCategory || searchTerm) && <Button variant="ghost" size="icon" aria-label="Volver al nivel anterior" onClick={() => searchTerm ? setSearchTerm('') : selectedSubcategory ? goCategory() : goHome()}><ChevronLeft className="h-5 w-5" /></Button>}
+          <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-peie-blue">{isMobile ? 'Herramientas' : searchTerm.trim() ? 'Resultados de búsqueda' : selectedSubcategory || selectedCategory || 'Herramientas'}</h1>
         </div>
-        <p className="text-sm text-slate-500 mt-1">{showUnits ? quantity(filtered.length) : selectedCategory ? 'Elegí una subcategoría para ver sus herramientas.' : 'Elegí una categoría principal.'}</p>
+        <p className="hidden sm:block text-sm text-slate-500 mt-1">{showUnits ? quantity(filtered.length) : selectedCategory ? 'Elegí una subcategoría para ver sus herramientas.' : 'Elegí una categoría principal.'}</p>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button variant="outline" aria-label="Buscar con cámara" onClick={() => navigate('/herramientas/busqueda-visual')}><Camera className="h-4 w-4 mr-2" /><span className="hidden sm:inline">Buscar con foto</span><span className="sm:hidden">Foto</span></Button>
-        {canManageTools && <Button className="bg-peie-blue" aria-label="Nueva herramienta" onClick={() => navigate('/herramientas/nueva')}><Plus className="h-4 w-4 mr-2" /><span className="hidden sm:inline">Nueva herramienta</span><span className="sm:hidden">Nueva</span></Button>}
+      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+        <Button variant="outline" className="h-9 w-9 p-0 sm:h-10 sm:w-auto sm:px-4" aria-label="Buscar con cámara" onClick={() => navigate('/herramientas/busqueda-visual')}><Camera className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">Buscar con foto</span></Button>
+        {canManageTools && <Button className="bg-peie-blue h-9 px-2 sm:h-10 sm:px-4" aria-label="Nueva herramienta" onClick={() => navigate('/herramientas/nueva')}><Plus className="h-4 w-4 mr-1" /><span className="hidden sm:inline">Nueva herramienta</span><span className="sm:hidden text-xs">Nueva</span></Button>}
       </div>
     </div>
 
@@ -220,35 +220,37 @@ export default function Herramientas() {
       </span>)}
     </div>
 
-    <div className="space-y-3">
+    <div className="space-y-2 sm:space-y-3">
       {isMobile && <div className="grid grid-cols-2 gap-2 sm:hidden">
-        <label className="min-w-0 text-xs font-semibold text-slate-600">Categoría
-          <select aria-label="Categoría" value={selectedCategory || ''} onChange={e => { setSelectedCategory(e.target.value || null); setSelectedSubcategory(null); }} className="mt-1 w-full h-11 rounded-xl border border-slate-200 bg-white px-2">
+        <label className="min-w-0 text-xs font-semibold text-slate-600"><span className="sr-only">Categoría</span>
+          <select aria-label="Categoría" value={selectedCategory || ''} onChange={e => { setSelectedCategory(e.target.value || null); setSelectedSubcategory(null); }} className="w-full h-9 rounded-lg border border-slate-200 bg-white px-2">
             <option value="">Todas las categorías</option>
             {categories.map(group => <option key={group.name} value={group.name}>{group.name} ({group.rows.length})</option>)}
           </select>
         </label>
-        <label className="min-w-0 text-xs font-semibold text-slate-600">Subcategoría
-          <select aria-label="Subcategoría" disabled={!selectedCategory} value={selectedSubcategory || ''} onChange={e => setSelectedSubcategory(e.target.value || null)} className="mt-1 w-full h-11 rounded-xl border border-slate-200 bg-white px-2 disabled:opacity-50">
+        <label className="min-w-0 text-xs font-semibold text-slate-600"><span className="sr-only">Subcategoría</span>
+          <select aria-label="Subcategoría" disabled={!selectedCategory} value={selectedSubcategory || ''} onChange={e => setSelectedSubcategory(e.target.value || null)} className="w-full h-9 rounded-lg border border-slate-200 bg-white px-2 disabled:opacity-50">
             <option value="">Todas las subcategorías</option>
             {subcategories.map(group => <option key={group.name} value={group.name}>{group.name} ({group.rows.length})</option>)}
           </select>
         </label>
       </div>}
-      <div className="flex flex-wrap gap-2">
-        <div className="relative flex-1 min-w-[200px]"><Search className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" /><Input aria-label="Buscar herramientas" placeholder="Buscar por nombre, medida, código o marca..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="h-11 pl-10 rounded-xl" /></div>
-        <Button variant="outline" className="h-11" onClick={clearFilters}>Limpiar</Button>
-        <Button variant="outline" className="h-11" aria-label="Exportar Excel" onClick={() => void exportToExcel()}><Download className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">Excel</span></Button>
+      <div className="flex gap-1 sm:gap-2">
+        <div className="relative flex-1 min-w-0"><Search className="absolute left-2 top-2.5 sm:top-3.5 h-4 w-4 text-slate-400" /><Input aria-label="Buscar herramientas" placeholder="Buscar herramienta..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="h-9 sm:h-11 pl-7 text-sm rounded-lg" /></div>
+        <Button variant="outline" className="h-9 sm:h-11 px-2 text-xs sm:text-sm" onClick={clearFilters}>Limpiar</Button>
+        <Button variant="outline" className="h-9 w-9 p-0 sm:h-11 sm:w-auto sm:px-4 shrink-0" aria-label="Exportar Excel" onClick={() => void exportToExcel()}><Download className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">Excel</span></Button>
       </div>
+      <div className="max-sm:[&>div]:grid max-sm:[&>div]:grid-cols-3 max-sm:[&>div]:gap-1 max-sm:[&>div>div]:min-w-0 max-sm:[&_select]:w-full max-sm:[&_select]:h-9 max-sm:[&_select]:truncate max-sm:[&_select]:rounded-lg max-sm:[&_select]:pl-2 max-sm:[&>div>button]:hidden">
       <FilterBar filters={[
         { key: 'status', label: 'Estado', value: filterStatus, options: statuses.map(s => ({ value:s, label:s })) },
         { key: 'obra', label: 'Obra actual', value: filterObra, options: obras.map(s => ({ value:s, label:s })) },
         { key: 'encargado', label: 'Coordinador', value: filterEncargado, options: encargados.map(s => ({ value:s, label:s })) },
       ]} onFilterChange={(key, value) => { if(key==='status') setFilterStatus(value); if(key==='obra') setFilterObra(value); if(key==='encargado') setFilterEncargado(value); }} />
+      </div>
     </div>
 
     {isAdmin && <details data-catalog-admin className="text-sm">
-      <summary className="cursor-pointer text-peie-blue font-medium py-2">Administrar catálogo</summary>
+      <summary className="cursor-pointer text-peie-blue font-medium text-xs sm:text-sm py-1 sm:py-2">Administrar catálogo</summary>
       <div className="flex gap-2 flex-wrap mt-2">
       <Button size="sm" variant="outline" onClick={() => setIsGestionCategoriasOpen(true)}><Layers className="h-4 w-4 mr-2" />Gestionar categorías</Button>
       <Button size="sm" variant="outline" onClick={() => setIsImportarExcelOpen(true)}><FileSpreadsheet className="h-4 w-4 mr-2" />Importar categorías Excel</Button>
@@ -285,16 +287,16 @@ export default function Herramientas() {
         {filtered.map(tool => {
           const Icon = icons[tool.classification.category] || Wrench;
           return <article key={tool.id} className={'min-w-0 rounded-2xl border border-slate-200 bg-white overflow-hidden ' + (!isMobile && viewMode==='list'?'sm:flex sm:items-center':'flex flex-col')}>
-            {(isMobile || viewMode==='grid') && <button type="button" aria-label={'Abrir ' + tool.name + ' ' + tool.code} onClick={()=>openTool(tool.id)} className="h-28 sm:h-36 w-full bg-slate-50 overflow-hidden"><ToolPhoto id={tool.id} name={tool.name} className="w-full h-full object-cover" fallback={<Icon className="h-8 w-8 text-slate-400" />} /></button>}
-            <div className="p-2 sm:p-4 flex-1 min-w-0 space-y-2 break-words">
-              <div className="flex flex-wrap gap-2 items-center justify-between"><span className="font-mono text-xs text-slate-500 break-all">{tool.code}</span><span className={'text-xs px-2 py-1 border rounded-full ' + statusStyle(tool.status)}>{tool.status}</span></div>
-              <button type="button" onClick={()=>openTool(tool.id)} className="text-left hover:text-peie-blue"><h2 className="text-base font-semibold">{tool.name}</h2></button>
+            {(isMobile || viewMode==='grid') && <button type="button" aria-label={'Abrir ' + tool.name + ' ' + tool.code} onClick={()=>openTool(tool.id)} className="h-20 sm:h-36 w-full bg-slate-50 overflow-hidden"><ToolPhoto id={tool.id} name={tool.name} className="w-full h-full object-cover" fallback={<Icon className="h-8 w-8 text-slate-400" />} /></button>}
+            <div className="p-2 sm:p-4 flex-1 min-w-0 space-y-1 sm:space-y-2 break-words">
+              <div className="flex flex-wrap gap-1 sm:gap-2 items-center justify-between"><span className="font-mono text-[10px] sm:text-xs text-slate-500 break-all">{tool.code}</span><span className={'text-[10px] sm:text-xs px-1.5 sm:px-2 py-1 border rounded-full ' + statusStyle(tool.status)}>{tool.status}</span></div>
+              <button type="button" onClick={()=>openTool(tool.id)} className="text-left hover:text-peie-blue"><h2 className="text-sm sm:text-base font-semibold">{tool.name}</h2></button>
               <p className="text-xs font-medium text-peie-blue">{tool.classification.category} › {tool.classification.subcategory}</p>
               <p className="text-xs text-slate-500">{tool.brand || 'Marca sin registrar'}{tool.model ? ' · ' + tool.model : ''}</p>
               <p className="text-xs text-slate-500 flex gap-1 items-center"><Building2 className="h-3.5 w-3.5 shrink-0" />{tool.obras?.name || 'Sin ubicación asignada'}</p>
             </div>
             <div className="p-2 sm:p-3 border-t border-slate-100 flex flex-wrap gap-1 justify-between sm:shrink-0">
-              <Button size="sm" className="px-2 text-xs sm:text-sm" variant="ghost" onClick={()=>openTool(tool.id)}>Ver ficha</Button>
+              <Button size="sm" aria-label="Ver ficha" className="px-2 text-xs sm:text-sm" variant="ghost" onClick={()=>openTool(tool.id)}><span className="sm:hidden">Ficha</span><span className="hidden sm:inline">Ver ficha</span></Button>
               <Button size="sm" className="bg-peie-blue px-2 text-xs sm:text-sm" onClick={()=>navigate('/solicitudes/nueva',{state:{herramientaId:tool.id}})}><Truck className="h-3.5 w-3.5 mr-1" />Pedir</Button>
             </div>
           </article>;

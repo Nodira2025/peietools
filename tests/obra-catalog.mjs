@@ -44,6 +44,11 @@ try {
   await page.goto(base + 'herramientas');
   await page.locator('article').first().waitFor();
   assert.equal(await page.locator('article').count(), 5, 'All tools shown immediately');
+  await page.setViewportSize({ width: 320, height: 640 });
+  assert.ok(await page.locator('article').first().evaluate(row => row.getBoundingClientRect().top < 285), 'Compact mobile controls leave tools above the fold');
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'No overflow at 320px');
+  await page.screenshot({ path: 'scratch/obra-catalog/compact-320.png', fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
   const cards = await page.locator('article').evaluateAll(rows => rows.slice(0, 2).map(row => ({ x: row.getBoundingClientRect().x, y: row.getBoundingClientRect().y })));
   assert.equal(cards[0].y, cards[1].y); assert.ok(cards[1].x > cards[0].x);
   await page.getByLabel('Categoría', { exact: true }).selectOption('Escalera');
@@ -77,7 +82,20 @@ try {
   await page.getByText('1 archivo listo', { exact: true }).waitFor();
   const all = await page.locator('a[download]').evaluate(async link => Array.from(new Uint8Array(await (await fetch(link.href)).arrayBuffer())));
   await writeFile('scratch/obra-catalog/all.pdf', Buffer.from(all));
-  assert.equal((Buffer.from(all).toString('latin1').match(/\/Type \/Page\b/g) || []).length, 5, 'All export includes inactive empty obra');
+  assert.equal((Buffer.from(all).toString('latin1').match(/\/Type \/Page\b/g) || []).length, 1, 'Grouped distribution fits two obras on one page');
+  await page.getByRole('button', { name: 'Generar JPEG', exact: true }).click();
+  await page.getByText('1 archivo listo', { exact: true }).waitFor();
+  const tableImage = await page.locator('a[download]').evaluate(async link => Array.from(new Uint8Array(await (await fetch(link.href)).arrayBuffer())));
+  await writeFile('scratch/obra-catalog/distribution.jpeg', Buffer.from(tableImage));
+  const multi = await page.evaluate(async ({ obras, tools }) => {
+    const { renderObraDistribution } = await import('/src/lib/obraDistribution.ts');
+    const { catalogPdf } = await import('/src/lib/obraCatalog.ts');
+    const data = [{ obra: obras[0], workers: [], tools: Array.from({length:70}, (_, i) => ({...tools[0], id:String(i), code:'TEST-'+i, name:i===0?'Rotomartillo con accesorios y maletín de transporte para perforaciones de hormigón armado':'Herramienta de prueba '+i})) }, {obra:obras[1], workers:[], tools:[]}];
+    const pages = await renderObraDistribution(data, '15/9/2026');
+    return { count:pages.length, pdf:Array.from(new Uint8Array(await (await catalogPdf(pages)).arrayBuffer())) };
+  }, { obras, tools });
+  assert.ok(multi.count >= 3, 'Large obra spans pages');
+  await writeFile('scratch/obra-catalog/multipage.pdf', Buffer.from(multi.pdf));
   failTools = true;
   await page.getByRole('button', { name: 'Generar PDF', exact: true }).click();
   await page.getByRole('alert').filter({ hasText: 'No se pudieron cargar las herramientas' }).waitFor();
