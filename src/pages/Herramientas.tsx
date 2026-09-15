@@ -226,6 +226,9 @@ export default function Herramientas() {
           const Icon = icons[group.category] || Wrench;
           const locations = new Set(group.rows.map(tool => tool.current_obra_id).filter(Boolean)).size;
           return <button key={group.key} onClick={() => setSelectedGroup(group.key)} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 text-left space-y-2 hover:border-blue-400 hover:shadow-sm">
+            <div data-group-cover className="h-24 sm:h-32 overflow-hidden rounded-xl bg-slate-50">
+              <ToolPhoto id={group.rows[0].id} candidateIds={group.rows.map(tool => tool.id)} name={group.label} className="w-full h-full object-contain p-2" fallback={<Icon className="h-10 w-10 text-slate-300" />} />
+            </div>
             <div className="flex items-center justify-between gap-2"><Icon className="h-6 w-6 text-peie-blue" /><span className="text-xl font-bold text-peie-blue">{group.rows.length}</span></div>
             <h2 className="font-semibold text-sm text-slate-800 break-words">{group.label}</h2>
             <p className="text-xs text-slate-500">{quantity(group.rows.length)} · {locations} {locations === 1 ? "obra" : "obras"}</p>

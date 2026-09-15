@@ -17,6 +17,7 @@ try {
   assert.equal(inventoryGroup({name:'Amoladora grande',category:'Amoladora › Diámetro por confirmar'}).key,'Amoladora:otras');
   assert.equal(inventoryGroup({name:'Cajón',category:'Cajón de herramientas › Metálico'}).key,inventoryGroup({name:'Cajón',category:'Cajón de herramientas › Material por confirmar'}).key);
   const rows=Array.from({length:12},(_,i)=>({id:'tool-'+i,code:'TEST-'+i,name:i<6?'Amoladora 7 pulgadas':i<8?'Amoladora chica':i<11?'Cajón de herramientas':'Amoladora grande',category:i<6?'Amoladora › 7 pulgadas':i<8?'Amoladora › 4 1/2 pulgadas':i<11?(i===8?'Cajón de herramientas › Metálico':'Cajón de herramientas › Material por confirmar'):'Amoladora › Diámetro por confirmar',brand:'Prueba',model:null,status:'En uso',current_obra_id:i%2?'obra-b':'obra-a',obras:{name:i%2?'Obra B':'Obra A',encargado_name:i%2?'Responsable B':'Responsable A'},photo_url:null}));
+  rows[1].photo_url='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="navy"/></svg>');
   browser=await chromium.launch({channel:'chrome',headless:true});
   const base=server.resolvedUrls.local[0];
   await mkdir('scratch/group-qa',{recursive:true});
@@ -30,7 +31,11 @@ try {
       let data=[];
       if(url.pathname.endsWith('/herramientas')){
         data=rows.filter(r=>!url.searchParams.has('id')||url.searchParams.get('id')==='eq.'+r.id);
-        if(url.searchParams.get('select')==='photo_url')data={photo_url:null};
+        if(url.searchParams.get('select')==='photo_url'){
+          const ids=url.searchParams.get('id')||'';
+          const match=rows.find(r=>r.photo_url && (ids==='eq.'+r.id || ids.slice(3,-1).split(',').includes(r.id)));
+          data=match?{photo_url:match.photo_url}:null;
+        }
         else if(route.request().headers().accept?.includes('vnd.pgrst.object+json'))data=data[0];
       }
       await route.fulfill({contentType:'application/json',body:JSON.stringify(data)});
@@ -42,6 +47,10 @@ try {
     assert.equal(await page.locator('article').count(),0);
     const seven=groups.getByRole('button').filter({hasText:'Amoladora 7 pulgadas'});
     assert.match(await seven.innerText(),/6 unidades/);
+    const cover=seven.locator('[data-group-cover] img');
+    await cover.waitFor();
+    assert.equal(await cover.getAttribute('src'),rows[1].photo_url);
+    assert.equal(await cover.evaluate(img=>img.complete && img.naturalWidth>0),true);
     await page.screenshot({path:`scratch/group-qa/groups-${width}.png`,fullPage:true});
     await seven.click();
     assert.equal(await page.locator('article').count(),6);
