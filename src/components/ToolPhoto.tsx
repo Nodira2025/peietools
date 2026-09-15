@@ -3,9 +3,10 @@ import { supabase } from '../lib/supabase';
 
 // Las fotos históricas están guardadas como base64. Pedirlas sólo cuando
 // la tarjeta se acerca a la pantalla evita descargarlas con todo el inventario.
-export default function ToolPhoto({ id, name, className, fallback, candidateIds }: {
+export default function ToolPhoto({ id, name, className, fallback, candidateIds, landscape = false }: {
   id: string;
   candidateIds?: string[];
+  landscape?: boolean;
   name: string;
   className?: string;
   fallback: ReactNode;
@@ -14,6 +15,8 @@ export default function ToolPhoto({ id, name, className, fallback, candidateIds 
   const container = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null);
+  const [portraitSource, setPortraitSource] = useState<string | null>(null);
+  const rotated = landscape && photo !== null && portraitSource === photo;
 
   useEffect(() => {
     if (!container.current) return;
@@ -51,9 +54,15 @@ export default function ToolPhoto({ id, name, className, fallback, candidateIds 
     return () => controller.abort();
   }, [id, visible, candidateKey]);
 
-  return <div ref={container} className="w-full h-full flex items-center justify-center text-slate-300">
+  return <div ref={container} className="relative w-full h-full flex items-center justify-center text-slate-300">
     {photo
-      ? <img src={photo} alt={name} className={className} loading="lazy" decoding="async" onError={() => setPhoto(null)} />
+      ? <img src={photo} alt={name} className={className} loading="lazy" decoding="async"
+          style={rotated ? { position: 'absolute', width: '56.25%', height: '177.777778%', maxWidth: 'none', transform: 'rotate(90deg)' } : undefined}
+          onLoad={event => {
+            const img = event.currentTarget;
+            setPortraitSource(img.naturalHeight > img.naturalWidth ? photo : null);
+          }}
+          onError={() => setPhoto(null)} />
       : fallback}
   </div>;
 }

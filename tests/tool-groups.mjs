@@ -17,7 +17,7 @@ try {
   assert.equal(inventoryGroup({name:'Amoladora grande',category:'Amoladora › Diámetro por confirmar'}).key,'Amoladora:otras');
   assert.equal(inventoryGroup({name:'Cajón',category:'Cajón de herramientas › Metálico'}).key,inventoryGroup({name:'Cajón',category:'Cajón de herramientas › Material por confirmar'}).key);
   const rows=Array.from({length:12},(_,i)=>({id:'tool-'+i,code:'TEST-'+i,name:i<6?'Amoladora 7 pulgadas':i<8?'Amoladora chica':i<11?'Cajón de herramientas':'Amoladora grande',category:i<6?'Amoladora › 7 pulgadas':i<8?'Amoladora › 4 1/2 pulgadas':i<11?(i===8?'Cajón de herramientas › Metálico':'Cajón de herramientas › Material por confirmar'):'Amoladora › Diámetro por confirmar',brand:'Prueba',model:null,status:'En uso',current_obra_id:i%2?'obra-b':'obra-a',obras:{name:i%2?'Obra B':'Obra A',encargado_name:i%2?'Responsable B':'Responsable A'},photo_url:null}));
-  rows[1].photo_url='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="navy"/></svg>');
+  rows[1].photo_url='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="90" height="160"><rect width="90" height="160" fill="navy"/></svg>');
   browser=await chromium.launch({channel:'chrome',headless:true});
   const base=server.resolvedUrls.local[0];
   await mkdir('scratch/group-qa',{recursive:true});
@@ -50,6 +50,12 @@ try {
     const cover=seven.locator('[data-group-cover] img');
     await cover.waitFor();
     assert.equal(await cover.getAttribute('src'),rows[1].photo_url);
+    await page.waitForFunction(() => document.querySelector('[data-group-cover] img')?.style.transform === 'rotate(90deg)');
+    const frame = await seven.locator('[data-group-cover]').boundingBox();
+    assert.ok(Math.abs(frame.width / frame.height - 16 / 9) < 0.02);
+    const photoBox = await cover.boundingBox();
+    assert.ok(Math.abs(photoBox.width - frame.width) < 1);
+    assert.ok(Math.abs(photoBox.height - frame.height) < 1);
     assert.equal(await cover.evaluate(img=>img.complete && img.naturalWidth>0),true);
     await page.screenshot({path:`scratch/group-qa/groups-${width}.png`,fullPage:true});
     await seven.click();
