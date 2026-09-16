@@ -82,6 +82,35 @@ export function filterExportObras(obras: CatalogObra[]): CatalogObra[] {
   return obras.filter(o => isWhitelistedExportObra(o.name));
 }
 
+export const OBRA_INFORMANTS: Record<string, string> = {
+  '#300 - LINK': 'Juan Pablo Reyes',
+  'AEROPUERTO': 'Matías Lizárraga',
+  'ARQUITECTOS Y ASOCIADOS': 'Oficina Central',
+  'BAMBOO': 'Cristian Olivera',
+  'COUNTRY CANTEROS': 'Pendiente',
+  'COUNTRY CANTARES': 'Pendiente',
+  'DOMUS': 'Gustavo Manuel Cruz',
+  'GHO': 'Nico Rivero',
+  'KANTAROSKY - LÓPEZ': 'Enzo Lucena',
+  'KANTAROSKY - LOPEZ': 'Enzo Lucena',
+  'ONE RESIDENCE': 'Cristian de la Rosa',
+  'QUALITY BARRIO NORTE': 'Marcos Ledesma',
+  'SAN PABLO': 'Leonardo López',
+  'SHELL OASIS': 'Axelis Flores',
+  'TORRE DUO - LINK': 'Pendiente',
+};
+
+export function getObraInformant(obraName: string, fallback?: string | null): string {
+  const norm = obraName.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  for (const [key, informant] of Object.entries(OBRA_INFORMANTS)) {
+    const normKey = key.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    if (norm === normKey || norm.includes(normKey) || normKey.includes(norm)) {
+      return informant;
+    }
+  }
+  return fallback || '-';
+}
+
 export const catalogFilename = (name: string) => name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_-]+/g, '-').slice(0, 80) || 'obra';
 
 /** One canvas per page: bounded memory on phones, with identical PDF/JPEG layout. */
@@ -134,7 +163,9 @@ export async function renderObraCatalog(data: CatalogData, date: string): Promis
       ctx.fillStyle = '#081A63'; ctx.fillRect(0, 150, 1240, 370);
       text(obra.name, 48, 205, 1144, 38, true, '#FFFFFF');
       text('Ubicación: ' + (obra.address || 'Sin dirección registrada'), 48, 304, 1144, 25, false, '#FFFFFF');
-      text('Responsable: ' + (obra.encargado_name || 'Sin asignar'), 48, 379, 1144, 25, false, '#FFFFFF');
+      const informant = getObraInformant(obra.name, obra.encargado_name);
+      const respLine = 'Responsable: ' + (obra.encargado_name || 'Sin asignar') + (informant && informant !== obra.encargado_name && informant !== '-' ? '   |   Relevado por: ' + informant : '');
+      text(respLine, 48, 379, 1144, 25, false, '#FFFFFF');
       text(`${workers.length} trabajadores    |    ${tools.length} herramientas    |    ${obra.active ? 'Activa' : 'Inactiva'}`, 48, 468, 1144, 27, true, '#4FC3F7', 1);
       text(section.title, 48, 577, 900, 29, true);
       text(`${section.rows.length} en esta obra`, 920, 577, 270, 22);
