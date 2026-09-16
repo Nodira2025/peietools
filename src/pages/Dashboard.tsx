@@ -7,7 +7,6 @@ import { supabase } from '../lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Wrench, 
-  QrCode, 
   Users, 
   ChevronRight, 
   FileText, 
@@ -1200,43 +1199,6 @@ export default function Dashboard() {
             
             <Card className="bg-white border-0 shadow-[0_8px_30px_rgba(0,0,0,0.02)] rounded-[24px] p-5 h-[268px] flex flex-col justify-between">
               <div className="space-y-3">
-                {/* QR Scanner */}
-                <div 
-                  onClick={() => navigate('/herramientas/scanner')}
-                  className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 transition-all cursor-pointer group"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-600 group-hover:text-white transition-all">
-                      <QrCode size={18} className="stroke-[2.5]" />
-                    </div>
-                    <div className="min-w-0">
-                      <h4 className="text-xs font-bold text-slate-800 leading-tight">Escanear Código QR</h4>
-                      <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Asignar o devolver herramientas</p>
-                    </div>
-                  </div>
-                  <ChevronRight size={14} className="text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-                </div>
-
-                {/* Barcode Scanner */}
-                <div 
-                  onClick={() => {
-                    toast({ title: "Lector de código de barras", description: "Apunta al código de barras de la herramienta." });
-                    navigate('/herramientas/scanner');
-                  }}
-                  className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 transition-all cursor-pointer group"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-green-50 text-green-600 flex items-center justify-center shrink-0 group-hover:bg-green-600 group-hover:text-white transition-all">
-                      <FileText size={18} className="stroke-[2.5]" />
-                    </div>
-                    <div className="min-w-0">
-                      <h4 className="text-xs font-bold text-slate-800 leading-tight">Código de Barras</h4>
-                      <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Búsqueda rápida de inventario</p>
-                    </div>
-                  </div>
-                  <ChevronRight size={14} className="text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-                </div>
-
                 {/* WhatsApp Support */}
                 <a 
                   href="https://wa.me/5493814015738?text=Hola,%20necesito%20soporte%20desde%20PEIE%20Tools"
@@ -1291,9 +1253,6 @@ export default function Dashboard() {
               <ul className="text-xs text-slate-650 space-y-2 list-disc list-inside pl-1 font-medium">
                 <li>
                   <strong className="text-slate-800">Búsqueda de Herramientas:</strong> Usa el icono de lupa del header o haz clic en "Buscar Herramienta" para consultar el stock, disponibilidad y estado.
-                </li>
-                <li>
-                  <strong className="text-slate-800">Lectores QR y de Barras:</strong> Utiliza la cámara de tu celular para escanear y registrar traslados rápidos sin tipear códigos manualmente.
                 </li>
                 <li>
                   <strong className="text-slate-800">Modo Sin Conexión:</strong> Si te quedas sin señal en la obra, la app guarda datos clave en caché para que puedas seguir consultando.

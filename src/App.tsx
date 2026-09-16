@@ -16,7 +16,6 @@ const Usuarios = lazy(() => import('./pages/Usuarios'));
 const Herramientas = lazy(() => import('./pages/Herramientas'));
 const NuevaHerramienta = lazy(() => import('./pages/NuevaHerramienta'));
 const HerramientaDetail = lazy(() => import('./pages/HerramientaDetail'));
-const QRScanner = lazy(() => import('./pages/QRScanner'));
 const BusquedaVisual = lazy(() => import('./pages/BusquedaVisual'));
 const BusquedaPersonal = lazy(() => import('./pages/BusquedaPersonal'));
 const Solicitudes = lazy(() => import('./pages/Solicitudes'));
@@ -89,7 +88,6 @@ export default function App() {
           
           <Route path="/herramientas" element={<Herramientas />} />
           <Route path="/herramientas/nueva" element={<NuevaHerramienta />} />
-          <Route path="/herramientas/scanner" element={<QRScanner />} />
           <Route path="/herramientas/busqueda-visual" element={<BusquedaVisual />} />
           <Route path="/herramientas/:id" element={<HerramientaDetail />} />
           

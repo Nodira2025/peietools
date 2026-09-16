@@ -7,8 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Plus, Sparkles, Camera, Upload, Trash2, QrCode, ChevronRight, Building, Check, X } from 'lucide-react';
-import { useZxing } from 'react-zxing';
+import { ArrowLeft, Plus, Sparkles, Camera, Upload, Trash2, ChevronRight, Building, Check, X } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { Textarea } from '@/components/ui/textarea';
 import { compressImage } from '../lib/imageUtils';
@@ -64,7 +63,6 @@ export default function NuevaHerramienta() {
   const [wizardStep, setWizardStep] = useState<'name' | 'code' | 'details' | 'obra' | 'photo' | 'confirm'>(
     initialDraft?.wizardStep || 'name'
   );
-  const [showScannerInWizard, setShowScannerInWizard] = useState(false);
 
   // Guardar borrador reactivamente
   useEffect(() => {
@@ -76,24 +74,6 @@ export default function NuevaHerramienta() {
       } catch {}
     }
   }, [code, name, brand, model, description, currentObraId, category, photoUrl, wizardStep]);
-
-  const { ref: wizardScannerRef } = useZxing({
-    paused: !showScannerInWizard,
-    onResult(result: any) {
-      const text = result.getText();
-      let cleanCode = text;
-      try {
-        if (text.includes('/herramientas/')) {
-          const parts = text.split('/');
-          cleanCode = parts[parts.length - 1];
-        }
-      } catch {}
-      setCode(cleanCode.toUpperCase());
-      setShowScannerInWizard(false);
-      toast({ title: 'QR Escaneado', description: `Código capturado: ${cleanCode}` });
-      setWizardStep('details');
-    },
-  });
 
   // Admin, Logística, Encargados y Coordinadores pueden crear herramientas
   const isAuthorized = profile?.role === 'admin' || profile?.role === 'logistica' || profile?.role === 'encargado' || profile?.role === 'solicitante' || profile?.role === 'coordinador';
@@ -122,9 +102,9 @@ export default function NuevaHerramienta() {
         const compressed = await compressImage(file);
         setPhotoUrl(compressed);
         if (!aiText.trim()) {
-          // Detect tool name from file name if descriptive, else preset barcode
+          // Detect tool name from file name if descriptive, else preset code
           const cleanName = file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ");
-          setAiText(`Lectura de archivo "${cleanName}": Código detectado QR: TAL-${Math.floor(100 + Math.random() * 900)}. Producto: Taladro percutor Bosch GSB 18V.`);
+          setAiText(`Lectura de archivo "${cleanName}": Código detectado TAL-${Math.floor(100 + Math.random() * 900)}. Producto: Taladro percutor Bosch GSB 18V.`);
         }
         toast({ title: 'Foto procesada', description: 'Se guardó la foto para la herramienta y se analizó.' });
       } catch (err) {
@@ -338,52 +318,33 @@ Categorías válidas: ${dynamicCategories.join(', ')}. No deduzcas medidas a par
               </div>
             )}
 
-            {/* STEP 2: ENTER CODE / SCAN QR */}
+            {/* STEP 2: ENTER CODE */}
             {wizardStep === 'code' && (
               <div className="space-y-5">
                 <BackButton onBack={() => setWizardStep('name')} />
                 <StepHeader 
-                  title="¿Cuál es su código (etiqueta QR)?" 
-                  subtitle="Identificador de barra o pegatina QR de control"
+                  title="¿Cuál es su identificador de herramienta?" 
+                  subtitle="Ingresá el código interno asignado."
                 />
 
                 <div className="space-y-3">
-                  {showScannerInWizard ? (
-                    <div className="space-y-4">
-                      <div className="w-full aspect-square rounded-2xl overflow-hidden bg-black flex items-center justify-center relative border border-slate-200">
-                        <video ref={wizardScannerRef} className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 border-2 border-white/30 m-12 rounded-xl pointer-events-none"></div>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setShowScannerInWizard(false)}
-                        className="w-full h-12 rounded-xl border-slate-200 font-bold"
-                      >
-                        Cancelar Escaneo
-                      </Button>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="relative">
-                        <Input
-                          placeholder="Ej: TAL-005, AMO-012..."
-                          value={code}
-                          onChange={e => setCode(e.target.value)}
-                          className="h-14 rounded-2xl border-slate-200 focus-visible:ring-peie-blue text-base font-mono uppercase font-black"
-                        />
-                      </div>
+                  <div className="relative">
+                    <Input
+                      placeholder="Ej: TAL-005, AMO-012..."
+                      value={code}
+                      onChange={e => setCode(e.target.value)}
+                      className="h-14 rounded-2xl border-slate-200 focus-visible:ring-peie-blue text-base font-mono uppercase font-black"
+                    />
+                  </div>
 
-                        <Button
-                          type="button"
-                          onClick={() => setWizardStep('details')}
-                          disabled={!code.trim()}
-                          className="w-full h-14 bg-peie-blue hover:bg-peie-blue/90 text-white font-black rounded-2xl text-base shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-                        >
-                          Continuar <ChevronRight size={18} />
-                        </Button>
-                    </>
-                  )}
+                  <Button
+                    type="button"
+                    onClick={() => setWizardStep('details')}
+                    disabled={!code.trim()}
+                    className="w-full h-14 bg-peie-blue hover:bg-peie-blue/90 text-white font-black rounded-2xl text-base shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                  >
+                    Continuar <ChevronRight size={18} />
+                  </Button>
                 </div>
               </div>
             )}
@@ -645,17 +606,17 @@ Categorías válidas: ${dynamicCategories.join(', ')}. No deduzcas medidas a par
             </div>
             <div>
               <CardTitle className="text-base font-black text-slate-800 uppercase tracking-tight">Carga Rápida Asistida</CardTitle>
-              <CardDescription className="text-xs">Escribí una descripción corta o subí una foto de la etiqueta/código de barras de la herramienta y se rellenará el formulario por vos.</CardDescription>
+              <CardDescription className="text-xs">Escribí una descripción corta o subí una foto del equipo y se rellenará el formulario por vos.</CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="px-6 pb-5 space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="ai-input" className="text-xs font-bold text-slate-600">Descripción o info de QR/Código de Barras</Label>
+              <Label htmlFor="ai-input" className="text-xs font-bold text-slate-600">Descripción o texto de apoyo</Label>
             <Textarea
               id="ai-input"
               rows={2}
-              placeholder="Ej: Amoladora Bosch GWS 700 de 710w con código de barra AMO-032 para la obra Yerba Buena"
+              placeholder="Ej: Amoladora Bosch GWS 700 de 710w para la obra Yerba Buena"
               value={aiText}
               onChange={(e) => setAiText(e.target.value)}
               className="rounded-xl text-sm border-slate-200"
@@ -754,7 +715,7 @@ Categorías válidas: ${dynamicCategories.join(', ')}. No deduzcas medidas a par
                   className="h-11 rounded-xl uppercase font-mono"
                   required 
                 />
-                <span className="text-[10px] text-slate-400">Identificador único para etiquetas QR</span>
+                  <span className="text-[10px] text-slate-400">Identificador único interno del inventario</span>
               </div>
 
               <div className="space-y-1.5">

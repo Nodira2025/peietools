@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Download, Share2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
-import { catalogFilename, type CatalogObra } from '../lib/obraCatalog';
+import { catalogFilename, filterExportObras, type CatalogObra } from '../lib/obraCatalog';
 
 interface ExportFile { file: File; url: string }
 
@@ -22,7 +22,8 @@ export default function ObraCatalogExport({ obras, selectedObra, disabled = fals
   useEffect(() => () => { sequence.current++; urls.current.forEach(url => URL.revokeObjectURL(url)); }, []);
   const open = (selection: CatalogObra[], all = false) => {
     setAllObras(all);
-    revoke(); setFiles([]); setError(''); setWarning(''); setScope(selection);
+    const targetSelection = all ? filterExportObras(selection) : selection;
+    revoke(); setFiles([]); setError(''); setWarning(''); setScope(targetSelection);
   };
   const close = () => {
     sequence.current++; revoke(); setFiles([]); setScope(null); setBusy(false);

@@ -50,6 +50,38 @@ function loadImage(url: string | null): Promise<HTMLImageElement | null> {
   });
 }
 
+export const EXPORT_OBRA_WHITELIST: readonly string[] = [
+  '#300 - LINK',
+  'AEROPUERTO',
+  'ARQUITECTOS Y ASOCIADOS',
+  'BAMBOO',
+  'COUNTRY CANTEROS',
+  'COUNTRY CANTARES',
+  'DOMUS',
+  'GHO',
+  'KANTAROSKY - LÓPEZ',
+  'KANTAROSKY - LOPEZ',
+  'ONE RESIDENCE',
+  'QUALITY BARRIO NORTE',
+  'SAN PABLO',
+  'SHELL OASIS',
+  'TORRE DUO - LINK',
+];
+
+export function isWhitelistedExportObra(name: string): boolean {
+  const norm = name.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  return EXPORT_OBRA_WHITELIST.some(allowed => {
+    const allowedNorm = allowed.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    return norm === allowedNorm || norm.includes(allowedNorm) || allowedNorm.includes(norm);
+  });
+}
+
+export function filterExportObras(obras: CatalogObra[]): CatalogObra[] {
+  const hasWhitelisted = obras.some(o => isWhitelistedExportObra(o.name));
+  if (!hasWhitelisted) return obras;
+  return obras.filter(o => isWhitelistedExportObra(o.name));
+}
+
 export const catalogFilename = (name: string) => name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_-]+/g, '-').slice(0, 80) || 'obra';
 
 /** One canvas per page: bounded memory on phones, with identical PDF/JPEG layout. */
