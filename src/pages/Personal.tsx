@@ -20,7 +20,7 @@ interface Empleado {
   id: string;
   full_name: string;
   obra_id: string | null;
-  status: 'Trabajando' | 'Libre';
+  status: string;
   specialty: string | null;
   photo_url: string | null;
   whatsapp: string | null;
@@ -152,7 +152,9 @@ export default function Personal() {
     if (!selectedEmpForProfile || !profileForm.full_name.trim() || !profile) return;
     setProfileUpdating(true);
     try {
-      const computedStatus = profileForm.obra_id ? 'Trabajando' : 'Libre';
+      const computedStatus = profileForm.obra_id === selectedEmpForProfile.obra_id
+        ? selectedEmpForProfile.status
+        : profileForm.obra_id ? 'Trabajando' : 'Libre';
 
       const { error } = await supabase
         .from('empleados')
@@ -321,7 +323,7 @@ export default function Personal() {
         id: e.id,
         full_name: e.full_name,
         obra_id: e.obra_id,
-        status: e.status ? (e.status === 'Disponible' || e.status === 'Libre' ? 'Libre' : 'Trabajando') : (e.obra_id ? 'Trabajando' : 'Libre'),
+        status: e.status === 'Disponible' ? 'Libre' : e.status || (e.obra_id ? 'Trabajando' : 'Libre'),
         specialty: e.specialty || 'Electricista',
         photo_url: e.photo_url,
         whatsapp: e.whatsapp || null,
@@ -395,7 +397,7 @@ export default function Personal() {
           id: emp.id,
           full_name: emp.full_name,
           obra_id: emp.obra_id,
-          status: emp.status ? (emp.status === 'Disponible' || emp.status === 'Libre' ? 'Libre' : 'Trabajando') : (emp.obra_id ? 'Trabajando' : 'Libre'),
+          status: emp.status === 'Disponible' ? 'Libre' : emp.status || (emp.obra_id ? 'Trabajando' : 'Libre'),
           specialty: emp.specialty || 'Electricista',
           photo_url: emp.photo_url,
           whatsapp: emp.whatsapp || null,
@@ -435,9 +437,9 @@ export default function Personal() {
     
     let matchesStatus = true;
     if (filterType === 'free') {
-      matchesStatus = e.status === 'Libre' || !e.obra_id;
+      matchesStatus = e.status === 'Libre';
     } else if (filterType === 'busy') {
-      matchesStatus = e.status === 'Trabajando' || !!e.obra_id;
+      matchesStatus = e.status === 'Trabajando';
     }
     
     return matchesSearch && matchesObra && matchesSpecialty && matchesStatus;
@@ -535,7 +537,7 @@ export default function Personal() {
   const groupedByObra: Record<string, { name: string; encargado_name?: string | null; id?: string; list: Empleado[] }> = {};
 
   filteredEmpleados.forEach((emp) => {
-    const isLibre = emp.status === 'Libre' || !emp.obra_id;
+    const isLibre = emp.status === 'Libre';
     const obraKey = isLibre ? 'Sin Asignar' : (emp.obra_id || 'Sin Asignar');
 
     if (!groupedByObra[obraKey]) {
@@ -784,8 +786,8 @@ export default function Personal() {
         <div className="flex gap-2 p-1 bg-slate-100 rounded-xl overflow-x-auto no-scrollbar">
           {[
             { value: 'all', label: `Todos ${empleados.length}` },
-            { value: 'free', label: `Libres ${empleados.filter(e => e.status === 'Libre' || !e.obra_id).length}` },
-            { value: 'busy', label: `En Obra ${empleados.filter(e => e.status === 'Trabajando' || e.obra_id).length}` }
+            { value: 'free', label: `Libres ${empleados.filter(e => e.status === 'Libre').length}` },
+            { value: 'busy', label: `En Obra ${empleados.filter(e => e.status === 'Trabajando').length}` }
           ].map(opt => (
             <Button 
               key={opt.value}
@@ -932,7 +934,7 @@ export default function Personal() {
                   {/* Grilla de Operarios en la Obra */}
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {group.list.map(emp => {
-                      const isLibre = emp.status === 'Libre' || !emp.obra_id;
+                      const isLibre = emp.status === 'Libre';
                       const badgeStyle = isLibre 
                         ? 'bg-green-50 text-green-600 border-green-150' 
                         : 'bg-blue-50 text-blue-600 border-blue-150';
@@ -980,7 +982,7 @@ export default function Personal() {
                                 
                                 <div className="flex items-center gap-1.5 mt-1">
                                   <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full border shrink-0 ${badgeStyle}`}>
-                                    {isLibre ? 'Libre' : 'En Obra'}
+                                    {emp.status === 'Trabajando' ? 'En Obra' : emp.status}
                                   </span>
                                 </div>
                               </div>
@@ -1023,7 +1025,7 @@ export default function Personal() {
             /* NOMINA COMPLETA / LISTA PLANA (ALFABETICO) */
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {filteredEmpleados.map(emp => {
-                const isLibre = emp.status === 'Libre' || !emp.obra_id;
+                const isLibre = emp.status === 'Libre';
                 const badgeStyle = isLibre 
                   ? 'bg-green-50 text-green-600 border-green-150' 
                   : 'bg-blue-50 text-blue-600 border-blue-150';
@@ -1072,7 +1074,7 @@ export default function Personal() {
                           
                           <div className="flex items-center gap-1.5 mt-1 min-w-0">
                             <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full border shrink-0 ${badgeStyle}`}>
-                              {isLibre ? 'Libre' : 'En Obra'}
+                              {emp.status === 'Trabajando' ? 'En Obra' : emp.status}
                             </span>
                             {!isLibre && emp.obras?.name && (
                               <span className="text-[9px] font-bold text-slate-500 truncate" title={emp.obras.name}>

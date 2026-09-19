@@ -37,9 +37,9 @@ try {
     const dialog = page.getByRole('dialog');
     await dialog.getByRole('heading', { name: 'Reportar Tarea', exact: true }).waitFor();
     await dialog.getByRole('button', { name: /Personal en Obra \(1\)/ }).waitFor();
-    assert.equal(await dialog.getByRole('button', { name: /Abrir WhatsApp/ }).isDisabled(), true);
+    assert.equal(await dialog.getByRole('button', { name: 'Guardar reporte' }).isDisabled(), true);
     await dialog.locator('select').nth(1).selectOption('employee-user');
-    assert.equal(await dialog.getByRole('button', { name: /Abrir WhatsApp/ }).isEnabled(), true);
+    assert.equal(await dialog.getByRole('button', { name: 'Guardar reporte' }).isEnabled(), true);
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'No horizontal overflow');
     await mkdir('scratch/logistica-qa', { recursive: true });
     await page.screenshot({ path: 'scratch/logistica-qa/report-task-' + width + '.png' });

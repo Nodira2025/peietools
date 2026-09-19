@@ -22,19 +22,12 @@ import {
   PieChart, 
   Pie, 
   Cell, 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
   Tooltip as ChartTooltip, 
   Legend, 
-  BarChart, 
-  Bar 
 } from 'recharts';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 interface Herramienta {
   id: string;
@@ -141,7 +134,7 @@ export default function Reportes() {
       // Load herramientas
       const { data: hData } = await supabase
         .from('herramientas')
-        .select('*, obras(name)')
+        .select('id, code, name, brand, model, status, category, current_obra_id, obras(name)')
         .order('name');
         
       if (hData) {
@@ -283,23 +276,6 @@ export default function Reportes() {
   const COLORS = ['#031530', '#0ea5e9', '#f43f5e', '#10b981', '#8b5cf6', '#06b6d4', '#64748b'];
 
   // Chart 2: Solicitudes Históricas (Simulado a partir de las herramientas creadas por mes)
-  const monthlyData = [
-    { name: 'Ene', Solicitudes: 45, Entregas: 40 },
-    { name: 'Feb', Solicitudes: 52, Entregas: 48 },
-    { name: 'Mar', Solicitudes: 68, Entregas: 60 },
-    { name: 'Abr', Solicitudes: 75, Entregas: 70 },
-    { name: 'May', Solicitudes: 85, Entregas: 78 },
-    { name: 'Jun', Solicitudes: 95, Entregas: 88 }
-  ];
-
-  // Chart 3: Tiempo promedio de entrega por obra (Horas)
-  const deliveryTimeData = [
-    { name: 'Obra Central', Horas: 1.2 },
-    { name: 'Lomas de Tafí', Horas: 2.8 },
-    { name: 'Yerba Buena', Horas: 2.1 },
-    { name: 'Av. Colón', Horas: 3.4 },
-    { name: 'Manantial', Horas: 1.8 }
-  ];
 
   // EXPORTS
   const exportToExcel = () => {
@@ -389,7 +365,7 @@ export default function Reportes() {
       h.obras?.name || 'Base Central'
     ]);
 
-    (doc as any).autoTable({
+    autoTable(doc, {
       head: [tableColumn],
       body: tableRows,
       startY: 32,
@@ -543,7 +519,7 @@ export default function Reportes() {
           </Button>
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-peie-blue">Dashboard Analítico</h1>
-            <p className="text-muted-foreground text-xs">Monitoreo ejecutivo en tiempo real estilo Power BI</p>
+            <p className="text-muted-foreground text-xs">Inventario e historial de operaciones registradas</p>
           </div>
         </div>
 
@@ -621,7 +597,7 @@ export default function Reportes() {
       </div>
 
       {/* CHARTS SECTION */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         
         {/* Distribución por Categoría (Torta) */}
         <Card className="rounded-2xl shadow-sm border-slate-100 bg-white">
@@ -654,49 +630,6 @@ export default function Reportes() {
           </CardContent>
         </Card>
 
-        {/* Flujo mensual de solicitudes (Línea) */}
-        <Card className="rounded-2xl shadow-sm border-slate-100 bg-white">
-          <CardHeader className="p-5 pb-1">
-            <CardTitle className="text-sm font-bold text-slate-800">Flujo Mensual de Solicitudes</CardTitle>
-            <CardDescription className="text-[11px]">Solicitudes e intercambios recibidos vs aceptados</CardDescription>
-          </CardHeader>
-          <CardContent className="p-4">
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={monthlyData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="name" stroke="#94a3b8" style={{ fontSize: '10px' }} />
-                  <YAxis stroke="#94a3b8" style={{ fontSize: '10px' }} />
-                  <ChartTooltip />
-                  <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: '10px' }} />
-                  <Line type="monotone" dataKey="Solicitudes" stroke="#0ea5e9" strokeWidth={2.5} activeDot={{ r: 6 }} />
-                  <Line type="monotone" dataKey="Entregas" stroke="#10b981" strokeWidth={2.5} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Tiempos de Entrega por Obra (Barras) */}
-        <Card className="rounded-2xl shadow-sm border-slate-100 bg-white">
-          <CardHeader className="p-5 pb-1">
-            <CardTitle className="text-sm font-bold text-slate-800">Tiempos de Despacho (Horas)</CardTitle>
-            <CardDescription className="text-[11px]">Demora promedio desde la solicitud hasta la entrega</CardDescription>
-          </CardHeader>
-          <CardContent className="p-4">
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={deliveryTimeData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="name" stroke="#94a3b8" style={{ fontSize: '9px' }} />
-                  <YAxis stroke="#94a3b8" style={{ fontSize: '10px' }} />
-                  <ChartTooltip />
-                  <Bar dataKey="Horas" fill="#031530" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* MAPA DE TUCUMÁN EN TIEMPO REAL */}

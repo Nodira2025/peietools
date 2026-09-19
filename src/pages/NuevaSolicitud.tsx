@@ -436,7 +436,7 @@ export default function NuevaSolicitud() {
     }
 
     const tool = herramientas.find(h => h.id === selectedToolId);
-    const finalToolName = requestedToolName.trim() || tool?.name || toolSearch.trim() || 'Herramienta solicitada';
+    const finalToolName = requestedToolName.trim() || tool?.name || toolSearch.trim();
 
 
     if (!tool && !finalToolName) {

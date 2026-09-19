@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import VoiceInputButton from './VoiceInputButton';
+import { WhatsAppPreviewModal } from './WhatsAppPreviewModal';
 
 export default function ReportTaskDialog({ open: isReportOpen, onOpenChange: setIsReportOpen }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const { profile } = useAuthStore();
@@ -20,6 +21,9 @@ export default function ReportTaskDialog({ open: isReportOpen, onOpenChange: set
   const [reportTarea, setReportTarea] = useState('');
   const [reportMotivo, setReportMotivo] = useState('Se trata de una compra / alquiler especial que excede la logística habitual.');
   const [reportMotivoOtro, setReportMotivoOtro] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [share, setShare] = useState<{ phone: string; message: string; name: string } | null>(null);
   useEffect(() => {
     if (!isReportOpen) return;
     let cancelled = false;
@@ -73,7 +77,8 @@ export default function ReportTaskDialog({ open: isReportOpen, onOpenChange: set
     void loadPeople();
     return () => { cancelled = true; };
   }, [isReportOpen, toast]);
-  const handleSendReport = () => {
+  const handleSendReport = async () => {
+    if (saving) return;
     if (!reportPerson) {
       toast({ variant: 'destructive', title: 'Persona requerida', description: 'Por favor, seleccioná a la persona que te encomendó la tarea.' });
       return;
@@ -87,28 +92,31 @@ export default function ReportTaskDialog({ open: isReportOpen, onOpenChange: set
     const targetPhone = (recipientObj?.whatsapp && recipientObj.whatsapp.length > 6)
       ? recipientObj.whatsapp
       : (reportRecipient === '5493814015738' ? reportRecipient : '');
-    if (!targetPhone) {
-      toast({ variant: 'destructive', title: 'Falta WhatsApp', description: 'La persona destinataria no tiene un número de WhatsApp cargado.' });
-      return;
-    }
 
     const recipientName = recipientObj?.full_name || 'Federico Grande';
 
     const motivoFinal = reportMotivo === 'Otro' ? (reportMotivoOtro.trim() || 'Otro motivo especificado por voz/texto') : reportMotivo;
 
     // Guardar en la base de datos de Supabase para la página de reportes
-    supabase.from('reportes_excedidos').insert([{
-      requester_id: profile?.id,
-      requester_name: profile?.full_name || 'Personal Logística',
-      target_person_id: oficinaProfiles.some(p => p.id === personaObj?.id) ? personaObj!.id : null,
-      target_person_name: personaNombre,
-      recipient_name: recipientName,
-      tarea: reportTarea.trim() || 'Sin descripción específica',
-      motivo: motivoFinal,
-      status: 'Enviado WhatsApp'
-    }]).then(({ error }) => {
-      if (error) console.warn('No se pudo guardar reporte en DB (asegurarse de aplicar supabase_update_v12.sql):', error);
-    });
+    setSaving(true);
+    setSaveError('');
+    try {
+      const { error } = await supabase.from('reportes_excedidos').insert([{
+        requester_id: profile?.id,
+        requester_name: profile?.full_name || 'Personal Logística',
+        target_person_id: oficinaProfiles.some(p => p.id === personaObj?.id) ? personaObj!.id : null,
+        target_person_name: personaNombre,
+        recipient_name: recipientName,
+        tarea: reportTarea.trim() || 'Sin descripción específica',
+        motivo: motivoFinal,
+        status: 'Pendiente'
+      }]);
+      if (error) throw error;
+    } catch {
+      setSaveError('No se pudo guardar el reporte. El texto se conserva; intentá nuevamente.');
+      toast({ variant: 'destructive', title: 'No se pudo guardar el reporte', description: 'El texto se conserva. Intentá nuevamente antes de compartirlo.' });
+      return;
+    } finally { setSaving(false); }
 
     const waMsg = [
       '*⚠️ REPORTAR TAREA EXCEDIDA DE LOGÍSTICA*',
@@ -130,14 +138,14 @@ export default function ReportTaskDialog({ open: isReportOpen, onOpenChange: set
     setReportTarea('');
     setReportMotivoOtro('');
 
-    toast({ title: 'Reporte Generado', description: `Abriendo chat de WhatsApp con ${recipientName}...` });
-    setTimeout(() => {
-      window.open(`https://wa.me/${targetPhone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(waMsg)}`, '_blank');
-    }, 400);
+    toast({ title: 'Reporte guardado', description: 'Ya está registrado para su seguimiento por Administración.' });
+    if (targetPhone) setShare({ phone: targetPhone, message: waMsg, name: recipientName });
   };
 
   return (
-      <Dialog open={isReportOpen} onOpenChange={setIsReportOpen}>
+      <>
+      <WhatsAppPreviewModal isOpen={share !== null} onClose={() => setShare(null)} phone={share?.phone || ''} message={share?.message || ''} recipientName={share?.name} />
+      <Dialog open={isReportOpen} onOpenChange={open => { if (!saving) setIsReportOpen(open); }}>
         <DialogContent className="rounded-3xl w-[92%] max-w-md bg-white border-slate-100 shadow-xl max-h-[90vh] overflow-y-auto p-0">
           <div className="bg-gradient-to-r from-rose-700 to-red-600 text-white p-5 relative">
             <DialogHeader className="text-left space-y-1">
@@ -146,7 +154,7 @@ export default function ReportTaskDialog({ open: isReportOpen, onOpenChange: set
                 <span>Reportar Tarea</span>
               </DialogTitle>
               <DialogDescription className="text-rose-100 text-xs font-semibold">
-                Aviso automático por WhatsApp para tareas o compras que exceden la logística.
+                Registrá tareas o compras que exceden la logística y compartilas por WhatsApp si hace falta.
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -289,9 +297,11 @@ export default function ReportTaskDialog({ open: isReportOpen, onOpenChange: set
             </div>
           </div>
 
+          {saveError && <p role="alert" className="px-4 py-2 text-sm text-red-700">{saveError}</p>}
           <div className="bg-slate-50 p-4 border-t border-slate-100 flex items-center justify-end gap-2 rounded-b-3xl">
             <Button
               variant="ghost"
+              disabled={saving}
               onClick={() => setIsReportOpen(false)}
               className="rounded-xl font-bold text-xs"
             >
@@ -299,13 +309,14 @@ export default function ReportTaskDialog({ open: isReportOpen, onOpenChange: set
             </Button>
             <Button
               onClick={handleSendReport}
-              disabled={!reportPerson}
+              disabled={!reportPerson || saving}
               className="bg-rose-600 hover:bg-rose-700 text-white font-black rounded-xl text-xs h-11 px-5 shadow-lg shadow-rose-600/20 flex items-center gap-2"
             >
-              <MessageCircle size={16} /> Abrir WhatsApp <ChevronRight size={14} />
+              <MessageCircle size={16} /> {saving ? 'Guardando...' : 'Guardar reporte'} <ChevronRight size={14} />
             </Button>
           </div>
         </DialogContent>
       </Dialog>
+      </>
   );
 }

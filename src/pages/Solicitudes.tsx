@@ -74,6 +74,7 @@ export default function Solicitudes() {
           id, requester_id, priority, status, created_at, needed_date, requested_tool_name,
           profiles!solicitudes_requester_id_fkey(full_name, whatsapp),
           herramientas!solicitudes_herramienta_id_fkey(name, code, obras!herramientas_current_obra_id_fkey(name)),
+          source_obra:obras!solicitudes_source_obra_id_fkey(name),
           target_obra:obras!solicitudes_target_obra_id_fkey(name),
           assigned:profiles!solicitudes_assigned_to_fkey(full_name)
         `);
@@ -85,6 +86,7 @@ export default function Solicitudes() {
             id, requester_id, priority, status, created_at, requested_tool_name,
             profiles!solicitudes_requester_id_fkey(full_name, whatsapp),
             herramientas!solicitudes_herramienta_id_fkey(name, code, obras!herramientas_current_obra_id_fkey(name)),
+            source_obra:obras!solicitudes_source_obra_id_fkey(name),
             target_obra:obras!solicitudes_target_obra_id_fkey(name),
             assigned:profiles!solicitudes_assigned_to_fkey(full_name)
           `);
@@ -118,7 +120,7 @@ export default function Solicitudes() {
           status: s.status,
           created_at: s.created_at,
           needed_date: s.needed_date,
-          source_name: s.herramientas?.obras?.name || 'A determinar por Logística',
+          source_name: s.source_obra?.name || 'A determinar por Logística',
           target_name: s.target_obra?.name || 'Desconocida',
           item_name: s.herramientas?.name || s.requested_tool_name || 'Herramienta solicitada',
           item_code: s.herramientas?.code || 'POR ASIGNAR',

@@ -2,6 +2,7 @@ import { hasStoredCoordinates, SHOW_EXTENDED_OPERATIONS } from './operationsFeat
 import { formatARS } from '../../services/tools/toolPriceReference';
 import { progressLabel } from './worksiteBubble';
 import { useState } from 'react';
+import ToolPhoto from '../ToolPhoto';
 import { useNavigate } from 'react-router-dom';
 import {
   Building,
@@ -267,11 +268,7 @@ export default function OperationsSidebar({
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="w-9 h-9 rounded-full overflow-hidden bg-blue-50 border border-slate-200 flex items-center justify-center shrink-0">
-                      {emp.photo_url ? (
-                        <img src={emp.photo_url} alt={emp.full_name} className="w-full h-full object-cover" />
-                      ) : (
-                        <HardHat className="h-4 w-4 text-blue-400" />
-                      )}
+                      <ToolPhoto table="empleados" id={emp.id} name={emp.full_name} className="w-full h-full object-cover" fallback={<HardHat className="h-4 w-4 text-blue-400" />} />
                     </div>
                     <div className="min-w-0">
                       <p className="font-extrabold text-xs text-slate-900 truncate">{emp.full_name}</p>
@@ -319,11 +316,7 @@ export default function OperationsSidebar({
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="w-9 h-9 rounded-lg overflow-hidden bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0">
-                      {tool.photo_url ? (
-                        <img src={tool.photo_url} alt={tool.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <Wrench className="h-4 w-4 text-slate-400" />
-                      )}
+                      <ToolPhoto id={tool.id} name={tool.name} className="w-full h-full object-cover" fallback={<Wrench className="h-4 w-4 text-slate-400" />} />
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">

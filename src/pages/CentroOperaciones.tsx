@@ -42,6 +42,7 @@ async function loadAll<T = Record<string, unknown>>(table: string, columns: stri
 
 export default function CentroOperaciones() {
   const [loadError, setLoadError] = useState(false);
+  const [partialErrors, setPartialErrors] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [worksites, setWorksites] = useState<OperationalWorksite[]>([]);
   const [allEmployees, setAllEmployees] = useState<OperationalEmployee[]>([]);
@@ -76,14 +77,18 @@ export default function CentroOperaciones() {
         if (showLoader) setLoading(true);
         setLoadError(false);
 
-        const [obrasRes, empsRes, toolsRes, novsRes] = await Promise.all([
-          loadAll('obras', 'id, code, name, address, encargado_name, phone, latitude, longitude, photo_url, active, status'),
-          loadAll('empleados', '*'),
-          loadAll('herramientas', 'id, code, name, description, brand, model, photo_url, status, current_obra_id, category, last_latitude, last_longitude'),
+        const results = await Promise.allSettled([
+          loadAll('obras', 'id, code, name, address, encargado_name, phone, latitude, longitude, active, status'),
+          loadAll('empleados', 'id, full_name, specialty, whatsapp, obra_id, status, valor_hora'),
+          loadAll('herramientas', 'id, code, name, description, brand, model, status, current_obra_id, category, last_latitude, last_longitude'),
           SHOW_EXTENDED_OPERATIONS ? loadAll<Attendance>('novedades_diarias', '*') : Promise.resolve({ data: [] as Attendance[], error: null }),
         ]);
 
         if (cancelled || currentRequest !== requestId) return;
+        if (results[0].status === 'rejected') throw results[0].reason;
+        const labels = ['obras', 'personal', 'herramientas', 'asistencia'];
+        setPartialErrors(results.flatMap((result, index) => result.status === 'rejected' ? [labels[index]] : []));
+        const [obrasRes, empsRes, toolsRes, novsRes] = results.map(result => result.status === 'fulfilled' ? result.value : { data: [], error: null });
         for (const result of [obrasRes, empsRes, toolsRes, novsRes]) if (result.error) throw result.error;
         const progress = SHOW_EXTENDED_OPERATIONS ? readLocalRecord(PROGRESS_KEY) : {};
         const rawObras = obrasRes.data || [];
@@ -292,6 +297,9 @@ export default function CentroOperaciones() {
   return (
     <div className="flex flex-col min-h-[calc(100vh-4rem)] overflow-y-auto font-sans space-y-4 p-2 sm:p-4 pb-20">
       {/* 1. Header & KPIs */}
+      {partialErrors.length > 0 && <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+        No se pudo cargar: {partialErrors.join(', ')}. Los totales están incompletos. <button className="underline" onClick={() => window.location.reload()}>Reintentar</button>
+      </div>}
       <div className="space-y-2 shrink-0">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1">
           <div className="flex items-center gap-2">

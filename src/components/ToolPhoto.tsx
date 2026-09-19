@@ -3,7 +3,8 @@ import { supabase } from '../lib/supabase';
 
 // Las fotos históricas están guardadas como base64. Pedirlas sólo cuando
 // la tarjeta se acerca a la pantalla evita descargarlas con todo el inventario.
-export default function ToolPhoto({ id, name, className, fallback, candidateIds, landscape = false }: {
+export default function ToolPhoto({ id, name, className, fallback, candidateIds, landscape = false, table = 'herramientas' }: {
+  table?: 'herramientas' | 'empleados';
   id: string;
   candidateIds?: string[];
   landscape?: boolean;
@@ -40,7 +41,7 @@ export default function ToolPhoto({ id, name, className, fallback, candidateIds,
     setPhoto(null);
     async function loadPhoto() {
       try {
-        let query = supabase.from('herramientas').select('photo_url');
+        let query = supabase.from(table).select('photo_url');
         query = candidateKey
           ? query.in('id', candidateKey.split(',')).not('photo_url', 'is', null).neq('photo_url', '').order('id').limit(1)
           : query.eq('id', id);
@@ -52,7 +53,7 @@ export default function ToolPhoto({ id, name, className, fallback, candidateIds,
     }
     void loadPhoto();
     return () => controller.abort();
-  }, [id, visible, candidateKey]);
+  }, [id, visible, candidateKey, table]);
 
   return <div ref={container} className="relative w-full h-full flex items-center justify-center text-slate-300">
     {photo

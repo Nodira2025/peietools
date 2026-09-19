@@ -75,7 +75,7 @@ export default function NuevoTrasladoPersonal() {
     // Traer datos del empleado
     const { data: empData, error: empError } = await supabase
       .from('empleados')
-      .select('id, full_name, obra_id, obras:obra_id(name, encargado_name)')
+      .select('id, full_name, obra_id, status, active, obras:obra_id(name, encargado_name)')
       .eq('id', id)
       .single();
 
@@ -193,7 +193,11 @@ export default function NuevoTrasladoPersonal() {
   // ─── Submit Action ───────────────────────────────────────────────────────
 
   const handleTransfer = async () => {
-    if (!targetObraId || !profile || !empleado) return;
+    if (!targetObraId || !profile || !empleado || submitting) return;
+    if (empleado.active === false || ['Ausente', 'En traslado', 'Inactivo'].includes(empleado.status)) {
+      toast({ variant: 'destructive', title: 'Operario no disponible', description: 'Revisá su estado antes de solicitar un nuevo traslado.' });
+      return;
+    }
     setSubmitting(true);
 
     try {
@@ -216,7 +220,7 @@ export default function NuevoTrasladoPersonal() {
         if (empUpdateError) throw empUpdateError;
 
         // Registrar traslado confirmado en auditoría
-        await supabase
+        const { error: auditError } = await supabase
           .from('traslados_personal')
           .insert([{
             empleado_id: empleado.id,
@@ -227,6 +231,12 @@ export default function NuevoTrasladoPersonal() {
             confirmed_by: profile.id,
             confirmed_at: now
           }]);
+
+        if (auditError) {
+          toast({ variant: 'destructive', title: 'Asignación guardada, historial pendiente', description: 'La obra del operario se actualizó, pero no se pudo registrar el traslado. No repitas la asignación; avisá a Administración.' });
+          navigate('/personal');
+          return;
+        }
 
         toast({
           title: 'Operario Asignado',
@@ -566,4 +576,3 @@ function StepHeader({ title, subtitle }: { title: string; subtitle?: string }) {
     </div>
   );
 }
-

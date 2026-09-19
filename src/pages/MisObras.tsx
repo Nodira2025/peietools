@@ -11,6 +11,7 @@ import { compressImage } from '../lib/imageUtils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import ObraCatalogExport from '../components/ObraCatalogExport';
+import ToolPhoto from '../components/ToolPhoto';
 
 // Mantener el registro disponible para reactivarlo, oculto en Mis obras.
 const SHOW_PROGRESS_PHOTOS = false;
@@ -35,7 +36,7 @@ interface Herramienta {
   code: string;
   brand: string | null;
   status: string;
-  photo_url: string | null;
+  photo_url?: string | null;
 }
 
 interface Empleado {
@@ -174,7 +175,7 @@ export default function MisObras() {
     // Herramientas en esta obra
     const { data: tools } = await supabase
       .from('herramientas')
-      .select('id, name, code, brand, status, photo_url')
+        .select('id, name, code, brand, status')
       .eq('current_obra_id', obra.id)
       .order('name');
     setHerramientas(tools || []);
@@ -182,23 +183,23 @@ export default function MisObras() {
     // Empleados asignados a esta obra
     const { data: emps } = await supabase
       .from('empleados')
-      .select('id, full_name, status, specialty, photo_url')
+        .select('id, full_name, status, specialty')
       .eq('obra_id', obra.id)
       .eq('active', true)
       .order('full_name');
     const mappedEmps = (emps || []).map((e: any) => ({
       ...e,
-      status: e.status === 'Disponible' || e.status === 'Libre' ? 'Libre' : 'Trabajando'
+        status: e.status === 'Disponible' ? 'Libre' : e.status || 'Trabajando'
     }));
     setEmpleados(mappedEmps);
   };
 
   const releaseHerramienta = async (hId: string) => {
-    if (!window.confirm('¿Liberar esta herramienta de la obra? Volverá al depósito virtual.')) return;
-    const { error } = await supabase.from('herramientas').update({ current_obra_id: null, status: 'Disponible' }).eq('id', hId);
+    if (!window.confirm('¿Marcar la herramienta como disponible? Se conservará esta obra como ubicación de retiro.')) return;
+    const { error } = await supabase.from('herramientas').update({ status: 'Disponible' }).eq('id', hId);
     if (error) toast({ variant: 'destructive', title: 'Error', description: error.message });
     else {
-      toast({ title: 'Liberada', description: 'La herramienta ya no pertenece a esta obra.' });
+      toast({ title: 'Liberada', description: 'Disponible para retirar en su ubicación actual.' });
       if (selectedObra) selectObra(selectedObra);
     }
   };
@@ -373,11 +374,7 @@ export default function MisObras() {
                   <CardContent className="p-0 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-14 h-14 bg-slate-100 shrink-0 flex items-center justify-center overflow-hidden">
-                        {h.photo_url ? (
-                          <img src={h.photo_url} alt={h.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <Wrench className="h-5 w-5 text-slate-300" />
-                        )}
+                        <ToolPhoto id={h.id} name={h.name} className="w-full h-full object-cover" fallback={<Wrench className="h-5 w-5 text-slate-300" />} />
                       </div>
                       <div className="min-w-0">
                         <p className="font-bold text-xs text-slate-800 truncate">{h.name}</p>
@@ -388,7 +385,7 @@ export default function MisObras() {
                       <span className={`text-[9px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${getStatusColor(h.status)}`}>
                         {h.status}
                       </span>
-                      {isSpecialRole && (
+                      {isSpecialRole && h.status === 'En uso' && (
                         <button 
                           onClick={(e) => { e.stopPropagation(); releaseHerramienta(h.id); }}
                           className="text-[10px] text-rose-500 font-bold hover:underline px-2"
@@ -426,11 +423,7 @@ export default function MisObras() {
                     <CardContent className="p-0 flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="w-14 h-14 bg-slate-50 shrink-0 flex items-center justify-center overflow-hidden">
-                          {emp.photo_url ? (
-                            <img src={emp.photo_url} alt={emp.full_name} className="w-full h-full object-cover" />
-                          ) : (
-                            <HardHat className="h-5 w-5 text-slate-300" />
-                          )}
+                          <ToolPhoto table="empleados" id={emp.id} name={emp.full_name} className="w-full h-full object-cover" fallback={<HardHat className="h-5 w-5 text-slate-300" />} />
                         </div>
                         <div>
                           <p className="font-bold text-xs text-slate-800">{emp.full_name}</p>
@@ -440,9 +433,9 @@ export default function MisObras() {
                       
                       <div className="flex items-center gap-2 pr-3 shrink-0">
                         <span className={`text-[9px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${statusStyle}`}>
-                          {emp.status === 'Libre' ? 'Libre' : 'En Obra'}
+                          {emp.status === 'Trabajando' ? 'En Obra' : emp.status}
                         </span>
-                        {isSpecialRole && (
+                        {isSpecialRole && emp.status === 'Trabajando' && (
                           <button 
                             onClick={(e) => { e.stopPropagation(); releaseEmpleado(emp.id); }}
                             className="text-[10px] text-rose-500 font-bold hover:underline px-2"

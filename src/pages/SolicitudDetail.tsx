@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ToolAvailabilityAssistant } from '../components/ToolAvailabilityAssistant';
 
 const ACTIVE_TOOL_REQUEST_STATUSES = ['Pendiente', 'En atención', 'Asignada', 'En retiro', 'En traslado', 'Entregada'];
-const ASSIGNABLE_TOOL_STATUSES = ['Disponible', 'En uso'];
+const ASSIGNABLE_TOOL_STATUSES = ['Disponible'];
 
 export default function SolicitudDetail() {
   const { id } = useParams();
@@ -217,6 +217,7 @@ export default function SolicitudDetail() {
         *,
         profiles!solicitudes_requester_id_fkey(full_name, whatsapp),
         herramientas!solicitudes_herramienta_id_fkey(name, code, brand, model, obras!herramientas_current_obra_id_fkey(name, latitude, longitude, encargado_name)),
+        source_obra:obras!solicitudes_source_obra_id_fkey(id, name),
         target_obra:obras!solicitudes_target_obra_id_fkey(id, name, latitude, longitude),
         assigned:profiles!solicitudes_assigned_to_fkey(full_name, whatsapp)
       `)
@@ -250,6 +251,17 @@ export default function SolicitudDetail() {
 
   const updateStatus = async (newStatus: string, recipientName?: string) => {
     if (!solicitud || !profile) return;
+    if (solicitud.herramienta_id && ['Asignada', 'En retiro', 'En traslado'].includes(newStatus)) {
+      const { data: tool, error: toolError } = await supabase.from('herramientas').select('status').eq('id', solicitud.herramienta_id).single();
+      if (toolError || !tool || !['Disponible', 'Reservada', 'En traslado'].includes(tool.status)) {
+        toast({ variant: 'destructive', title: 'Herramienta no disponible', description: toolError ? 'No se pudo verificar el estado actual. Reintentá.' : 'La obra de origen debe liberarla antes del traslado. También podés elegir otra unidad disponible.' });
+        return;
+      }
+    }
+    if (!solicitud.herramienta_id && ['En retiro', 'En traslado', 'Entregada', 'Confirmada'].includes(newStatus)) {
+      toast({ variant: 'destructive', title: 'Falta asignar la herramienta', description: 'Elegí una unidad disponible antes de iniciar el traslado.' });
+      return;
+    }
     
     const payload: any = { status: newStatus };
     if (newStatus === 'En atención' || newStatus === 'Asignada') {
@@ -290,31 +302,41 @@ export default function SolicitudDetail() {
       ? 'Recibio en obra: ' + finalRecipient + ' | Gestionado por ' + profile.full_name
       : 'Gestionado por ' + profile.full_name;
     
-    await supabase.from('movimientos').insert([{
+    const { error: movementError } = solicitud.herramienta_id ? await supabase.from('movimientos').insert([{
       herramienta_id: solicitud.herramienta_id,
       solicitud_id: solicitud.id,
       user_id: profile.id,
       action: 'Cambio de estado a: ' + newStatus,
       notes: movNotes
-    }]);
+    }]) : { error: null };
 
     // --- SINCRONIZAR ESTADO DE LA HERRAMIENTA ---
-    if (newStatus === 'Asignada' || newStatus === 'En retiro') {
-      await supabase.from('herramientas')
+    let toolSyncError = null;
+    if (solicitud.herramienta_id && (newStatus === 'Asignada' || newStatus === 'En retiro')) {
+      const result = await supabase.from('herramientas')
         .update({ status: 'Reservada' })
         .eq('id', solicitud.herramienta_id);
+      toolSyncError = result.error;
     } else if (newStatus === 'En traslado') {
-      await supabase.from('herramientas')
+      const result = await supabase.from('herramientas')
         .update({ status: 'En traslado' })
         .eq('id', solicitud.herramienta_id);
+      toolSyncError = result.error;
     } else if (newStatus === 'Entregada' || newStatus === 'Confirmada') {
       // Al confirmar recepcion: herramienta pasa a "En uso" y se mueve a la obra destino
-      await supabase.from('herramientas')
+      const result = await supabase.from('herramientas')
         .update({ 
           status: 'En uso',
           current_obra_id: solicitud.target_obra_id 
         })
         .eq('id', solicitud.herramienta_id);
+      toolSyncError = result.error;
+    }
+
+    if (toolSyncError || movementError) {
+      toast({ variant: 'destructive', title: 'Movimiento incompleto', description: toolSyncError ? 'Se guardó el estado del pedido, pero no se actualizó la herramienta. Avisá a Administración para conciliar el movimiento.' : 'Se actualizó el pedido, pero no se guardó su historial. Avisá a Administración.' });
+      void fetchSolicitud();
+      return;
     }
 
     if (newStatus === 'Asignada') {
@@ -559,7 +581,7 @@ export default function SolicitudDetail() {
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-red-50 p-3 rounded-xl border border-red-100">
               <p className="text-[10px] font-bold text-red-400 uppercase tracking-wider">Origen</p>
-              <p className="font-semibold text-red-700 text-sm mt-0.5">{solicitud.herramientas?.obras?.name || 'A determinar por Logística'}</p>
+              <p className="font-semibold text-red-700 text-sm mt-0.5">{solicitud.source_obra?.name || 'A determinar por Logística'}</p>
             </div>
             <div className="bg-green-50 p-3 rounded-xl border border-green-100">
               <p className="text-[10px] font-bold text-green-400 uppercase tracking-wider">Destino</p>
@@ -584,7 +606,7 @@ export default function SolicitudDetail() {
             )}
           </div>
 
-          {isLogistica && solicitud.status !== 'Pendiente' && canAct && (
+          {isLogistica && ['Asignada', 'En atención', 'En retiro', 'En traslado'].includes(solicitud.status) && canAct && (
             <ToolAvailabilityAssistant
               requestId={solicitud.id}
               requestedToolName={solicitud.requested_tool_name || solicitud.herramientas?.name || 'Herramienta'}
@@ -1040,7 +1062,7 @@ export default function SolicitudDetail() {
                     
                     <div className="flex justify-between">
                       <span className="text-slate-400 text-xs">Origen</span>
-                      <span className="text-red-600 font-medium">{solicitud.herramientas?.obras?.name || 'A determinar por Logística'}</span>
+                      <span className="text-red-600 font-medium">{solicitud.source_obra?.name || 'A determinar por Logística'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400 text-xs">Destino</span>

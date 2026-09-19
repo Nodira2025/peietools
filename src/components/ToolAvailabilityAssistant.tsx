@@ -52,7 +52,7 @@ interface Candidate extends ToolRow {
 }
 
 const ACTIVE_REQUEST_STATUSES = ['Pendiente', 'En atención', 'Asignada', 'En retiro', 'En traslado', 'Entregada'];
-const AVAILABLE_TOOL_STATUSES = ['Disponible', 'En uso'];
+const AVAILABLE_TOOL_STATUSES = ['Disponible'];
 
 const normalize = (value: string) => value
   .toLowerCase()
@@ -160,13 +160,14 @@ export function ToolAvailabilityAssistant({
         const isCurrentTool = currentToolId === tool.id;
         const hasActiveRequest = activeToolIds.has(tool.id);
         const statusAllowsAssignment = AVAILABLE_TOOL_STATUSES.includes(tool.status);
-        const available = isCurrentTool || (statusAllowsAssignment && !hasActiveRequest && overlappingReservations.length === 0);
+        const alreadyReserved = isCurrentTool && ['Reservada', 'En traslado'].includes(tool.status);
+        const available = alreadyReserved || (statusAllowsAssignment && !hasActiveRequest && overlappingReservations.length === 0);
 
         let unavailableReason: string | null = null;
-        if (isCurrentTool) unavailableReason = null;
+        if (alreadyReserved) unavailableReason = null;
         else if (hasActiveRequest) unavailableReason = 'Tiene otro pedido activo';
         else if (overlappingReservations.length > 0) unavailableReason = 'Reservada para esa fecha';
-        else if (!statusAllowsAssignment) unavailableReason = `Estado actual: ${tool.status}`;
+        else if (!statusAllowsAssignment) unavailableReason = tool.status === 'En uso' ? 'En uso: requiere liberación de la obra de origen' : `Estado actual: ${tool.status}`;
 
         const nextAvailableAt = overlappingReservations.length > 0 && !hasActiveRequest
           ? overlappingReservations

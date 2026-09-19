@@ -350,6 +350,7 @@ export default function Logistica() {
         .select(`
           id, status, priority, created_at, needed_date, comments, requested_tool_name,
           herramientas!solicitudes_herramienta_id_fkey(name, code, obras!herramientas_current_obra_id_fkey(name)),
+          source_obra:obras!solicitudes_source_obra_id_fkey(name),
           target_obra:obras!solicitudes_target_obra_id_fkey(name),
           profiles!solicitudes_requester_id_fkey(full_name)
         `)
@@ -361,6 +362,7 @@ export default function Logistica() {
           .select(`
             id, status, priority, created_at, comments, requested_tool_name,
             herramientas!solicitudes_herramienta_id_fkey(name, code, obras!herramientas_current_obra_id_fkey(name)),
+            source_obra:obras!solicitudes_source_obra_id_fkey(name),
             target_obra:obras!solicitudes_target_obra_id_fkey(name),
             profiles!solicitudes_requester_id_fkey(full_name)
           `)
@@ -400,7 +402,7 @@ export default function Logistica() {
             needed_date: s.needed_date,
             item_name: s.herramientas?.name || s.requested_tool_name || cleanComment || 'Herramienta solicitada',
             item_code: s.herramientas?.code || 'POR ASIGNAR',
-            source_name: s.herramientas?.obras?.name || 'A determinar por Logística',
+            source_name: s.source_obra?.name || 'A determinar por Logística',
             target_name: s.target_obra?.name,
             requester_name: s.profiles?.full_name
           };
