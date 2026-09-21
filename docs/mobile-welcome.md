@@ -31,3 +31,15 @@ Prompt utilizado:
 `npm run build` y ESLint focalizado en los nuevos módulos. Pruebas de navegador con `node tests/logistics-qa-server.mjs` y `node tests/mobile-welcome.mjs`: entrada móvil, navegación al panel, GPS y clima, reemplazo de foto, ancho de 320 px, escritorio, permiso denegado y acceso sin servicios externos. Capturas en `scratch/welcome-qa`.
 
 Las pruebas usan backend y respuestas externas simulados. No escriben cuentas reales ni acreditan despliegue en producción.
+
+## Inicio de escritorio
+
+En PC, `/dashboard` muestra una portada personalizada inspirada en la referencia de escritorio: indicadores reales, bienvenida, perfil, orientación hacia el menú lateral y accesos a Personal, Herramientas y Mis Obras. Se conserva el dashboard anterior para el panel móvil. Los permisos y rutas existentes no se modifican. La barra lateral de esta portada se compacta y mantiene desplazamiento propio cuando el alto disponible lo requiere.
+
+`tests/desktop-welcome.mjs` verifica perfil, clima, ayuda, navegación, anchos de 1440, 1280, 1024 y 800 px, y preservación de la bienvenida móvil. Las capturas usan datos simulados.
+
+Asset de escritorio: `public/img/peie-desktop-worksite.png`, generado con la herramienta integrada de imagegen. Las formas, el logo, los textos y controles son elementos de la aplicación. La fotografía generada no documenta una obra real.
+
+Prompt utilizado:
+
+> Generate ONLY a professional photorealistic construction site photograph for the right side of a PEIE desktop dashboard. Use attached screenshot as composition reference for the photograph only. Two electrical construction engineers seen from behind in lower right, one wearing white hardhat and fluorescent yellow safety vest over navy checked long sleeve shirt, other wearing yellow hardhat and high visibility vest. The first points toward a large unfinished concrete building and tall construction tower crane. Bright pale blue daylight sky fills upper half, soft cinematic natural lighting, realistic Argentina construction setting. Portrait aspect 4:5, high resolution. No typography, no letters, no logos, no interface, no graphic waves, no borders. This photo will be masked by curved blue and white shapes in CSS.

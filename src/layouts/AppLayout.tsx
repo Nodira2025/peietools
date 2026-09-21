@@ -1,3 +1,4 @@
+import DesktopWelcome from '../pages/DesktopWelcome';
 import MobileWelcome from '../pages/MobileWelcome';
 import { useMobileMode } from '../hooks/useMobileMode';
 import { SHOW_REPORTS, SHOW_PURCHASES_SHORTCUT, SHOW_TOOL_MOVEMENTS_SHORTCUT } from '../config/navigationFeatures';
@@ -22,6 +23,7 @@ export default function AppLayout() {
   const location = useLocation();
   const mobile = useMobileMode();
   const welcome = location.pathname === '/bienvenida' && mobile;
+  const desktopWelcome = location.pathname === '/dashboard' && !mobile;
   const [showMas, setShowMas] = useState(false);
   const [deviceMode] = useState<'auto' | 'mobile' | 'desktop'>(() => {
     return (localStorage.getItem('login_device_mode') as any) || 'auto';
@@ -206,7 +208,7 @@ export default function AppLayout() {
       : 'md:hidden fixed inset-0 bg-black/60 z-50 transition-opacity duration-300';
 
   return (
-    <div className={wrapperClass}>
+    <div className={`${wrapperClass}${desktopWelcome ? ' desktop-home-shell' : ''}`}>
       
       {/* Sidebar de Escritorio */}
       <aside className={sidebarClass}>
@@ -421,7 +423,7 @@ export default function AppLayout() {
         
         {/* Contenedor fluido de páginas */}
         <div className={welcome ? 'flex-1' : containerClass}>
-          <Suspense fallback={<LogoLoader text="Cargando sección..." size="md" />}>{location.pathname === '/bienvenida' ? <MobileWelcome pendingCount={pendingCount} /> : <Outlet />}</Suspense>
+          <Suspense fallback={<LogoLoader text="Cargando sección..." size="md" />}>{location.pathname === '/bienvenida' ? <MobileWelcome pendingCount={pendingCount} /> : desktopWelcome ? <DesktopWelcome pendingCount={pendingCount} /> : <Outlet />}</Suspense>
         </div>
 
       </main>
