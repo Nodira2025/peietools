@@ -19,7 +19,7 @@ export default function Login() {
   const { toast } = useToast();
 
   if (user && profile) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/bienvenida" replace />;
   }
 
   const handleLogin = async (e: React.FormEvent) => {

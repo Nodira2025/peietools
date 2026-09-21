@@ -9,6 +9,7 @@ import AppLayout from './layouts/AppLayout';
 
 // Pages
 const Login = lazy(() => import('./pages/Login'));
+const Perfil = lazy(() => import('./pages/Perfil'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Reportes = lazy(() => import('./pages/Reportes'));
 const Obras = lazy(() => import('./pages/Obras'));
@@ -82,7 +83,9 @@ export default function App() {
         <Route path="/cargar-cv" element={<Navigate to="/postulacion" replace />} />
         
         <Route element={<AppLayout />}>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<Navigate to="/bienvenida" replace />} />
+          <Route path="/bienvenida" element={null} />
+          <Route path="/perfil" element={<Perfil />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/reportes" element={<Reportes />} />
           

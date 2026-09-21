@@ -10,6 +10,7 @@ interface Profile {
   whatsapp: string | null;
   obra_id: string | null;
   active: boolean;
+  photo_url?: string | null;
   clear_password?: string | null;
 }
 

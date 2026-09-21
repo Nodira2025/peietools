@@ -1,3 +1,5 @@
+import MobileWelcome from '../pages/MobileWelcome';
+import { useMobileMode } from '../hooks/useMobileMode';
 import { SHOW_REPORTS, SHOW_PURCHASES_SHORTCUT, SHOW_TOOL_MOVEMENTS_SHORTCUT } from '../config/navigationFeatures';
 import { useState, useEffect, Suspense } from 'react';
 import { Navigate, Outlet, Link, useLocation } from 'react-router-dom';
@@ -18,6 +20,8 @@ import LogoLoader from '../components/LogoLoader';
 export default function AppLayout() {
   const { user, profile, loading, signOut } = useAuthStore();
   const location = useLocation();
+  const mobile = useMobileMode();
+  const welcome = location.pathname === '/bienvenida' && mobile;
   const [showMas, setShowMas] = useState(false);
   const [deviceMode] = useState<'auto' | 'mobile' | 'desktop'>(() => {
     return (localStorage.getItem('login_device_mode') as any) || 'auto';
@@ -334,7 +338,7 @@ export default function AppLayout() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1.5"><Link to="/perfil" className="text-center text-sm font-semibold text-blue-800 py-2">Mi perfil</Link>
             <button
               onClick={() => setIsPasswordDialogOpen(true)}
               className="flex items-center justify-center space-x-2 px-3 py-2 w-full text-xs font-semibold text-peie-blue hover:bg-peie-blue/5 border border-peie-blue/15 rounded-xl transition-colors"
@@ -359,7 +363,7 @@ export default function AppLayout() {
       <main className={mainClass}>
         
         {/* Encabezado Flotante Móvil */}
-        <header className={headerClass}>
+        <header className={welcome ? 'hidden' : headerClass}>
           {/* Botón Home Izquierdo */}
           <Link 
             to="/" 
@@ -416,8 +420,8 @@ export default function AppLayout() {
         </header>
         
         {/* Contenedor fluido de páginas */}
-        <div className={containerClass}>
-          <Suspense fallback={<LogoLoader text="Cargando sección..." size="md" />}><Outlet /></Suspense>
+        <div className={welcome ? 'flex-1' : containerClass}>
+          <Suspense fallback={<LogoLoader text="Cargando sección..." size="md" />}>{location.pathname === '/bienvenida' ? <MobileWelcome pendingCount={pendingCount} /> : <Outlet />}</Suspense>
         </div>
 
       </main>
@@ -425,7 +429,7 @@ export default function AppLayout() {
       {/* Barra de Navegación Inferior (Exclusiva para Móviles) */}
       <nav className={navClass}>
         {[
-          { name: 'Inicio', path: '/dashboard', icon: Home, isButton: false },
+          { name: 'Inicio', path: '/bienvenida', icon: Home, isButton: false },
           { name: 'Mis Obras', path: '/mis-obras', icon: Building, isButton: false },
           { name: 'Herramientas', path: '/herramientas', icon: Wrench, isButton: false },
           { name: 'Personal', path: '/personal', icon: Users, isButton: false },
@@ -490,7 +494,7 @@ export default function AppLayout() {
             </div>
 
             {/* Listado de links */}
-            <div className="grid grid-cols-2 gap-4 py-2">
+            <div className="grid grid-cols-2 gap-4 py-2"><Link to="/perfil" onClick={() => setShowMas(false)} className="p-4 bg-slate-900 rounded-2xl text-center">Mi perfil</Link><Link to="/dashboard" onClick={() => setShowMas(false)} className="p-4 bg-slate-900 rounded-2xl text-center">Panel de trabajo</Link>
 
               <Link 
                 to="/centro-operaciones" 
