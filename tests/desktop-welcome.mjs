@@ -34,8 +34,11 @@ try {
   await page.locator('.desktop-welcome-pillars').getByRole('link', { name: 'Herramientas que impulsan' }).click();
   await page.waitForURL('**/herramientas');
   await page.locator('aside').getByRole('link', { name: 'Inicio', exact: true }).click();
+  await page.waitForURL('**/dashboard');
+  await page.getByRole('heading', { name: '¡Bienvenido, Martín!' }).waitFor();
   for (const size of [{width:1280,height:720},{width:1024,height:768},{width:800,height:900}]) {
     await page.setViewportSize(size);
+    await page.locator('.desktop-welcome').waitFor();
     assert.equal(await page.locator('body').evaluate(el => el.scrollWidth > innerWidth), false);
     await page.screenshot({ path: `scratch/welcome-qa/desktop-${size.width}.png`, fullPage: true });
   }
