@@ -19,6 +19,7 @@ interface Herramienta {
   name: string;
   brand: string | null;
   model: string | null;
+  description?: string | null;
   status: string;
   category: string | null;
   current_obra_id: string | null;
@@ -80,7 +81,7 @@ export default function Herramientas() {
       const rows: Herramienta[] = [];
       for (let offset = 0; ; offset += 500) {
         const { data, error } = await supabase.from('herramientas')
-          .select('id, code, name, brand, model, status, category, current_obra_id, obras(name, encargado_name)')
+          .select('id, code, name, brand, model, description, status, category, current_obra_id, obras(name, encargado_name)')
           .order('id').range(offset, offset + 499);
         if (error) throw error;
         rows.push(...(data || []).map(row => ({
@@ -162,12 +163,12 @@ export default function Herramientas() {
     try {
       const XLSX = await import('xlsx');
       const sheet = XLSX.utils.json_to_sheet(rows.map(tool => ({
-        'Código': tool.code, 'Nombre': tool.name, 'Marca': tool.brand || '', 'Modelo': tool.model || '',
+        'Código': tool.code, 'Nombre': tool.name, 'Marca': tool.brand || '', 'Modelo': tool.model || '', 'Características': tool.description || '',
         'Categoría principal': tool.classification.category, 'Subcategoría': tool.classification.subcategory,
         'Estado': tool.status, 'Obra actual': tool.obras?.name || 'Sin ubicación asignada',
         'Coordinador': tool.obras?.encargado_name || '',
       })));
-      sheet['!cols'] = [12, 36, 18, 24, 25, 28, 20, 26, 26].map(wch => ({ wch }));
+      sheet['!cols'] = [12, 36, 18, 24, 50, 25, 28, 20, 26, 26].map(wch => ({ wch }));
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, sheet, 'Herramientas');
       XLSX.writeFile(workbook, 'Inventario_Herramientas_' + new Date().toISOString().slice(0,10) + '.xlsx');

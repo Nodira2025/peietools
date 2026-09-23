@@ -61,7 +61,7 @@ try {
     await page.getByLabel('Categoría principal *', { exact: true }).click();
     assert.equal(await page.getByRole('option', { name: 'Rotuladora', exact: true }).count(), 1);
     await page.getByRole('option', { name: 'Rotomartillo', exact: true }).click();
-    await page.getByLabel('Subcategoría *', { exact: true }).click();
+    await page.getByLabel('Subcategoría (opcional)', { exact: true }).click();
     await page.getByRole('option', { name: 'Demoledor', exact: true }).click();
     await page.getByRole('button', { name: 'Guardar', exact: true }).click();
     if (mode === 'success') {

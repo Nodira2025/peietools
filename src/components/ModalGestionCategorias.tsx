@@ -26,6 +26,7 @@ export default function ModalGestionCategorias({ open, onOpenChange, onCategorie
   const [sub, setSub] = useState('');
   const [editing, setEditing] = useState<RegisteredCategory | null>(null);
   const [creating, setCreating] = useState(false);
+  const [creationKind, setCreationKind] = useState<'category' | 'subcategory'>('category');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -69,8 +70,8 @@ export default function ModalGestionCategorias({ open, onOpenChange, onCategorie
   const save = async () => {
     if (saving || loading || loadError) return;
     const category = canonicalCategory(main);
-    const subcategory = sub.trim() ? canonicalSubcategory(category, sub) : '';
-    if (!main.trim() || main.includes('›') || sub.includes('›')) {
+    const subcategory = creationKind === 'subcategory' && sub.trim() ? canonicalSubcategory(category, sub) : '';
+    if (!main.trim() || (creationKind === 'subcategory' && !sub.trim()) || main.includes('›') || sub.includes('›')) {
       toast({ variant: 'destructive', title: 'Revisá el nombre', description: 'Ingresá los nombres de categoría y subcategoría en sus campos separados.' }); return;
     }
     const newName = subcategory ? serializeClassification({category, subcategory}) : category;
@@ -144,6 +145,7 @@ export default function ModalGestionCategorias({ open, onOpenChange, onCategorie
 
   const startEdit = (row: RegisteredCategory) => {
     const path = parseCategoryPath(row.name);
+    setCreationKind(path ? 'subcategory' : 'category');
     setEditing(row); setCreating(true); setMain(path?.category || canonicalCategory(row.name)); setSub(path?.subcategory || '');
   };
   const editableRows = registered.filter(row => classifyTool({category:row.name}).category === selected && !isStandard(row.name));
@@ -154,12 +156,14 @@ export default function ModalGestionCategorias({ open, onOpenChange, onCategorie
       {loadError && <p role="alert" className="text-sm text-red-700">{loadError}<Button variant="ghost" size="sm" onClick={()=>void load()}>Reintentar</Button></p>}
       <div className="flex flex-wrap gap-3 items-end">
         <div className="flex-1 min-w-40 space-y-1"><Label htmlFor="catalog-parent">Categoría principal</Label><select id="catalog-parent" className="w-full rounded-lg border p-2 bg-white text-sm" value={selected} onChange={e=>setSelected(e.target.value)}>{catalog.map(c=><option key={c.name}>{c.name}</option>)}</select></div>
-        <Button disabled={loading||saving||!!loadError} onClick={()=>{setCreating(true);setEditing(null);setMain(selected);setSub('');}}><Plus className="h-4 w-4 mr-1" />Agregar</Button>
+        <Button disabled={loading||saving||!!loadError} onClick={()=>{setCreationKind('category');setCreating(true);setEditing(null);setMain('');setSub('');}}><Plus className="h-4 w-4 mr-1" />Crear categoría</Button>
+        <Button variant="outline" disabled={loading||saving||!!loadError||!selected} onClick={()=>{setCreationKind('subcategory');setCreating(true);setEditing(null);setMain(selected);setSub('');}}><Plus className="h-4 w-4 mr-1" />Crear subcategoría</Button>
       </div>
       {creating && <div className="rounded-xl border bg-slate-50 p-4 space-y-3">
-        <div><Label htmlFor="catalog-name">Categoría principal *</Label><Input id="catalog-name" list="catalog-names" value={main} onChange={e=>setMain(e.target.value)} placeholder="Ej.: Escalera" /><datalist id="catalog-names">{catalog.map(c=><option key={c.name} value={c.name} />)}</datalist></div>
-        <div><Label htmlFor="catalog-sub">Subcategoría</Label><Input id="catalog-sub" value={sub} onChange={e=>setSub(e.target.value)} placeholder="Ej.: 14 peldaños" /><p className="text-xs text-slate-500 mt-1">Dejá este campo vacío para crear solamente la categoría principal.</p></div>
-        <div className="flex justify-end gap-2"><Button variant="ghost" disabled={saving} onClick={()=>setCreating(false)}>Cancelar</Button><Button disabled={saving||!main.trim()} onClick={()=>void save()}>{saving?'Guardando…':'Guardar'}</Button></div>
+        <p className="font-semibold">{editing ? 'Editar' : 'Crear'} {creationKind === 'category' ? 'categoría' : 'subcategoría'}</p>
+        <div><Label htmlFor="catalog-name">{creationKind === 'category' ? 'Nombre de la categoría *' : 'Categoría principal *'}</Label>{creationKind === 'category' ? <Input id="catalog-name" value={main} onChange={e=>setMain(e.target.value)} placeholder="Ej.: Compresores" /> : <select id="catalog-name" className="w-full rounded-lg border p-2 bg-white text-sm" value={main} onChange={e=>setMain(e.target.value)}>{catalog.map(c=><option key={c.name}>{c.name}</option>)}</select>}</div>
+        {creationKind === 'subcategory' ? <div><Label htmlFor="catalog-sub">Nombre de la subcategoría *</Label><Input id="catalog-sub" value={sub} onChange={e=>setSub(e.target.value)} placeholder="Ej.: 14 peldaños" /></div> : <p className="text-xs text-slate-500">Podés usar esta categoría sin agregar subcategorías.</p>}
+        <div className="flex justify-end gap-2"><Button variant="ghost" disabled={saving} onClick={()=>setCreating(false)}>Cancelar</Button><Button disabled={saving||loading||!!loadError||!main.trim()||(creationKind==='subcategory'&&!sub.trim())} onClick={()=>void save()}>{saving?'Guardando…':editing?'Guardar cambios':creationKind==='category'?'Crear categoría':'Crear subcategoría'}</Button></div>
       </div>}
       <div className="space-y-2">
         {catalog.find(c=>c.name===selected)?.subcategories.map(subcategory=><div key={subcategory} className="flex justify-between gap-3 rounded-lg border p-3 text-sm"><span>{subcategory}</span><span className="text-slate-500 shrink-0">{herramientas.filter(t=>{const c=classifyTool(t);return c.category===selected&&c.subcategory===subcategory;}).length} unidades</span></div>)}
