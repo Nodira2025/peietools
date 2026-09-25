@@ -15,27 +15,43 @@ export interface CatalogData { obra: CatalogObra; workers: Worker[]; tools: Tool
 export interface CatalogPage { blob: Blob; name: string; width?: number; height?: number }
 
 // Explicit ranges prevent Supabase's row limit from silently truncating a catalog.
-export async function loadObraCatalog(obra: CatalogObra, toolsOnly = false): Promise<CatalogData> {
+export async function loadObraCatalog(obra: CatalogObra, toolsOnly = false, signal?: AbortSignal): Promise<CatalogData> {
   const workers: Worker[] = [];
   const tools: Tool[] = [];
   for (let offset = 0; !toolsOnly; offset += 500) {
-    const result = await supabase.from('empleados').select('id, full_name, specialty, photo_url')
-      .eq('obra_id', obra.id).eq('active', true).order('full_name').order('id').range(offset, offset + 499);
+    const result = await catalogRequest(abort => supabase.from('empleados').select('id, full_name, specialty')
+      .eq('obra_id', obra.id).eq('active', true).order('full_name').order('id').range(offset, offset + 499).abortSignal(abort), signal);
     if (result.error) throw new Error('No se pudo cargar el personal de ' + obra.name);
-    workers.push(...(result.data || []));
+    workers.push(...(result.data || []).map(worker => ({ ...worker, photo_url: null })));
     if ((result.data?.length || 0) < 500) break;
   }
   for (let offset = 0; ; offset += 500) {
-    const query = toolsOnly
-      ? supabase.from('herramientas').select('id, name, code, brand, status')
-      : supabase.from('herramientas').select('id, name, code, brand, status, photo_url');
-    const result = await query
-      .eq('current_obra_id', obra.id).order('name').order('id').range(offset, offset + 499);
+    const result = await catalogRequest(abort => supabase.from('herramientas').select('id, name, code, brand, status')
+      .eq('current_obra_id', obra.id).order('name').order('id').range(offset, offset + 499).abortSignal(abort), signal);
     if (result.error) throw new Error('No se pudieron cargar las herramientas de ' + obra.name);
-    tools.push(...(result.data || []).map(tool => ({ ...tool, photo_url: 'photo_url' in tool ? tool.photo_url : null })) as Tool[]);
+    tools.push(...(result.data || []).map(tool => ({ ...tool, photo_url: null })));
     if ((result.data?.length || 0) < 500) break;
   }
   return { obra, workers, tools };
+}
+
+// Also bounds waits for authentication and response parsing, not only the HTTP request.
+async function catalogRequest<T>(run: (signal: AbortSignal) => PromiseLike<T>, signal?: AbortSignal, timeout = 20000): Promise<T> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let cancel: () => void = () => {};
+  const stopped = new Promise<never>((_, reject) => {
+    cancel = () => { controller.abort(); reject(new Error('Exportación cancelada.')); };
+    timer = setTimeout(() => { controller.abort(); reject(new Error('La conexión demoró demasiado. Revisá tu conexión y reintentá.')); }, timeout);
+    signal?.addEventListener('abort', cancel, { once: true });
+    if (signal?.aborted) cancel();
+  });
+  try {
+    return await Promise.race([stopped, Promise.resolve().then(() => {
+      if (controller.signal.aborted) throw new Error('Exportación cancelada.');
+      return run(controller.signal);
+    })]);
+  } finally { clearTimeout(timer); signal?.removeEventListener('abort', cancel); }
 }
 
 function loadImage(url: string | null): Promise<HTMLImageElement | null> {
@@ -114,19 +130,21 @@ export function getObraInformant(obraName: string, fallback?: string | null): st
 export const catalogFilename = (name: string) => name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_-]+/g, '-').slice(0, 80) || 'obra';
 
 /** One canvas per page: bounded memory on phones, with identical PDF/JPEG layout. */
-export async function renderObraCatalog(data: CatalogData, date: string): Promise<{ pages: CatalogPage[]; missingPhotos: number }> {
+export async function renderObraCatalog(data: CatalogData, date: string, options: { signal?: AbortSignal; onProgress?: (message: string) => void } = {}): Promise<{ pages: CatalogPage[]; missingPhotos: number }> {
   const { obra, workers, tools } = data;
   const logo = await loadImage('/logo-peie.png');
   if (!logo) throw new Error('No se pudo cargar el logo de PEIE. Reintentá la exportación.');
   const sections = [
-    { title: 'TRABAJADORES', rows: workers.map(w => ({ name: w.full_name, detail: 'Rol: ' + (w.specialty || 'Sin registrar'), extra: '', photo: w.photo_url })) },
-    { title: 'HERRAMIENTAS', rows: tools.map(t => ({ name: t.name, detail: t.code + ' · ' + (t.brand || 'Marca sin registrar'), extra: t.status, photo: t.photo_url })) },
+    { table: 'empleados', title: 'TRABAJADORES', rows: workers.map(w => ({ id: w.id, name: w.full_name, detail: 'Rol: ' + (w.specialty || 'Sin registrar'), extra: '', photo: w.photo_url })) },
+    { table: 'herramientas', title: 'HERRAMIENTAS', rows: tools.map(t => ({ id: t.id, name: t.name, detail: t.code + ' · ' + (t.brand || 'Marca sin registrar'), extra: t.status, photo: t.photo_url })) },
   ];
   const totalPages = sections.reduce((sum, section) => sum + Math.max(1, Math.ceil(section.rows.length / 8)), 0);
   const pages: CatalogPage[] = [];
   let missingPhotos = 0;
   for (const section of sections) {
     for (let start = 0; start < Math.max(1, section.rows.length); start += 8) {
+      if (options.signal?.aborted) throw new Error('Exportación cancelada.');
+      options.onProgress?.(`Generando página ${pages.length + 1} de ${totalPages}: ${section.title.toLowerCase()}`);
       const canvas = document.createElement('canvas');
       canvas.width = 1240; canvas.height = 1754;
       const ctx = canvas.getContext('2d');
@@ -170,7 +188,25 @@ export async function renderObraCatalog(data: CatalogData, date: string): Promis
       text(section.title, 48, 577, 900, 29, true);
       text(`${section.rows.length} en esta obra`, 920, 577, 270, 22);
       const rows = section.rows.slice(start, start + 8);
-      const photos = await Promise.all(rows.map(row => loadImage(row.photo)));
+      const photos: (HTMLImageElement | null)[] = rows.map(() => null);
+      let next = 0;
+      // Avoid downloading all historical base64 originals in a single response.
+      await Promise.all(Array.from({ length: Math.min(2, rows.length) }, async () => {
+        while (next < rows.length && !options.signal?.aborted) {
+          const index = next++;
+          const row = rows[index];
+          try {
+            const result = row.photo ? { data: { photo_url: row.photo }, error: null }
+              : await catalogRequest(abort => supabase.from(section.table).select('photo_url')
+                .eq('id', row.id).abortSignal(abort).maybeSingle(), options.signal, 8000);
+            if (result.error) throw result.error;
+            const url = result.data?.photo_url;
+            photos[index] = url ? await loadImage(url) : null;
+            if (url && !photos[index]) missingPhotos++;
+          } catch { missingPhotos++; }
+        }
+      }));
+      if (options.signal?.aborted) throw new Error('Exportación cancelada.');
       rows.forEach((row, index) => {
         const x = 48 + (index % 2) * 584;
         const y = 612 + Math.floor(index / 2) * 248;
@@ -183,7 +219,6 @@ export async function renderObraCatalog(data: CatalogData, date: string): Promis
           const scale = Math.min(138 / image.width, 174 / image.height);
           ctx.drawImage(image, x + 16 + (138 - image.width * scale) / 2, y + 18 + (174 - image.height * scale) / 2, image.width * scale, image.height * scale);
         } else {
-          if (row.photo) missingPhotos++;
           text('Sin foto', x + 36, y + 107, 110, 21, false, '#64748B');
         }
         text(row.name, x + 174, y + 44, 368, 26, true, '#081A63', 3);

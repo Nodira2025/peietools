@@ -29,6 +29,8 @@ try {
   tools[1].category = 'Amoladoras › 7"';
   tools[1].status = 'Disponible';
   let failTools = false;
+  let stallData = false;
+  let stallPhoto = false;
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/*', async route => {
@@ -36,11 +38,18 @@ try {
     if (url.origin === new URL(base).origin) return route.continue();
     if (!url.pathname.startsWith('/rest/v1/')) return route.abort();
     const table = url.pathname.split('/').pop();
+    if (table === 'herramientas' && url.searchParams.get('select') === 'photo_url' && stallPhoto) return;
+    if (table === 'herramientas' && url.searchParams.has('current_obra_id') && stallData) return;
     if (table === 'herramientas' && failTools) return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'Test failure' }) });
     let data = table === 'obras' ? obras : table === 'empleados' ? workers : table === 'herramientas' ? tools : [];
     const key = table === 'empleados' ? 'obra_id' : 'current_obra_id';
     if (url.searchParams.has(key)) data = data.filter(row => 'eq.' + row[key] === url.searchParams.get(key));
-    if (url.searchParams.get('select') === 'photo_url') data = { photo_url: null };
+    if (url.searchParams.get('select') === 'photo_url') {
+      const row = data.find(row => 'eq.' + row.id === url.searchParams.get('id'));
+      data = { photo_url: row?.photo_url || null };
+    } else if (url.searchParams.has(key)) {
+      assert.ok(!url.searchParams.get('select').includes('photo_url'), 'Bulk catalog queries must not download original photos');
+    }
     return route.fulfill({ contentType: 'application/json', body: JSON.stringify(data) });
   });
   // Group browsing is covered by tests/tool-groups.mjs.
@@ -83,6 +92,24 @@ try {
   await page.getByRole('button', { name: 'Generar PDF', exact: true }).click();
   await page.getByRole('alert').filter({ hasText: 'No se pudieron cargar las herramientas' }).waitFor();
   assert.equal(await page.locator('a[download]').count(), 0, 'Never offer a partial export after query failure');
+  failTools = false;
+  stallData = true;
+  await page.getByRole('button', { name: 'Generar PDF', exact: true }).click();
+  await page.getByRole('alert').filter({ hasText: 'La conexión demoró demasiado' }).waitFor({ timeout: 30000 });
+  assert.equal(await page.locator('a[download]').count(), 0, 'A stalled data request cannot produce a partial report');
+  assert.ok(await page.getByRole('button', { name: 'Generar PDF', exact: true }).isEnabled());
+  await page.getByRole('button', { name: 'Generar PDF', exact: true }).click();
+  await page.getByText(/Preparando obra 1/).waitFor();
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  stallData = false;
+  stallPhoto = true;
+  await page.getByRole('button', { name: 'Exportar obra', exact: true }).click();
+  await page.getByRole('button', { name: 'Generar PDF', exact: true }).click();
+  await page.getByText('1 archivo listo', { exact: true }).waitFor({ timeout: 40000 });
+  assert.ok(await page.getByText(/6 fotos no se pudieron cargar/).isVisible(), 'Stalled photos must fall back without blocking PDF');
+  const download = page.waitForEvent('download');
+  await page.locator('a[download]').click();
+  assert.equal(await (await download).failure(), null, 'Mobile download succeeds');
   assert.deepEqual(errors, []);
-  console.log('PASS mobile 2 columns, direct inventory, filters + reload, JPEG pagination, PDF single/all, missing photos, empty/inactive obra, API failure');
+  console.log('PASS mobile PDF/JPEG, single/all, missing/stalled photos, API failure/timeout, cancel/retry and download');
 } finally { await browser?.close(); await server.close(); }

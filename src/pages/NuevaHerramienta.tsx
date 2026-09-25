@@ -16,11 +16,7 @@ import VoiceInputButton from '../components/VoiceInputButton';
 import { notifyCatalogChanged, useCategories } from '../lib/useCategories';
 import ToolCategoryFields from '../components/ToolCategoryFields';
 import { canonicalCategory, classifyTool, serializeClassification } from '../lib/toolTaxonomy';
-
-interface Obra {
-  id: string;
-  name: string;
-}
+import { useActiveObras } from '../lib/useActiveObras';
 
 export default function NuevaHerramienta() {
   const navigate = useNavigate();
@@ -42,7 +38,7 @@ export default function NuevaHerramienta() {
 
   const initialDraft = getInitialDraft();
 
-  const [obras, setObras] = useState<Obra[]>([]);
+  const { obras, loading: obrasLoading, error: obrasError, retry: retryObras } = useActiveObras();
   const [code, setCode] = useState(initialDraft?.code || '');
   const [name, setName] = useState(initialDraft?.name || '');
   const [brand, setBrand] = useState(initialDraft?.brand || '');
@@ -80,12 +76,6 @@ export default function NuevaHerramienta() {
 
 
   useEffect(() => {
-    async function fetchObras() {
-      const { data } = await supabase.from('obras').select('id, name').eq('active', true).order('name');
-      if (data) setObras(data);
-    }
-    fetchObras();
-
     const checkSize = () => {
       setIsMobile(window.innerWidth < 768);
     };
@@ -272,6 +262,14 @@ Categorías válidas: ${dynamicCategories.join(', ')}. No deduzcas medidas a par
   };
 
   const selectedObraObject = obras.find(o => o.id === currentObraId);
+  const obrasStatus = obrasLoading
+    ? <p role="status" className="rounded-xl bg-blue-50 p-4 text-sm text-peie-blue">Cargando obras…</p>
+    : obrasError || !obras.length
+      ? <div role={obrasError ? 'alert' : 'status'} className="space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+          <p>{obrasError || 'No hay obras activas disponibles para tu cuenta. Consultá al administrador si falta una obra.'}</p>
+          <Button type="button" variant="outline" onClick={retryObras}>Reintentar carga de obras</Button>
+        </div>
+      : null;
 
   if (isMobile) {
     return (
@@ -407,6 +405,7 @@ Categorías válidas: ${dynamicCategories.join(', ')}. No deduzcas medidas a par
                 />
 
                 <div className="space-y-2.5 max-h-[45vh] overflow-y-auto pr-1">
+                  {obrasStatus}
                   {obras.map(o => (
                     <button
                       key={o.id}
@@ -769,7 +768,8 @@ Categorías válidas: ${dynamicCategories.join(', ')}. No deduzcas medidas a par
 
               <div className="space-y-1.5">
                 <Label htmlFor="obra" className="text-xs font-semibold text-slate-700">Obra o Base Inicial *</Label>
-                <Select value={currentObraId} onValueChange={setCurrentObraId} required>
+                {obrasStatus}
+                <Select value={currentObraId} onValueChange={setCurrentObraId} required disabled={obrasLoading || !!obrasError || !obras.length}>
                   <SelectTrigger id="obra" className="h-11 rounded-xl text-slate-800">
                     <SelectValue placeholder="Selecciona dónde se ubica físicamente" />
                   </SelectTrigger>

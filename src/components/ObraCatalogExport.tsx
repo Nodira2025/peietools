@@ -18,19 +18,24 @@ export default function ObraCatalogExport({ obras, selectedObra, disabled = fals
   const [files, setFiles] = useState<ExportFile[]>([]);
   const urls = useRef<string[]>([]);
   const sequence = useRef(0);
+  const controller = useRef<AbortController | null>(null);
   const revoke = () => { urls.current.forEach(url => URL.revokeObjectURL(url)); urls.current = []; };
-  useEffect(() => () => { sequence.current++; urls.current.forEach(url => URL.revokeObjectURL(url)); }, []);
+  useEffect(() => () => { sequence.current++; controller.current?.abort(); urls.current.forEach(url => URL.revokeObjectURL(url)); }, []);
   const open = (selection: CatalogObra[], all = false) => {
     setAllObras(all);
     const targetSelection = all ? filterExportObras(selection) : selection;
     revoke(); setFiles([]); setError(''); setWarning(''); setScope(targetSelection);
   };
   const close = () => {
-    sequence.current++; revoke(); setFiles([]); setScope(null); setBusy(false);
+    sequence.current++; controller.current?.abort(); revoke(); setFiles([]); setScope(null); setBusy(false);
   };
   const generate = async (format: 'pdf' | 'jpeg') => {
     if (!scope?.length || busy) return;
     const request = ++sequence.current;
+    controller.current?.abort();
+    const abort = new AbortController();
+    controller.current = abort;
+    setProgress('Iniciando exportación…');
     setBusy(true); setError(''); setWarning(''); revoke(); setFiles([]);
     try {
       const { loadObraCatalog, renderObraCatalog, catalogPdf } = await import('../lib/obraCatalog');
@@ -40,10 +45,10 @@ export default function ObraCatalogExport({ obras, selectedObra, disabled = fals
       const date = new Date().toLocaleString('es-AR');
       for (const [index, obra] of scope.entries()) {
         setProgress(`Preparando obra ${index + 1} de ${scope.length}: ${obra.name}`);
-        const data = await loadObraCatalog(obra, allObras);
+        const data = await loadObraCatalog(obra, allObras, abort.signal);
         if (sequence.current !== request) return;
         if (allObras) { distribution.push(data); continue; }
-        const result = await renderObraCatalog(data, date);
+        const result = await renderObraCatalog(data, date, { signal: abort.signal, onProgress: message => { if (sequence.current === request) setProgress(message); } });
         if (sequence.current !== request) return;
         pages.push(...result.pages); missingPhotos += result.missingPhotos;
       }
@@ -51,6 +56,8 @@ export default function ObraCatalogExport({ obras, selectedObra, disabled = fals
         const { renderObraDistribution } = await import('../lib/obraDistribution');
         pages.push(...await renderObraDistribution(distribution, date.split(',')[0]));
       }
+      if (sequence.current !== request) return;
+      setProgress('Preparando archivos para descargar…');
       const name = allObras ? 'todas-las-obras' : catalogFilename(scope[0].name);
       const output = format === 'pdf'
         ? [new File([await catalogPdf(pages)], `PEIE-${name}.pdf`, { type: 'application/pdf' })]
