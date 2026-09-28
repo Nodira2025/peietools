@@ -1,3 +1,4 @@
+import AgendaNotifications from '../components/AgendaNotifications';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -307,6 +308,7 @@ export default function Notificaciones() {
 
       </div>
 
+      <AgendaNotifications />
       {/* Filtros */}
       <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100 flex flex-col md:flex-row md:items-center gap-3">
         {/* Búsqueda */}

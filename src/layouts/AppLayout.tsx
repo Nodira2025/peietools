@@ -1,3 +1,4 @@
+import {useAgendaNotifications} from '../hooks/useAgendaNotifications';
 import DesktopWelcome from '../pages/DesktopWelcome';
 import MobileWelcome from '../pages/MobileWelcome';
 import { useMobileMode } from '../hooks/useMobileMode';
@@ -28,8 +29,10 @@ export default function AppLayout() {
   const [deviceMode] = useState<'auto' | 'mobile' | 'desktop'>(() => {
     return (localStorage.getItem('login_device_mode') as any) || 'auto';
   });
-  const [pendingCount, setPendingCount] = useState(0);
+  const {items: agendaNotices} = useAgendaNotifications();
+  const [movementPendingCount, setPendingCount] = useState(0);
 
+  const pendingCount = movementPendingCount + agendaNotices.length;
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -149,6 +152,7 @@ export default function AppLayout() {
   const mainNavTop = [
     { name: 'Inicio', path: '/dashboard', icon: Sparkles, show: true },
     { name: 'Centro de Operaciones', path: '/centro-operaciones', icon: Compass, show: true },
+    { name: 'Agenda', path: '/agenda', icon: Calendar, show: true },
     { name: 'Notificaciones', path: '/notificaciones', icon: Bell, show: true, badge: pendingCount },
     { name: 'Reportes', path: '/reportes', icon: BarChart3, show: SHOW_REPORTS && (isLogistica || isAdmin) },
     { name: 'Herramientas', path: '/herramientas', icon: Wrench, show: true },
@@ -495,6 +499,7 @@ export default function AppLayout() {
               </button>
             </div>
 
+            <Link to="/agenda" onClick={() => setShowMas(false)} className="flex items-center gap-3 p-4 bg-blue-950 rounded-2xl"><Calendar size={24}/><span className="font-bold">Agenda y cumpleaños</span></Link>
             {/* Listado de links */}
             <div className="grid grid-cols-2 gap-4 py-2"><Link to="/perfil" onClick={() => setShowMas(false)} className="p-4 bg-slate-900 rounded-2xl text-center">Mi perfil</Link><Link to="/dashboard" onClick={() => setShowMas(false)} className="p-4 bg-slate-900 rounded-2xl text-center">Panel de trabajo</Link>
 

@@ -33,6 +33,7 @@ const Ordenes = lazy(() => import('./pages/Ordenes'));
 const NuevaOrden = lazy(() => import('./pages/NuevaOrden'));
 const OrdenDetail = lazy(() => import('./pages/OrdenDetail'));
 const NuevoPersonalAsistido = lazy(() => import('./pages/NuevoPersonalAsistido'));
+const Agenda = lazy(() => import('./pages/Agenda'));
 const Notificaciones = lazy(() => import('./pages/Notificaciones'));
 const SeguimientoTraslado = lazy(() => import('./pages/SeguimientoTraslado'));
 const Contactos = lazy(() => import('./pages/Contactos'));
@@ -100,6 +101,7 @@ export default function App() {
           <Route path="/solicitudes/nueva" element={<NuevaSolicitud />} />
           <Route path="/solicitudes/:id" element={<SolicitudDetail />} />
           <Route path="/solicitudes/:id/seguimiento" element={<SeguimientoTraslado />} />
+          <Route path="/agenda" element={<Agenda />} />
           <Route path="/notificaciones" element={<Notificaciones />} />
 
           <Route path="/formularios" element={<Formularios />} />
