@@ -1,0 +1,78 @@
+.peie-login {
+  --login-ink: #191846;
+  --login-muted: #626d86;
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 40px;
+  background: #edf2f7;
+  color: var(--login-ink);
+}
+.peie-login__shell {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: min(1180px, 100%);
+  overflow: hidden;
+  border: 1px solid #dce3ec;
+  border-radius: 22px;
+  background: white;
+  box-shadow: 0 18px 60px #192f5412, 0 2px 8px #192f5410;
+}
+.peie-login__story {
+  position: relative;
+  background: linear-gradient(180deg, #082953b8 0%, #08295355 48%, #08295308 100%), url('/img/peie-desktop-worksite.png') center 65% / cover;
+  color: white;
+}
+.peie-login__story-copy { padding: 58px 42px; }
+.peie-login__eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; }
+.peie-login__story h2 { margin: 22px 0 20px; font-size: clamp(36px, 3.8vw, 54px); font-weight: 750; line-height: 1.08; letter-spacing: -.035em; }
+.peie-login__story-copy > p:last-child { max-width: 390px; font-size: 18px; line-height: 1.55; color: #f0f5fd; }
+.peie-login__access { padding: 44px 58px 28px; min-width: 0; }
+.peie-login__logo { width: 206px; height: auto; margin-bottom: 28px; }
+.peie-login__heading .peie-login__eyebrow { color: var(--login-muted); margin-bottom: 10px; }
+.peie-login__heading h1 { font-size: clamp(25px, 2.5vw, 32px); font-weight: 750; letter-spacing: -.03em; line-height: 1.2; }
+.peie-login__heading > p:last-child { color: var(--login-muted); margin-top: 8px; font-size: 15px; line-height: 1.5; }
+.peie-login__form { margin-top: 34px; display: flex; flex-direction: column; gap: 20px; }
+.peie-login__field label { display: block; margin-bottom: 8px; font-size: 14px; font-weight: 600; }
+.peie-login__input-wrap { position: relative; }
+.peie-login__input-wrap > svg { position: absolute; left: 16px; top: 17px; color: #7d89a2; pointer-events: none; }
+.peie-login__input-wrap input { width: 100%; height: 54px; border: 1px solid #cdd5e3; border-radius: 12px; padding: 0 50px 0 48px; background: #fff; color: var(--login-ink); font-size: 16px; }
+.peie-login__input-wrap input::placeholder { color: #7d89a2; }
+.peie-login :is(input, button, a, select):focus-visible { outline: 3px solid #39a6c5; outline-offset: 3px; }
+.peie-login__visibility { position: absolute; right: 5px; top: 5px; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 8px; color: #626d86; }
+.peie-login__visibility:hover { background: #edf2f7; }
+.peie-login__submit { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; min-height: 54px; margin-top: 6px; padding: 14px 48px; border-radius: 12px; background: var(--login-ink); color: white; font-size: 17px; font-weight: 600; transition: background .15s; }
+.peie-login__submit > svg { position: absolute; right: 20px; }
+.peie-login__submit:hover { background: #292865; }
+.peie-login__submit:disabled { cursor: wait; opacity: .7; }
+.peie-login__recovery { align-self: center; display: inline-flex; align-items: center; min-height: 44px; color: #164b9f; font-size: 14px; text-align: center; border-radius: 4px; }
+.peie-login__recovery:hover { text-decoration: underline; }
+.peie-login__footer { margin-top: 30px; padding-top: 24px; border-top: 1px solid #e1e6ee; text-align: center; }
+.peie-login__view { display: inline-flex; align-items: center; gap: 7px; padding-left: 12px; border: 1px solid #dce3ec; border-radius: 8px; font-size: 12px; color: var(--login-muted); }
+.peie-login__view select { max-width: 180px; min-height: 44px; padding: 0 8px; border-radius: 8px; background: white; color: var(--login-ink); cursor: pointer; }
+.peie-login__footer > p { margin-top: 20px; color: var(--login-muted); font-size: 12px; }
+.peie-login__mobile-banner { display: none; }
+@media (max-width: 1000px) and (min-width: 761px) {
+  .peie-login { padding: 24px; }
+  .peie-login__access { padding: 36px 30px 26px; }
+  .peie-login__story-copy { padding: 48px 28px; }
+  .peie-login__wide-break { display: none; }
+}
+@media (max-width: 760px) {
+  .peie-login { padding: max(24px, env(safe-area-inset-top)) max(22px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(22px, env(safe-area-inset-left)); background: white; }
+  .peie-login__shell { display: block; max-width: 420px; border: 0; border-radius: 0; box-shadow: none; overflow: visible; }
+  .peie-login__story { display: none; }
+  .peie-login__access { padding: 0; }
+  .peie-login__logo { width: 152px; margin: 0 auto 18px; }
+  .peie-login__mobile-banner { display: flex; align-items: flex-end; min-height: 146px; padding: 20px; border-radius: 14px; background: linear-gradient(90deg, #082953b8, #08295320), url('/img/peie-desktop-worksite.png') center 60% / cover; color: white; }
+  .peie-login__mobile-banner p { font-size: 23px; line-height: 1.15; font-weight: 700; letter-spacing: -.02em; }
+  .peie-login__heading { margin-top: 18px; }
+  .peie-login__heading h1, .peie-login__heading .peie-login__eyebrow { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .peie-login__heading > p:last-child { font-size: 14px; }
+  .peie-login__form { margin-top: 24px; gap: 18px; }
+  .peie-login__footer { margin-top: 24px; padding-top: 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .peie-login__submit { transition: none; }
+  .peie-login .animate-spin { animation: none; }
+}
