@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Zap } from 'lucide-react';
+import { accountErrorMessage, normalizeUsername, validateUserAccount } from '../lib/userAccounts';
 import { useAuthStore } from '../store/auth';
 
 interface Profile {
@@ -22,16 +22,23 @@ interface Profile {
   user_passwords?: { clear_password: string } | { clear_password: string }[] | null;
 }
 
+async function loadUsuarios(): Promise<Profile[]> {
+  const { data, error } = await supabase.from('profiles').select('*, user_passwords(clear_password)').order('full_name');
+  if (error) throw error;
+  return data || [];
+}
+
 export default function Usuarios() {
   const { profile, checkUser } = useAuthStore();
   const [usuarios, setUsuarios] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [elevating, setElevating] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const canManage = profile?.role === 'admin' && profile.active;
   const { toast } = useToast();
 
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [role, setRole] = useState('');
+  const [role, setRole] = useState('solicitante');
   const [whatsapp, setWhatsapp] = useState('');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -60,19 +67,28 @@ export default function Usuarios() {
   };
 
   const fetchUsuarios = async () => {
-    setLoading(true);
-    const { data, error } = await supabase.from('profiles').select('*, user_passwords(clear_password)').order('full_name');
-    if (error) {
+    if (!canManage) return;
+    try {
+      setUsuarios(await loadUsuarios());
+    } catch {
       toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar los usuarios' });
-    } else {
-      setUsuarios(data || []);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
-    fetchUsuarios();
-  }, []);
+    if (!canManage) return;
+    let cancelled = false;
+    loadUsuarios().then(data => {
+      if (!cancelled) setUsuarios(data);
+    }).catch(() => {
+      if (!cancelled) toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar los usuarios' });
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [canManage, toast]);
 
   const handleEdit = (user: Profile) => {
     setSelectedUser(user);
@@ -87,83 +103,82 @@ export default function Usuarios() {
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedUser) return;
-    setLoading(true);
+    if (!selectedUser || saving) return;
+    setSaving(true);
 
     try {
-      // Usamos la nueva función RPC para actualizar datos sensibles (auth.users) y perfil
-      const { error } = await supabase.rpc('admin_update_user', {
+      const validation = validateUserAccount({ username: email, password, fullName, role, creating: false });
+      if (validation) throw new Error(validation);
+      const { error } = await supabase.rpc('admin_update_user_v2', {
         p_user_id: selectedUser.id,
-        p_new_username: email, // El campo 'email' actúa como username
+        p_new_username: normalizeUsername(email), // El campo 'email' actúa como username
         p_new_password: password || null, // Solo se cambia si se escribe algo
-        p_new_full_name: fullName,
+        p_new_full_name: fullName.trim(),
         p_new_role: role,
-        p_new_whatsapp: whatsapp
+        p_new_whatsapp: whatsapp.trim(),
+        p_new_active: isActive
       });
 
       if (error) throw error;
 
       toast({ title: 'Éxito', description: 'Usuario actualizado correctamente' });
       setIsDialogOpen(false);
-      fetchUsuarios();
-    } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Error', description: error.message });
+      setPassword('');
+      await fetchUsuarios();
+      if (selectedUser.id === profile?.id) await checkUser();
+    } catch (error: unknown) {
+      toast({ variant: 'destructive', title: 'Error', description: accountErrorMessage(error, 'No se pudo guardar el usuario. Volvé a intentar.') });
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    if (saving) return;
+    setSaving(true);
 
     try {
-      // Usamos la nueva función RPC para crear el usuario con confirmación automática
+      const validation = validateUserAccount({ username: email, password, fullName, role, creating: true });
+      if (validation) throw new Error(validation);
       const { data: newUserId, error } = await supabase.rpc('admin_create_user', {
-        p_username: email, // Usamos el campo 'email' como username
+        p_username: normalizeUsername(email), // Usamos el campo 'email' como username
         p_password: password,
-        p_full_name: fullName,
+        p_full_name: fullName.trim(),
         p_role: role,
-        p_whatsapp: whatsapp
+        p_whatsapp: whatsapp.trim()
       });
 
       if (error) throw error;
+      if (!newUserId) throw new Error('El servidor no confirmó el alta. Revisá la lista antes de reintentar.');
 
       toast({ 
-        title: 'Usuario Creado', 
-        description: `Se ha registrado a ${fullName} correctamente. Ya puede ingresar.` 
+        title: 'Usuario creado',
+        description: `Se registró a ${fullName.trim()}. Usuario de acceso: ${normalizeUsername(email)}.`
       });
       setIsCreateDialogOpen(false);
-      fetchUsuarios();
+      await fetchUsuarios();
       
       // Limpiar campos
       setEmail(''); setPassword(''); setFullName(''); setWhatsapp(''); setRole('solicitante');
       
-    } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Error al crear usuario', description: error.message });
+    } catch (error: unknown) {
+      toast({ variant: 'destructive', title: 'Error al crear usuario', description: accountErrorMessage(error, 'No se pudo guardar el usuario. Volvé a intentar.') });
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  const handleAutoElevate = async () => {
-    if (!profile) return;
-    setElevating(true);
-    const { error } = await supabase
-      .from('profiles')
-      .update({ role: 'admin' })
-      .eq('id', profile.id);
-
-    setElevating(false);
-
-    if (error) {
-      toast({ variant: 'destructive', title: 'Error al elevar permisos', description: error.message });
-    } else {
-      toast({ title: '¡Permisos de Administrador Concedidos!', description: 'Ahora posees control total del sistema.' });
-      await checkUser(); // Refrescar el perfil local al instante
-      fetchUsuarios();
+  const openCreateDialog = (open: boolean) => {
+    if (saving) return;
+    if (open) {
+      setSelectedUser(null); setEmail(''); setPassword(''); setFullName('');
+      setWhatsapp(''); setRole('solicitante'); setIsActive(true);
     }
+    setIsCreateDialogOpen(open);
   };
+
+  if (!canManage) return <p role="alert" className="p-6">La gestión de usuarios está disponible para administradores.</p>;
 
   return (
     <div className="space-y-6 pb-safe">
@@ -174,7 +189,7 @@ export default function Usuarios() {
         </div>
 
         <div className="flex gap-2">
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <Dialog open={isCreateDialogOpen} onOpenChange={openCreateDialog}>
             <DialogTrigger asChild>
               <Button className="bg-peie-blue hover:bg-peie-blue/90 text-white rounded-xl shadow-md flex items-center gap-2">
                 <UsersIcon size={18} />
@@ -195,11 +210,11 @@ export default function Usuarios() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="createEmail">Nombre de Usuario (ej: juan)</Label>
-                  <Input id="createEmail" value={email} onChange={e => setEmail(e.target.value)} required placeholder="juan" />
+                  <Input id="createEmail" autoCapitalize="none" autoCorrect="off" value={email} onChange={e => setEmail(e.target.value)} required placeholder="juan" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="createPassword">Contraseña</Label>
-                  <Input id="createPassword" type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="min. 6 caracteres" />
+                  <Input id="createPassword" type="password" minLength={6} autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="min. 6 caracteres" />
                 </div>
                 <div className="space-y-2">
                   <Label>Rol Inicial</Label>
@@ -216,28 +231,17 @@ export default function Usuarios() {
                   <Label htmlFor="createWhatsapp">WhatsApp</Label>
                   <Input id="createWhatsapp" value={whatsapp} onChange={e => setWhatsapp(e.target.value)} placeholder="549XXXXXXXXXX" />
                 </div>
-                <Button type="submit" disabled={loading} className="w-full bg-peie-blue hover:bg-peie-blue/90">
-                  {loading ? 'Creando...' : 'Registrar Usuario'}
+                <Button type="submit" disabled={saving} className="w-full bg-peie-blue hover:bg-peie-blue/90">
+                  {saving ? 'Creando...' : 'Registrar Usuario'}
                 </Button>
               </form>
             </DialogContent>
           </Dialog>
         </div>
 
-        {/* BOTÓN DISCRETO PARA QUE TE CONVIERTAS EN ADMIN SI ESTÁS CON OTRO USUARIO */}
-        {profile && profile.role !== 'admin' && (
-          <Button 
-            onClick={handleAutoElevate} 
-            disabled={elevating}
-            className="bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl shadow-md flex items-center gap-2 animate-bounce"
-          >
-            <Zap size={16} className="fill-white" />
-            <span>{elevating ? 'Concediendo...' : 'Convertirme en Admin Maestro'}</span>
-          </Button>
-        )}
       </div>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isDialogOpen} onOpenChange={open => { if (!saving) { setIsDialogOpen(open); if (!open) setPassword(''); } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Editar Usuario: {selectedUser?.full_name}</DialogTitle>
@@ -255,6 +259,7 @@ export default function Usuarios() {
                 <SelectContent>
                   <SelectItem value="admin">Administrador</SelectItem>
                   <SelectItem value="solicitante">Coordinador</SelectItem>
+                  <SelectItem value="encargado">Coordinador (rol anterior)</SelectItem>
                   <SelectItem value="logistica">Logística</SelectItem>
                 </SelectContent>
               </Select>
@@ -262,7 +267,10 @@ export default function Usuarios() {
             <div className="space-y-2">
               <Label htmlFor="username">Nombre de Usuario (para ingresar)</Label>
               <Input 
-                id="username" 
+                id="username"
+                required
+                autoCapitalize="none"
+                autoCorrect="off"
                 value={email} 
                 onChange={e => setEmail(e.target.value)} 
                 placeholder="Ej: franco"
@@ -271,7 +279,9 @@ export default function Usuarios() {
             <div className="space-y-2">
               <Label htmlFor="password">Nueva Contraseña (dejar en blanco para no cambiar)</Label>
               <Input 
-                id="password" 
+                id="password"
+                minLength={6}
+                autoComplete="new-password"
                 type="password"
                 value={password} 
                 onChange={e => setPassword(e.target.value)} 
@@ -281,7 +291,8 @@ export default function Usuarios() {
             <div className="space-y-2">
               <Label htmlFor="fullName">Nombre Completo</Label>
               <Input 
-                id="fullName" 
+                id="fullName"
+                required
                 value={fullName} 
                 onChange={e => setFullName(e.target.value)} 
                 placeholder="Nombre y Apellido"
@@ -306,8 +317,8 @@ export default function Usuarios() {
               />
               <Label htmlFor="active">Usuario Activo</Label>
             </div>
-            <Button type="submit" disabled={loading} className="w-full bg-peie-blue hover:bg-peie-blue/90">
-              {loading ? 'Guardando...' : 'Guardar Cambios'}
+            <Button type="submit" disabled={saving} className="w-full bg-peie-blue hover:bg-peie-blue/90">
+              {saving ? 'Guardando...' : 'Guardar Cambios'}
             </Button>
           </form>
         </DialogContent>
@@ -346,19 +357,21 @@ export default function Usuarios() {
                   size="icon" 
                   className="text-muted-foreground hover:text-peie-blue -mr-2 -mt-2"
                   onClick={() => handleEdit(user)}
+                  aria-label={`Editar usuario ${user.full_name || user.username || ''}`}
                 >
                   <Edit className="h-4 w-4" />
                 </Button>
               </CardHeader>
               <CardContent className="text-sm space-y-1 mt-2 text-muted-foreground">
                 <p className="capitalize"><strong>Rol:</strong> <span className="font-medium text-foreground">{getRoleLabel(user.role)}</span></p>
+                <p><strong>Usuario:</strong> {user.username || 'Pendiente de completar'}</p>
                 <p><strong>WhatsApp:</strong> {user.whatsapp || 'No configurado'}</p>
                 <p><strong>Estado:</strong> {user.active ? <span className="text-green-600 font-medium">Activo</span> : <span className="text-red-500 font-medium">Inactivo</span>}</p>
                 
                 {(() => {
                   const clearPassword = Array.isArray(user.user_passwords)
                     ? user.user_passwords[0]?.clear_password
-                    : (user.user_passwords as any)?.clear_password;
+                    : user.user_passwords?.clear_password;
                   
                   return (
                     <p className="flex items-center gap-1.5">

@@ -5,11 +5,12 @@ import { Navigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowRight, Eye, EyeOff, LoaderCircle, LockKeyhole, UserRound } from 'lucide-react';
 import './Login.css';
+import { accountErrorMessage, loginEmail } from '../lib/userAccounts';
 
 type DeviceMode = 'auto' | 'mobile' | 'desktop';
 
 export default function Login() {
-  const { user, profile } = useAuthStore();
+  const { user, profile, error: profileError } = useAuthStore();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -23,21 +24,18 @@ export default function Login() {
     e.preventDefault();
     if (loading) return;
     setLoading(true);
-    const cleanUser = username.toLowerCase().trim();
-    const loginEmail = cleanUser.includes('@') ? cleanUser : `${cleanUser}@peie.com`;
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email: loginEmail, password });
+      const { error } = await supabase.auth.signInWithPassword({ email: loginEmail(username), password });
       if (error) throw error;
       localStorage.setItem('login_device_mode', deviceMode);
       await useAuthStore.getState().checkUser();
+      const access = useAuthStore.getState();
+      if (access.error || !access.profile) throw new Error(access.error || 'No se pudo completar el ingreso. Volvé a intentar.');
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'No se pudo iniciar sesión. Intentá nuevamente.';
       toast({
         variant: 'destructive',
         title: 'Acceso denegado',
-        description: message === 'Invalid login credentials'
-          ? 'El usuario o la contraseña son incorrectos. Por favor, verifica tus datos.'
-          : message,
+        description: accountErrorMessage(error, 'No se pudo iniciar sesión. Intentá nuevamente.'),
       });
     } finally {
       setLoading(false);
@@ -67,6 +65,7 @@ export default function Login() {
           </header>
 
           <form className="peie-login__form" onSubmit={handleLogin} aria-busy={loading}>
+            {profileError && <p role="alert" className="text-sm text-red-700">{profileError}</p>}
             <div className="peie-login__field">
               <label htmlFor="username">Usuario</label>
               <div className="peie-login__input-wrap">
