@@ -21,6 +21,7 @@ interface Obra {
   name: string;
   address: string;
   encargado_name: string | null;
+  coordinador_id?: string | null;
   active: boolean;
   photo_url?: string | null;
   latitude?: number | null;
@@ -81,7 +82,7 @@ export default function MisObras() {
     setLoading(true);
     const { data: obrasData, error } = await supabase
       .from('obras')
-      .select('id, name, address, encargado_name, active, photo_url, latitude, longitude')
+      .select('*')
       .order('name');
     
     if (error) {
@@ -119,10 +120,11 @@ export default function MisObras() {
       };
     });
 
-    // Si no es admin ni logistica, pre-filtrar en cliente con tolerancia a abreviaciones y nombres parciales
+    // Preferir el usuario vinculado; conservar coincidencias historicas solo en obras sin vinculo.
     const filteredByRole = isSpecialRole ? processedObras : processedObras.filter(o => {
       if (!profile) return false;
       if (profile.obra_id === o.id) return true;
+      if (o.coordinador_id) return o.coordinador_id === profile.id;
       if (!profile.full_name) return false;
 
       const userFullName = profile.full_name.toLowerCase().trim();

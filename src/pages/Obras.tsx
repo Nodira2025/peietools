@@ -10,6 +10,7 @@ import { Building, Plus, Trash2, Edit, Search, Power } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import FilterBar from '../components/FilterBar';
+import CoordinatorPicker from '../components/CoordinatorPicker';
 
 interface Obra {
   id: string;
@@ -17,6 +18,7 @@ interface Obra {
   name: string;
   address: string | null;
   encargado_name: string | null;
+  coordinador_id?: string | null;
   phone: string | null;
   latitude: number | null;
   longitude: number | null;
@@ -63,6 +65,10 @@ export default function Obras() {
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
   const [manager, setManager] = useState('');
+  const [managerId, setManagerId] = useState<string | null>(null);
+  const [managerChanged, setManagerChanged] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [managerError, setManagerError] = useState('');
   const [phone, setPhone] = useState('');
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
@@ -126,6 +132,9 @@ export default function Obras() {
     setLatitude(''); setLongitude(''); setActive(true);
     setIsEditing(false);
     setCurrentId(null);
+    setManagerId(null);
+    setManagerChanged(false);
+    setManagerError('');
   };
 
   const handleOpenNew = () => {
@@ -138,6 +147,9 @@ export default function Obras() {
     setName(obra.name);
     setAddress(obra.address || '');
     setManager(obra.encargado_name || '');
+    setManagerId(obra.coordinador_id || null);
+    setManagerChanged(false);
+    setManagerError('');
     setPhone(obra.phone || '');
     setLatitude(obra.latitude != null ? obra.latitude.toString() : '');
     setLongitude(obra.longitude != null ? obra.longitude.toString() : '');
@@ -149,33 +161,53 @@ export default function Obras() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = { 
-      code: code || null, 
-      name, 
-      address, 
-      encargado_name: manager, 
-      phone,
-      latitude: latitude ? parseFloat(latitude) : null,
-      longitude: longitude ? parseFloat(longitude) : null,
-      active
-    };
-
-    let error;
-    if (isEditing && currentId) {
-      const { error: updateError } = await supabase.from('obras').update(payload).eq('id', currentId);
-      error = updateError;
-    } else {
-      const { error: insertError } = await supabase.from('obras').insert([payload]);
-      error = insertError;
+    if (saving) return;
+    if (managerChanged && manager.trim() && !managerId) {
+      setManagerError('Seleccioná un usuario de las coincidencias antes de guardar.');
+      toast({ variant: 'destructive', title: 'Elegí un usuario', description: 'Seleccioná un coordinador o administrador de las coincidencias antes de guardar.' });
+      return;
     }
+    setSaving(true);
+    try {
+      if (managerChanged && managerId) {
+        const { data: selected, error: selectedError } = await supabase.from('profiles')
+          .select('id').eq('id', managerId).eq('active', true)
+          .in('role', ['admin', 'coordinador', 'encargado', 'solicitante']).maybeSingle();
+        if (selectedError || !selected) throw new Error('No se pudo validar el usuario seleccionado. Verificá que siga activo e intentá nuevamente.');
+      }
+      const payload = {
+        code: code || null,
+        name,
+        address,
+        encargado_name: manager.trim(),
+        ...(managerChanged ? { coordinador_id: managerId } : {}),
+        phone,
+        latitude: latitude ? parseFloat(latitude) : null,
+        longitude: longitude ? parseFloat(longitude) : null,
+        active
+      };
 
-    if (error) {
-      toast({ variant: 'destructive', title: 'Error', description: error.message });
-    } else {
-      toast({ title: 'Éxito', description: isEditing ? 'Obra actualizada correctamente' : 'Obra creada correctamente' });
-      setIsDialogOpen(false);
-      resetForm();
-      fetchObras();
+      let error;
+      if (isEditing && currentId) {
+        const { error: updateError } = await supabase.from('obras').update(payload).eq('id', currentId);
+        error = updateError;
+      } else {
+        const { error: insertError } = await supabase.from('obras').insert([payload]);
+        error = insertError;
+      }
+
+      if (error) {
+        toast({ variant: 'destructive', title: 'Error', description: error.message });
+      } else {
+        toast({ title: 'Éxito', description: isEditing ? 'Obra actualizada correctamente' : 'Obra creada correctamente' });
+        setIsDialogOpen(false);
+        resetForm();
+        fetchObras();
+      }
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'No se pudo guardar', description: error instanceof Error ? error.message : 'Intentá nuevamente.' });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -236,7 +268,7 @@ export default function Obras() {
           <p className="text-muted-foreground">Administra las obras y depósitos de la empresa.</p>
         </div>
 
-        <Dialog open={isDialogOpen} onOpenChange={(open) => { if(!open) resetForm(); setIsDialogOpen(open); }}>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => { if (saving) return; if(!open) resetForm(); setIsDialogOpen(open); }}>
           <Button className="bg-peie-blue hover:bg-peie-blue/90 w-full sm:w-auto" onClick={handleOpenNew}>
             <Plus className="mr-2 h-4 w-4" /> Nueva Obra
           </Button>
@@ -261,7 +293,9 @@ export default function Obras() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="manager">Coordinador</Label>
-                <Input id="manager" value={manager} onChange={e => setManager(e.target.value)} />
+                <CoordinatorPicker value={manager} onChange={(name, id) => { setManager(name); setManagerId(id); setManagerChanged(true); setManagerError(''); }} />
+                {managerError && <p role="alert" className="text-sm text-red-700">{managerError}</p>}
+                {managerId && <p className="text-xs text-green-700">Usuario seleccionado.</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">Teléfono</Label>
@@ -300,8 +334,8 @@ export default function Obras() {
                 />
                 <Label htmlFor="active" className="font-normal cursor-pointer">Obra Activa</Label>
               </div>
-              <Button type="submit" className="w-full bg-peie-blue hover:bg-peie-blue/90">
-                {isEditing ? 'Guardar Cambios' : 'Crear Obra'}
+              <Button type="submit" disabled={saving} className="w-full bg-peie-blue hover:bg-peie-blue/90">
+                {saving ? 'Guardando…' : isEditing ? 'Guardar Cambios' : 'Crear Obra'}
               </Button>
             </form>
           </DialogContent>
