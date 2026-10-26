@@ -1,3 +1,5 @@
+import { coordinatorEntry, coordinatorOptions } from '../lib/coordinatorDirectory';
+import { useCoordinatorContacts } from '../hooks/useCoordinatorContacts';
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -31,6 +33,7 @@ type WizardStep =
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function NuevoTrasladoPersonal() {
+  const coordinatorContacts = useCoordinatorContacts();
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -89,7 +92,7 @@ export default function NuevoTrasladoPersonal() {
     // Traer lista de obras destino (todas las obras activas, excluyendo la actual del operario)
     const { data: obrasData } = await supabase
       .from('obras')
-      .select('id, name, encargado_name, status')
+      .select('id, name, encargado_name, coordinador_id, status')
       .eq('active', true)
       .neq('id', empData.obra_id || '00000000-0000-0000-0000-000000000000')
       .order('name');
@@ -321,11 +324,11 @@ export default function NuevoTrasladoPersonal() {
 
   const filteredObras = obras.filter(o => {
     const matchSearch = !searchTerm || o.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchEncargado = !filterEncargado || (o.encargado_name === filterEncargado);
+    const matchEncargado = !filterEncargado || (coordinatorEntry(o, coordinatorContacts).value === filterEncargado);
     return matchSearch && matchEncargado;
   });
 
-  const encargadosUnicos = [...new Set(obras.map(o => o.encargado_name).filter(Boolean))].sort();
+  const encargadosUnicos = coordinatorOptions(obras, coordinatorContacts);
 
   if (loading) return <div className="p-8 text-center text-muted-foreground">Cargando...</div>;
   if (!empleado) return null;
@@ -394,7 +397,7 @@ export default function NuevoTrasladoPersonal() {
                 >
                   <option value="">Todos los encargados</option>
                   {encargadosUnicos.map(e => (
-                    <option key={e!} value={e!}>{e}</option>
+                    <option key={e.value} value={e.value}>{e.label}</option>
                   ))}
                 </select>
               </div>

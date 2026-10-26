@@ -1,3 +1,5 @@
+import { coordinatorEntry, coordinatorOptions } from '../lib/coordinatorDirectory';
+import { useCoordinatorContacts } from '../hooks/useCoordinatorContacts';
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -42,6 +44,7 @@ interface Obra {
   id: string;
   name: string;
   encargado_name?: string | null;
+  coordinador_id?: string | null;
 }
 
 interface Herramienta {
@@ -78,6 +81,7 @@ type WizardStep =
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function NuevaSolicitud() {
+  const coordinatorContacts = useCoordinatorContacts();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
@@ -217,7 +221,7 @@ export default function NuevaSolicitud() {
       // 2. Cargar Obras destino (todas las obras activas disponibles como destino)
       const { data: obrasData } = await supabase
         .from('obras')
-        .select('id, name, encargado_name')
+        .select('id, name, encargado_name, coordinador_id')
         .eq('active', true)
         .order('name');
       if (obrasData) {
@@ -408,14 +412,14 @@ export default function NuevaSolicitud() {
   });
 
   const filteredObras = obras.filter(o => {
-    const matchEncargado = !filterEncargado || o.encargado_name === filterEncargado;
+    const matchEncargado = !filterEncargado || coordinatorEntry(o, coordinatorContacts).value === filterEncargado;
     if (!matchEncargado) return false;
     const searchNorm = normalizeString(obraSearch);
     if (!searchNorm) return true;
     const nameNorm = normalizeString(o.name);
     return nameNorm.includes(searchNorm);
   });
-  const encargadosUnicos = [...new Set(obras.map(o => o.encargado_name).filter((e): e is string => !!e))].sort();
+  const encargadosUnicos = coordinatorOptions(obras, coordinatorContacts);
 
   const handleEncargadoChange = (val: string) => {
     const actualVal = val === '_all_' ? '' : val;
@@ -729,8 +733,8 @@ export default function NuevaSolicitud() {
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
                     <SelectItem value="_all_">Todos los encargados</SelectItem>
-                    {encargadosUnicos.map((e, idx) => (
-                      <SelectItem key={idx} value={e}>{e}</SelectItem>
+                    {encargadosUnicos.map(e => (
+                      <SelectItem key={e.value} value={e.value}>{e.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

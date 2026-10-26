@@ -1,3 +1,5 @@
+import { coordinatorEntry, coordinatorOptions } from '../lib/coordinatorDirectory';
+import { useCoordinatorContacts } from '../hooks/useCoordinatorContacts';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Wrench, Plus, Search, Layers, Disc, Hammer, Shield, Ruler, ChevronLeft, ChevronRight, Building2, LayoutGrid, List, Download, Truck, Camera, Package, FileSpreadsheet, Tag, type LucideIcon } from 'lucide-react';
@@ -23,7 +25,7 @@ interface Herramienta {
   status: string;
   category: string | null;
   current_obra_id: string | null;
-  obras?: { name: string; encargado_name: string | null } | null;
+  obras?: { name: string; encargado_name: string | null; coordinador_id?: string | null } | null;
 }
 type ClassifiedTool = Herramienta & { classification: ToolClassification };
 const icons: Record<string, LucideIcon> = {
@@ -49,6 +51,7 @@ function cachedInventory(): Herramienta[] {
 }
 
 export default function Herramientas() {
+  const coordinatorContacts = useCoordinatorContacts();
   const navigate = useNavigate();
   const location = useLocation();
   const { profile } = useAuthStore();
@@ -81,7 +84,7 @@ export default function Herramientas() {
       const rows: Herramienta[] = [];
       for (let offset = 0; ; offset += 500) {
         const { data, error } = await supabase.from('herramientas')
-          .select('id, code, name, brand, model, description, status, category, current_obra_id, obras(name, encargado_name)')
+          .select('id, code, name, brand, model, description, status, category, current_obra_id, obras(name, encargado_name, coordinador_id)')
           .order('id').range(offset, offset + 499);
         if (error) throw error;
         rows.push(...(data || []).map(row => ({
@@ -128,8 +131,8 @@ export default function Herramientas() {
   const scoped = useMemo(() => classified.filter(tool =>
     (!filterObra || tool.obras?.name === filterObra) &&
     (!filterStatus || tool.status === filterStatus) &&
-    (!filterEncargado || tool.obras?.encargado_name === filterEncargado)
-  ), [classified, filterObra, filterStatus, filterEncargado]);
+    (!filterEncargado || coordinatorEntry(tool.obras, coordinatorContacts).value === filterEncargado)
+  ), [classified, filterObra, filterStatus, filterEncargado, coordinatorContacts]);
   const filtered = useMemo(() => scoped.filter(tool =>
     (!selectedGroup || inventoryGroup(tool).key === selectedGroup) &&
     matchesToolSearch(tool, searchTerm)
@@ -152,7 +155,7 @@ export default function Herramientas() {
   };
 
   const obras = useMemo(() => [...new Set(herramientas.flatMap(t => t.obras?.name ? [t.obras.name] : []))].sort(), [herramientas]);
-  const encargados = useMemo(() => [...new Set(herramientas.flatMap(t => t.obras?.encargado_name ? [t.obras.encargado_name] : []))].sort(), [herramientas]);
+  const encargados = useMemo(() => coordinatorOptions(herramientas.map(t => t.obras), coordinatorContacts), [herramientas, coordinatorContacts]);
   const statuses = useMemo(() => [...new Set(herramientas.map(t => t.status))].sort(), [herramientas]);
   const goHome = () => { setSelectedGroup(null); setSearchTerm(''); };
   const clearFilters = () => { setSearchTerm(''); setFilterObra(''); setFilterStatus(''); setFilterEncargado(''); setSelectedGroup(null); };
@@ -205,7 +208,7 @@ export default function Herramientas() {
       <FilterBar filters={[
         { key: 'status', label: 'Estado', value: filterStatus, options: statuses.map(s => ({ value:s, label:s })) },
         { key: 'obra', label: 'Obra actual', value: filterObra, options: obras.map(s => ({ value:s, label:s })) },
-        { key: 'encargado', label: 'Coordinador', value: filterEncargado, options: encargados.map(s => ({ value:s, label:s })) },
+        { key: 'encargado', label: 'Coordinador', value: filterEncargado, options: encargados },
       ]} onFilterChange={changeScope} />
       </div>
     </div>

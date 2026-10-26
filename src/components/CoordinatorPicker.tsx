@@ -8,6 +8,7 @@ export interface CoordinatorOption {
   full_name: string;
   username: string | null;
   role: string;
+  whatsapp?: string | null;
 }
 
 const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
@@ -30,7 +31,7 @@ export default function CoordinatorPicker({ value, onChange }: {
     void (async () => {
       try {
         const { data, error: queryError } = await supabase.from('profiles')
-          .select('id,full_name,username,role').eq('active', true)
+          .select('id,full_name,username,role,whatsapp').eq('active', true)
           .in('role', ['admin', 'coordinador', 'encargado', 'solicitante'])
           .order('full_name').abortSignal(controller.signal);
         if (queryError) throw queryError;
@@ -45,7 +46,7 @@ export default function CoordinatorPicker({ value, onChange }: {
     return () => { mounted = false; clearTimeout(timeout); controller.abort(); };
   }, [attempt]);
 
-  const matches = users.filter(user => normalize(`${user.full_name || ''} ${user.username || ''}`).includes(normalize(value)));
+  const matches = users.filter(user => normalize(`${user.full_name || ''} ${user.username || ''} ${user.whatsapp || ''}`).includes(normalize(value)));
   const choose = (user: CoordinatorOption) => {
     onChange(user.full_name || user.username || '', user.id);
     setOpen(false);
@@ -80,6 +81,7 @@ export default function CoordinatorPicker({ value, onChange }: {
             aria-selected={highlight === index} onMouseDown={event => event.preventDefault()} onClick={() => choose(user)}
             className={`block w-full text-left rounded-md p-3 text-sm ${highlight === index ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
             <span className="block font-semibold">{user.full_name || user.username}</span>
+            <span className="block text-sm">{user.whatsapp?.trim() || 'Celular pendiente'}</span>
             <span className="block text-xs text-slate-500">{user.username ? `@${user.username} · ` : ''}{user.role === 'admin' ? 'Administrador' : 'Coordinador'}</span>
           </button>)}
         </div>

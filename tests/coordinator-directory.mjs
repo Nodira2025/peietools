@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import ts from 'typescript';
+const source=await readFile('src/lib/coordinatorDirectory.ts','utf8');
+const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+const {coordinatorEntry,coordinatorOptions}=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
+const contacts=[{id:'c',full_name:'Carlos Grande',username:'carlos',whatsapp:'3810000000'},{id:'m',full_name:'Martín Grande',username:'martin',whatsapp:null}];
+const rows=[{encargado_name:'CARLOS GRANDE'},{encargado_name:'Carlos Grande '},{encargado_name:'Carlos',coordinador_id:'c'}];
+assert.equal(coordinatorOptions(rows,contacts).length,1);
+assert.equal(coordinatorOptions(rows,contacts)[0].label,'Carlos Grande · 3810000000');
+assert.notEqual(coordinatorEntry({encargado_name:'Carlos'},contacts).value,'user:c','No inferir identidad por nombre abreviado');
+assert.equal(coordinatorOptions([{encargado_name:'Carlos '},{encargado_name:'Carlos'}],[]).length,1);
+assert.match(coordinatorEntry({encargado_name:'Martin Grande'},contacts).label,/Celular pendiente/);
+assert.equal(coordinatorEntry({encargado_name:'Carlos Grande',coordinador_id:'m'},contacts).value,'user:m','El ID tiene prioridad sobre un nombre antiguo');
+assert.match(coordinatorEntry({encargado_name:'Carlos Grande'},[...contacts,{...contacts[0],id:'otro'}]).label,/Sin vincular/,'No fusionar homonimos');
+assert.match(coordinatorEntry({encargado_name:'Carlos',coordinador_id:'unknown'},contacts).label,/Contacto no disponible/);
+console.log('PASS: espacios, mayusculas, tildes, ID, celulares, faltantes, homonimos y nombres ambiguos.');

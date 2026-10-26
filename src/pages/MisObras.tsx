@@ -1,3 +1,5 @@
+import { coordinatorEntry, coordinatorOptions } from '../lib/coordinatorDirectory';
+import { useCoordinatorContacts } from '../hooks/useCoordinatorContacts';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -49,6 +51,7 @@ interface Empleado {
 }
 
 export default function MisObras() {
+  const coordinatorContacts = useCoordinatorContacts();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
@@ -234,13 +237,13 @@ export default function MisObras() {
       (o.address || '').toLowerCase().includes(search.toLowerCase()) || 
       (o.encargado_name || '').toLowerCase().includes(search.toLowerCase());
     
-    const matchEncargado = !filterEncargado || o.encargado_name === filterEncargado;
+    const matchEncargado = !filterEncargado || coordinatorEntry(o, coordinatorContacts).value === filterEncargado;
     const matchActive = !filterActive || (filterActive === 'true' ? o.active : !o.active);
     
     return matchSearch && matchEncargado && matchActive;
   });
 
-  const encargadosUnicos = [...new Set(obras.map(o => o.encargado_name).filter(Boolean))].sort();
+  const encargadosUnicos = coordinatorOptions(obras, coordinatorContacts);
   if (selectedObra) {
     const mapsEmbedApiKey = import.meta.env.VITE_GOOGLE_MAPS_EMBED_API_KEY?.trim();
     const hasCoordinates = selectedObra.latitude != null && selectedObra.longitude != null;
@@ -655,7 +658,7 @@ export default function MisObras() {
             className="h-9 rounded-xl border border-slate-200 px-3 text-xs bg-white text-slate-700 font-semibold shadow-sm focus:outline-none"
           >
             <option value="">Coordinador: Todos</option>
-            {encargadosUnicos.map(e => <option key={e} value={e!}>{e}</option>)}
+            {encargadosUnicos.map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
           </select>
         )}
         

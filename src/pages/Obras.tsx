@@ -1,3 +1,5 @@
+import { coordinatorEntry, coordinatorOptions } from '../lib/coordinatorDirectory';
+import { useCoordinatorContacts } from '../hooks/useCoordinatorContacts';
 import { hasStoredCoordinates } from '../components/operations/operationsFeatures';
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
@@ -26,6 +28,7 @@ interface Obra {
 }
 
 export default function Obras() {
+  const coordinatorContacts = useCoordinatorContacts();
   const { profile } = useAuthStore();
   const isAdmin = profile?.role === 'admin' || profile?.role === 'logistica';
   const [obras, setObras] = useState<Obra[]>([]);
@@ -252,13 +255,13 @@ export default function Obras() {
       (o.address || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (o.code || '').toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchManager = !filterManager || o.encargado_name === filterManager;
+    const matchManager = !filterManager || coordinatorEntry(o, coordinatorContacts).value === filterManager;
     const matchActive = !filterActive || (filterActive === 'true' ? o.active : !o.active);
     
     return matchSearch && matchManager && matchActive;
   });
 
-  const encargadosUnicos = [...new Set(obras.map(o => o.encargado_name).filter(Boolean))].sort().map(e => ({ value: e!, label: e! }));
+  const encargadosUnicos = coordinatorOptions(obras, coordinatorContacts);
 
   return (
     <div className="space-y-6">
