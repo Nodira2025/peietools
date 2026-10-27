@@ -13,6 +13,7 @@ import { useAuthStore } from '../store/auth';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import FilterBar from '../components/FilterBar';
 import CoordinatorPicker from '../components/CoordinatorPicker';
+import WorksiteAddressSearch from '../components/WorksiteAddressSearch';
 
 interface Obra {
   id: string;
@@ -52,6 +53,8 @@ export default function Obras() {
       (position) => {
         setLatitude(position.coords.latitude.toString());
         setLongitude(position.coords.longitude.toString());
+        setLocationError('');
+        setAllowPendingLocation(false);
         setCapturingGPS(false);
         toast({ title: 'Éxito', description: 'Coordenadas capturadas con éxito.' });
       },
@@ -76,6 +79,8 @@ export default function Obras() {
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
   const [active, setActive] = useState(true);
+  const [allowPendingLocation, setAllowPendingLocation] = useState(false);
+  const [locationError, setLocationError] = useState('');
 
   const fetchObras = async () => {
     try {
@@ -138,6 +143,8 @@ export default function Obras() {
     setManagerId(null);
     setManagerChanged(false);
     setManagerError('');
+    setAllowPendingLocation(false);
+    setLocationError('');
   };
 
   const handleOpenNew = () => {
@@ -159,12 +166,23 @@ export default function Obras() {
     setActive(obra.active !== false);
     setCurrentId(obra.id);
     setIsEditing(true);
+    setAllowPendingLocation(false);
+    setLocationError('');
     setIsDialogOpen(true);
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (saving) return;
+    const hasCoordinates = hasStoredCoordinates({latitude: latitude.trim() ? Number(latitude) : null, longitude: longitude.trim() ? Number(longitude) : null});
+    if ((latitude.trim() || longitude.trim()) && !hasCoordinates) {
+      setLocationError('Ingresá una latitud y longitud válidas, o borrá ambas para dejar la ubicación pendiente.');
+      return;
+    }
+    if (address.trim() && !hasCoordinates && !allowPendingLocation) {
+      setLocationError('Ubicá el domicilio en el mapa o marcá «Guardar con ubicación pendiente».');
+      return;
+    }
     if (managerChanged && manager.trim() && !managerId) {
       setManagerError('Seleccioná un usuario de las coincidencias antes de guardar.');
       toast({ variant: 'destructive', title: 'Elegí un usuario', description: 'Seleccioná un coordinador o administrador de las coincidencias antes de guardar.' });
@@ -192,15 +210,15 @@ export default function Obras() {
 
       let error;
       if (isEditing && currentId) {
-        const { error: updateError } = await supabase.from('obras').update(payload).eq('id', currentId);
+        const { error: updateError } = await supabase.from('obras').update(payload).eq('id', currentId).select('id').single();
         error = updateError;
       } else {
-        const { error: insertError } = await supabase.from('obras').insert([payload]);
+        const { error: insertError } = await supabase.from('obras').insert([payload]).select('id').single();
         error = insertError;
       }
 
       if (error) {
-        toast({ variant: 'destructive', title: 'Error', description: error.message });
+        toast({ variant: 'destructive', title: 'No se pudo guardar la obra', description: ['42501','PGRST116'].includes(error.code) ? 'La base no confirmó el guardado. Revisá los permisos de tu cuenta para crear o editar obras.' : error.message });
       } else {
         toast({ title: 'Éxito', description: isEditing ? 'Obra actualizada correctamente' : 'Obra creada correctamente' });
         setIsDialogOpen(false);
@@ -292,7 +310,12 @@ export default function Obras() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="address">Dirección</Label>
-                <Input id="address" value={address} onChange={e => setAddress(e.target.value)} />
+                <Input id="address" value={address} placeholder="Calle, altura y localidad" onChange={e => {
+                  setAddress(e.target.value); setLatitude(''); setLongitude(''); setAllowPendingLocation(false); setLocationError('El domicilio cambió. Volvé a ubicarlo para actualizar el mapa.');
+                }} />
+                <WorksiteAddressSearch key={`${currentId || 'new'}:${address}`} address={address} onSelect={match => {
+                  setLatitude(String(match.latitude)); setLongitude(String(match.longitude)); setLocationError(''); setAllowPendingLocation(false);
+                }} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="manager">Coordinador</Label>
@@ -327,6 +350,12 @@ export default function Obras() {
                   <Input id="longitude" type="number" step="any" value={longitude} onChange={e => setLongitude(e.target.value)} />
                 </div>
               </div>
+              {!(latitude && longitude && hasStoredCoordinates({latitude:Number(latitude),longitude:Number(longitude)})) && <div className="flex items-center space-x-2 pt-2">
+                <input type="checkbox" id="pending-location" checked={allowPendingLocation} onChange={event => { setAllowPendingLocation(event.target.checked); setLocationError(''); }} />
+                <Label htmlFor="pending-location" className="font-normal">Guardar con ubicación pendiente (no aparecerá en el mapa)</Label>
+              </div>}
+              {latitude && longitude && hasStoredCoordinates({latitude:Number(latitude),longitude:Number(longitude)}) && <a className="block text-sm text-blue-700 underline" href={`https://www.google.com/maps?q=${encodeURIComponent(`${latitude},${longitude}`)}`} target="_blank" rel="noreferrer">Verificar ubicación seleccionada en el mapa</a>}
+              {locationError && <p role="alert" className="text-sm text-amber-800">{locationError}</p>}
               <div className="flex items-center space-x-2 pt-2">
                 <input 
                   type="checkbox" 

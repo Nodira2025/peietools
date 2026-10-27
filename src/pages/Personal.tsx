@@ -283,13 +283,18 @@ export default function Personal() {
 
     setProfileUpdating(true);
     try {
-      const { error } = await supabase
+      const { data: deleted, error } = await supabase
         .from('empleados')
         .delete()
-        .eq('id', selectedEmpForProfile.id);
+        .eq('id', selectedEmpForProfile.id)
+        .select('id');
 
       if (error) {
-        toast({ variant: 'destructive', title: 'Error al eliminar', description: error.message });
+        toast({ variant: 'destructive', title: 'No se pudo eliminar', description: error.code === '23503'
+          ? 'Este operario tiene movimientos o registros asociados. No se borró su historial. Revisá su baja con Administración.'
+          : error.code === '42501' ? 'Tu cuenta no tiene permiso para eliminar operarios.' : error.message });
+      } else if (!deleted?.length) {
+        toast({ variant: 'destructive', title: 'No se eliminó el operario', description: 'La base no confirmó la eliminación. Revisá los permisos de tu cuenta o actualizá el listado.' });
       } else {
         toast({ title: 'Empleado eliminado', description: 'El operario fue removido del sistema.' });
         setIsProfileOpen(false);
