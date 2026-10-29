@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Edit, Truck, AlertTriangle, MapPin, Navigation, Building2, Download, Camera, CheckCircle, Save, X, Trash2, Calendar, FileSpreadsheet, DollarSign, Wrench, Plus, Receipt, Sparkles, History } from 'lucide-react';
+import { Archive, ArrowLeft, Edit, Truck, AlertTriangle, MapPin, Navigation, Building2, Download, Camera, CheckCircle, Save, X, Trash2, Calendar, FileSpreadsheet, DollarSign, Wrench, Plus, Receipt, Sparkles, History } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 import { useAuthStore } from '../store/auth';
@@ -366,49 +366,28 @@ export default function HerramientaDetail() {
     }
   };
 
-  const handleDeleteHerramienta = async () => {
-    if (!herramienta) return;
-    const confirmDelete = window.confirm(`¿Estás seguro de que deseas eliminar permanentemente la herramienta "${herramienta.name}" (${herramienta.code}) y todo su historial relacionado (movimientos, solicitudes, mantenimientos)? Esta acción no se puede deshacer.`);
-    if (!confirmDelete) return;
-
-    setLoading(true);
-
+  const handleDeactivateHerramienta = async () => {
+    if (!herramienta || !isAdmin || saving) return;
+    if (!window.confirm(`¿Dar de baja a "${herramienta.name}" (${herramienta.code})? Pasará a Fuera de servicio y aparecerá en Dados de baja. Se conservarán su ficha, movimientos, solicitudes y mantenimientos.`)) return;
+    setSaving(true);
     try {
-      // 1. Eliminar movimientos asociados
-      const { error: errorMov } = await supabase
-        .from('movimientos')
-        .delete()
-        .eq('herramienta_id', herramienta.id);
-      if (errorMov) throw new Error(`Historial de movimientos: ${errorMov.message}`);
-
-      // 2. Eliminar solicitudes asociadas
-      const { error: errorSol } = await supabase
-        .from('solicitudes')
-        .delete()
-        .eq('herramienta_id', herramienta.id);
-      if (errorSol) throw new Error(`Solicitudes de traslado: ${errorSol.message}`);
-
-      // 3. Eliminar mantenimientos asociados
-      const { error: errorMant } = await supabase
-        .from('mantenimientos')
-        .delete()
-        .eq('herramienta_id', herramienta.id);
-      if (errorMant) throw new Error(`Historial de mantenimiento: ${errorMant.message}`);
-
-      // 4. Eliminar herramienta
-      const { error: errorHerr } = await supabase
-        .from('herramientas')
-        .delete()
-        .eq('id', herramienta.id);
-      if (errorHerr) throw new Error(`Ficha de herramienta: ${errorHerr.message}`);
-
-      toast({ title: 'Éxito', description: 'La herramienta y todo su historial han sido eliminados.' });
-      navigate('/herramientas');
+      const { data, error } = await supabase.from('herramientas')
+        .update({ status: 'Fuera de servicio' }).eq('id', herramienta.id).select('id, status').single();
+      if (error) throw error;
+      if (data?.id !== herramienta.id || data.status !== 'Fuera de servicio') throw new Error('La base no confirmó la baja. Revisá los permisos e intentá nuevamente.');
+      notifyCatalogChanged();
+      const { error: historyError } = await supabase.from('movimientos').insert({
+        herramienta_id: herramienta.id, user_id: profile?.id,
+        action: 'Herramienta dada de baja (Fuera de servicio)',
+        notes: 'Baja por ' + (profile?.full_name || 'Administración') + '. Se conserva el historial anterior.',
+      });
+      toast({ title: 'Herramienta dada de baja', description: historyError
+        ? 'La baja se guardó y el historial anterior se conserva, pero no se pudo agregar el movimiento de baja.'
+        : 'La ficha y todo su historial están disponibles en Dados de baja.' });
+      navigate('/dados-de-baja?tipo=herramientas');
     } catch (err: any) {
-      toast({ variant: 'destructive', title: 'Error al eliminar', description: err.message });
-    } finally {
-      setLoading(false);
-    }
+      toast({ variant: 'destructive', title: 'No se pudo dar de baja', description: err.message || 'Intentá nuevamente.' });
+    } finally { setSaving(false); }
   };
 
   const getStatusColor = (status: string) => {
@@ -729,6 +708,7 @@ export default function HerramientaDetail() {
             <Button
               className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold h-11 rounded-xl shadow-sm flex items-center justify-center gap-2 text-xs"
               onClick={() => setIsModalReservaOpen(true)}
+              disabled={herramienta.status === 'Fuera de servicio'}
             >
               <Calendar className="h-4 w-4" /> Reservar con Fecha (Agendar)
             </Button>
@@ -772,7 +752,7 @@ export default function HerramientaDetail() {
               <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-center">
                 <AlertTriangle className="mx-auto h-6 w-6 text-red-400 mb-1" />
                 <p className="text-xs text-red-600 font-semibold">
-                  {herramienta.status === 'Fuera de servicio' ? 'Herramienta reportada como ROTA' : 'Herramienta EN REPARACION'}
+                  {herramienta.status === 'Fuera de servicio' ? 'Fuera de servicio · Visible en Dados de baja' : 'Herramienta EN REPARACION'}
                 </p>
               </div>
             )}
@@ -841,15 +821,17 @@ export default function HerramientaDetail() {
                 </div>
               </div>
             )}
-            {/* ELIMINAR HERRAMIENTA - solo admin */}
-            {isAdmin && (
+            {herramienta.status === 'Fuera de servicio' && <Button variant="outline" onClick={() => navigate('/dados-de-baja?tipo=herramientas')}>Ver Dados de baja</Button>}
+            {/* Baja conservando todos los registros relacionados. */}
+            {isAdmin && herramienta.status !== 'Fuera de servicio' && (
               <div className="pt-2 border-t border-slate-100 mt-2">
                 <Button 
                   variant="outline"
                   className="w-full text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 font-bold h-11 rounded-xl"
-                  onClick={handleDeleteHerramienta}
+                  onClick={handleDeactivateHerramienta}
+                  disabled={saving}
                 >
-                  <Trash2 className="mr-2 h-4 w-4" /> Eliminar Herramienta
+                  <Archive className="mr-2 h-4 w-4" /> Dar de baja
                 </Button>
               </div>
             )}

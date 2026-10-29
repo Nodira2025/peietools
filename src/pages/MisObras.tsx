@@ -95,7 +95,7 @@ export default function MisObras() {
     }
 
     // Obtener counts de herramientas y empleados
-    const { data: toolsData } = await supabase.from('herramientas').select('current_obra_id');
+    const { data: toolsData } = await supabase.from('herramientas').select('current_obra_id').neq('status', 'Fuera de servicio');
     const { data: empsData } = await supabase.from('empleados').select('obra_id').eq('active', true);
 
     const toolsMap = (toolsData || []).reduce((acc: any, t: any) => {
@@ -181,6 +181,7 @@ export default function MisObras() {
     const { data: tools } = await supabase
       .from('herramientas')
         .select('id, name, code, brand, status')
+      .neq('status', 'Fuera de servicio')
       .eq('current_obra_id', obra.id)
       .order('name');
     setHerramientas(tools || []);

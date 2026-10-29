@@ -27,7 +27,7 @@ export async function loadObraCatalog(obra: CatalogObra, toolsOnly = false, sign
   }
   for (let offset = 0; ; offset += 500) {
     const result = await catalogRequest(abort => supabase.from('herramientas').select('id, name, code, brand, status')
-      .eq('current_obra_id', obra.id).order('name').order('id').range(offset, offset + 499).abortSignal(abort), signal);
+      .eq('current_obra_id', obra.id).neq('status', 'Fuera de servicio').order('name').order('id').range(offset, offset + 499).abortSignal(abort), signal);
     if (result.error) throw new Error('No se pudieron cargar las herramientas de ' + obra.name);
     tools.push(...(result.data || []).map(tool => ({ ...tool, photo_url: null })));
     if ((result.data?.length || 0) < 500) break;

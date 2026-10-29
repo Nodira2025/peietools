@@ -47,6 +47,7 @@ const Coordinadores = lazy(() => import('./pages/Coordinadores'));
 const PostulacionPublica = lazy(() => import('./pages/PostulacionPublica'));
 const Entrevistas = lazy(() => import('./pages/Entrevistas'));
 const PersonalDatos = lazy(() => import('./pages/PersonalDatos'));
+const DadosDeBaja = lazy(() => import('./pages/DadosDeBaja'));
 
 
 
@@ -144,6 +145,7 @@ export default function App() {
             } 
           />
           <Route path="/personal" element={<Personal />} />
+          <Route path="/dados-de-baja" element={<DadosDeBaja />} />
           <Route path="/personal-datos" element={
             <Suspense fallback={<LogoLoader fullScreen text="Cargando Personal Datos..." size="md" />}>
               <PersonalDatos />

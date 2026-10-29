@@ -93,7 +93,7 @@ export function ModalNuevaReserva({
   const cargarOpciones = async () => {
     try {
       const [resH, resO, resP] = await Promise.all([
-        supabase.from('herramientas').select('id, name, code').order('name'),
+        supabase.from('herramientas').select('id, name, code').neq('status', 'Fuera de servicio').order('name'),
         supabase.from('obras').select('id, name').order('name'),
         supabase.from('profiles').select('id, full_name').order('full_name'),
       ]);
@@ -170,6 +170,9 @@ export function ModalNuevaReserva({
 
     setGuardando(true);
     try {
+      const { data: tool, error: toolError } = await supabase.from('herramientas').select('status').eq('id', targetTool).single();
+      if (toolError || !tool) throw new Error('No se pudo verificar el estado actual de la herramienta. Intentá nuevamente.');
+      if (tool.status === 'Fuera de servicio') throw new Error('Esta herramienta está dada de baja / fuera de servicio y no se puede reservar.');
       const res = await crearReservaHerramienta({
         herramienta_id: targetTool,
         solicitante_id: profile.id,

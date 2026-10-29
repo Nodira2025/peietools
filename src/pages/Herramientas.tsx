@@ -46,7 +46,7 @@ const statusStyle = (status: string) => ({
 function cachedInventory(): Herramienta[] {
   try {
     const rows: unknown = JSON.parse(localStorage.getItem('peie_cache_herramientas') || '[]');
-    return Array.isArray(rows) && rows.every(row => row && typeof row.id === 'string' && typeof row.name === 'string' && typeof row.code === 'string') ? rows : [];
+    return Array.isArray(rows) && rows.every(row => row && typeof row.id === 'string' && typeof row.name === 'string' && typeof row.code === 'string') ? rows.filter(row => row.status !== 'Fuera de servicio') : [];
   } catch { return []; }
 }
 
@@ -85,6 +85,7 @@ export default function Herramientas() {
       for (let offset = 0; ; offset += 500) {
         const { data, error } = await supabase.from('herramientas')
           .select('id, code, name, brand, model, description, status, category, current_obra_id, obras(name, encargado_name, coordinador_id)')
+          .neq('status', 'Fuera de servicio')
           .order('id').range(offset, offset + 499);
         if (error) throw error;
         rows.push(...(data || []).map(row => ({
@@ -198,6 +199,7 @@ export default function Herramientas() {
       </div>
     </div>
 
+    <Button variant="outline" onClick={() => navigate('/dados-de-baja?tipo=herramientas')}>Dados de baja / Fuera de servicio</Button>
     <div className="space-y-2 sm:space-y-3">
       <div className="flex gap-1 sm:gap-2">
         <div className="relative flex-1 min-w-0"><Search className="absolute left-2 top-2.5 sm:top-3.5 h-4 w-4 text-slate-400" /><Input aria-label="Buscar herramientas" placeholder="Buscar herramienta..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="h-9 sm:h-11 pl-7 text-sm rounded-lg" /></div>

@@ -722,6 +722,7 @@ export default function Personal() {
 
   return (
     <div className="space-y-5 pb-safe">
+      <Button variant="outline" onClick={() => navigate('/dados-de-baja?tipo=personal')}>Dados de baja</Button>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-peie-blue">Personal</h1>

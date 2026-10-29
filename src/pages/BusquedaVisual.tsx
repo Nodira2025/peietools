@@ -207,7 +207,7 @@ export default function BusquedaVisual() {
   useEffect(() => {
     async function loadData() {
       const [toolsRes, obrasRes] = await Promise.all([
-        supabase.from('herramientas').select('*, obras(name)'),
+        supabase.from('herramientas').select('*, obras(name)').neq('status', 'Fuera de servicio'),
         supabase.from('obras').select('id, name').eq('active', true).order('name')
       ]);
       if (toolsRes.data) {

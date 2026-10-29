@@ -121,7 +121,7 @@ export default function Dashboard() {
           // Active sites in DB
           supabase.from('obras').select('id, encargado_name').eq('active', true),
           // All tools locations
-          supabase.from('herramientas').select('current_obra_id'),
+          supabase.from('herramientas').select('current_obra_id').neq('status', 'Fuera de servicio'),
           // All employees locations
           supabase.from('empleados').select('obra_id').eq('active', true)
         ]);
