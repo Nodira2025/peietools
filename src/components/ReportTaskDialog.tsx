@@ -31,7 +31,7 @@ export default function ReportTaskDialog({ open: isReportOpen, onOpenChange: set
       try {
         const [{ data: profilesData, error: profilesError }, { data: electricistasData, error: employeesError }] = await Promise.all([
           supabase.from('profiles').select('id, full_name, role, whatsapp').eq('active', true).order('full_name'),
-          supabase.from('empleados').select('id, full_name, specialty, whatsapp').order('full_name'),
+          supabase.from('empleados').select('id, full_name, specialty, whatsapp').eq('active', true).order('full_name'),
         ]);
         if (profilesError) throw profilesError;
         if (employeesError) throw employeesError;

@@ -30,6 +30,7 @@ try {
     page.setDefaultTimeout(15000);
     const calls = [];
     const errors = [];
+    let employeeActive = true;
     let saved = { empleado_id: 'worker-1', dni: '30123456', domicilio: 'Domicilio de prueba', legajo: 'P-1' };
     page.on('pageerror', error => errors.push(error.message));
     await context.routeWebSocket('wss://*.supabase.co/**', () => {});
@@ -39,9 +40,16 @@ try {
       if (!url.hostname.endsWith('.supabase.co')) return route.abort();
       const table = url.pathname.split('/').at(-1);
       const method = route.request().method();
-      calls.push({ table, method, payload: route.request().postDataJSON() });
+      calls.push({ table, method, payload: route.request().postDataJSON(), query: url.searchParams.toString() });
       let data = [];
       if (table === 'empleados') data = [{ id: 'worker-1', full_name: 'Trabajador de prueba', specialty: 'Oficial', whatsapp: '3810000000', obra_id: 'work-1', photo_url: null, status: 'Trabajando', obras: { name: 'Obra de prueba', encargado_name: null } }];
+      if (table === 'empleados') {
+        if (method === 'PATCH' && route.request().postDataJSON()?.active === false) {
+          if (options.denied) return route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ code: '42501', message: 'Denied' }) });
+          if (options.emptyUpdate) data = [];
+          else { employeeActive = false; data = [{ id: 'worker-1', active: false }]; }
+        } else if (method === 'GET' && url.searchParams.get('active') === 'eq.true' && !employeeActive) data = [];
+      }
       if (table === 'obras') data = [{ id: 'work-1', name: 'Obra de prueba', active: true }];
       if (table === 'empleados_legajos') {
         if (options.unavailable) return route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ code: 'PGRST205', message: 'Missing table' }) });
@@ -59,6 +67,36 @@ try {
     finally { await context.close(); }
   }
 
+  await test('baja preserves records and removes the worker from the active list after reload', async (page, calls) => {
+    await page.goto(`${origin}personal`);
+    await page.getByRole('button', { name: 'Ver', exact: true }).click();
+    page.once('dialog', dialog => dialog.accept());
+    await page.getByRole('button', { name: 'Dar de baja', exact: true }).click();
+    await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    assert.ok(calls.some(call => call.method === 'PATCH' && call.table === 'empleados' && JSON.stringify(call.payload) === '{"active":false}'));
+    assert.ok(!calls.some(call => call.method === 'DELETE'));
+    await page.reload();
+    await page.getByRole('button', { name: 'Todos 0', exact: true }).waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Ver', exact: true }).count(), 0);
+  }, { mobile: true });
+  await test('cancelled baja leaves employee unchanged', async (page, calls) => {
+    await page.goto(`${origin}personal`);
+    await page.getByRole('button', { name: 'Ver', exact: true }).click();
+    page.once('dialog', dialog => dialog.dismiss());
+    await page.getByRole('button', { name: 'Dar de baja', exact: true }).click();
+    assert.ok(!calls.some(call => call.method === 'PATCH' || call.method === 'DELETE'));
+    assert.ok(await page.getByRole('dialog').isVisible());
+  });
+  for (const scenario of [{ denied: true, title: 'No se pudo dar de baja' }, { emptyUpdate: true, title: 'Baja no confirmada' }]) {
+    await test(`failed baja: ${scenario.title}`, async page => {
+      await page.goto(`${origin}personal`);
+      await page.getByRole('button', { name: 'Ver', exact: true }).click();
+      page.once('dialog', dialog => dialog.accept());
+      await page.getByRole('button', { name: 'Dar de baja', exact: true }).click();
+      await page.getByText(scenario.title, { exact: true }).first().waitFor();
+      assert.ok(await page.getByRole('dialog').isVisible());
+    }, scenario);
+  }
   await test('Personal retains the basic profile and never requests private records', async (page, calls) => {
     await page.goto(`${origin}personal`);
     await page.getByRole('button', { name: 'Ver', exact: true }).click();
@@ -73,7 +111,7 @@ try {
     await page.getByRole('button', { name: 'Nuevo Operario', exact: true }).click();
     assert.equal(await page.getByRole('dialog').getByRole('textbox').count(), 3);
     await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
-    await page.getByRole('link', { name: 'Personal Datos', exact: true }).click();
+    await page.goto(`${origin}personal-datos`);
     await page.getByRole('heading', { name: 'Personal Datos', exact: true }).waitFor();
   });
   await test('Personal Datos reads and saves the existing private record only', async (page, calls) => {

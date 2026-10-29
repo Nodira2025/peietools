@@ -93,7 +93,7 @@ export default function Obras() {
       ] = await Promise.all([
         supabase.from('obras').select('*').order('name'),
         supabase.from('herramientas').select('current_obra_id'),
-        supabase.from('empleados').select('obra_id')
+        supabase.from('empleados').select('obra_id').eq('active', true)
       ]);
 
       if (obrasError) throw obrasError;

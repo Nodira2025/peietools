@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { HardHat, Search, Clock, Camera, Plus, Trash2, Edit2, Check, Download, FileImage, FileSpreadsheet, X, Maximize2 } from 'lucide-react';
+import { HardHat, Search, Clock, Camera, Plus, UserMinus, Edit2, Check, Download, FileImage, FileSpreadsheet, X, Maximize2 } from 'lucide-react';
 
 import { useAuthStore } from '../store/auth';
 import { compressImage } from '../lib/imageUtils';
@@ -276,32 +276,31 @@ export default function Personal() {
   };
 
 
-  const handleDeleteEmployee = async () => {
-    if (!selectedEmpForProfile) return;
-    const confirmDelete = window.confirm(`¿Estás seguro de que querés eliminar a ${selectedEmpForProfile.full_name}? Esta acción no se puede deshacer.`);
-    if (!confirmDelete) return;
+  const handleDeactivateEmployee = async () => {
+    if (!selectedEmpForProfile || !isAdmin || profileUpdating) return;
+    const confirmed = window.confirm(`¿Dar de baja a ${selectedEmpForProfile.full_name}? Dejará de aparecer en el personal activo. Se conservarán su ficha, movimientos y registros anteriores.`);
+    if (!confirmed) return;
 
     setProfileUpdating(true);
     try {
-      const { data: deleted, error } = await supabase
+      const { data: updated, error } = await supabase
         .from('empleados')
-        .delete()
+        .update({ active: false })
         .eq('id', selectedEmpForProfile.id)
-        .select('id');
+        .select('id, active');
 
       if (error) {
-        toast({ variant: 'destructive', title: 'No se pudo eliminar', description: error.code === '23503'
-          ? 'Este operario tiene movimientos o registros asociados. No se borró su historial. Revisá su baja con Administración.'
-          : error.code === '42501' ? 'Tu cuenta no tiene permiso para eliminar operarios.' : error.message });
-      } else if (!deleted?.length) {
-        toast({ variant: 'destructive', title: 'No se eliminó el operario', description: 'La base no confirmó la eliminación. Revisá los permisos de tu cuenta o actualizá el listado.' });
+        toast({ variant: 'destructive', title: 'No se pudo dar de baja', description: error.code === '42501'
+          ? 'Tu cuenta no tiene permiso para dar de baja operarios.' : error.message });
+      } else if (!updated?.some(employee => employee.id === selectedEmpForProfile.id && employee.active === false)) {
+        toast({ variant: 'destructive', title: 'Baja no confirmada', description: 'La base no confirmó la baja. Revisá los permisos de tu cuenta o actualizá el listado.' });
       } else {
-        toast({ title: 'Empleado eliminado', description: 'El operario fue removido del sistema.' });
+        toast({ title: 'Operario dado de baja', description: 'Ya no aparece en el personal activo. Su ficha e historial se conservaron.' });
         setIsProfileOpen(false);
-        fetchData();
+        await fetchData();
       }
     } catch (err) {
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo eliminar al empleado.' });
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo dar de baja al operario.' });
     } finally {
       setProfileUpdating(false);
     }
@@ -319,6 +318,7 @@ export default function Personal() {
     const { data: empData, error: empError } = await supabase
       .from('empleados')
       .select('id, full_name, obra_id, status, specialty, photo_url, whatsapp, obras:obra_id(name, encargado_name)')
+      .eq('active', true)
       .order('full_name');
       
     if (empError) {
@@ -1342,12 +1342,12 @@ export default function Personal() {
             {isAdmin && (
               <Button
                 variant="ghost"
-                onClick={handleDeleteEmployee}
+                onClick={handleDeactivateEmployee}
                 disabled={profileUpdating}
                 className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-xl font-extrabold text-xs px-3 flex items-center gap-1"
               >
-                <Trash2 className="h-3.5 w-3.5" />
-                <span>Eliminar</span>
+                <UserMinus className="h-3.5 w-3.5" />
+                <span>Dar de baja</span>
               </Button>
             )}
             <div className="flex gap-2 ml-auto">

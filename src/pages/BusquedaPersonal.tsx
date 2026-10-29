@@ -104,7 +104,7 @@ export default function BusquedaPersonal() {
   useEffect(() => {
     async function loadData() {
       const [empRes, obrasRes] = await Promise.all([
-        supabase.from('empleados').select('*, obras(name)'),
+        supabase.from('empleados').select('*, obras(name)').eq('active', true),
         supabase.from('obras').select('id, name').eq('active', true).order('name')
       ]);
       

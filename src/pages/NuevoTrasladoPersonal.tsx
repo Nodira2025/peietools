@@ -80,6 +80,7 @@ export default function NuevoTrasladoPersonal() {
       .from('empleados')
       .select('id, full_name, obra_id, status, active, obras:obra_id(name, encargado_name)')
       .eq('id', id)
+      .eq('active', true)
       .single();
 
     if (empError) {

@@ -123,7 +123,7 @@ export default function Dashboard() {
           // All tools locations
           supabase.from('herramientas').select('current_obra_id'),
           // All employees locations
-          supabase.from('empleados').select('obra_id')
+          supabase.from('empleados').select('obra_id').eq('active', true)
         ]);
 
 

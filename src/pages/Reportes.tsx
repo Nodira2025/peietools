@@ -237,7 +237,7 @@ export default function Reportes() {
 
 
       // Load employee counts
-      const { data: empData } = await supabase.from('empleados').select('id, status');
+      const { data: empData } = await supabase.from('empleados').select('id, status').eq('active', true);
       if (empData) {
         setTotalEmpleados(empData.length);
         setEmpleadosDisponibles(empData.filter(e => e.status === 'Disponible' || e.status === 'Libre').length);
