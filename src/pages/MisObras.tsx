@@ -242,6 +242,11 @@ export default function MisObras() {
     const matchActive = !filterActive || (filterActive === 'true' ? o.active : !o.active);
     
     return matchSearch && matchEncargado && matchActive;
+  }).sort((a, b) => {
+    const aHasPersonal = (a.empCount || 0) > 0;
+    const bHasPersonal = (b.empCount || 0) > 0;
+    if (aHasPersonal !== bHasPersonal) return aHasPersonal ? -1 : 1;
+    return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
   });
 
   const encargadosUnicos = coordinatorOptions(obras, coordinatorContacts);
